@@ -1,0 +1,89 @@
+% visstyle.sty -- a small, self-contained two-column style approximating the
+% IEEE VGTC / PacificVis short-paper layout using only base TeX Live packages.
+%
+% This exists so the paper builds on a stock `texlive-latex-recommended`
+% installation: vgtc.cls and IEEEtran.cls are not always packaged, and a paper
+% that cannot be compiled by a reviewer is not reproducible. Swap the
+% documentclass for vgtc.cls at camera-ready time.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{visstyle}[2026/08/08 Lightweight VGTC-like short paper style]
+
+\RequirePackage[letterpaper,top=1.0in,bottom=1.0in,left=0.75in,right=0.75in,
+                columnsep=0.25in]{geometry}
+\RequirePackage{mathptmx}
+\RequirePackage[T1]{fontenc}
+\RequirePackage[utf8]{inputenc}
+\RequirePackage{microtype}
+\RequirePackage{graphicx}
+\RequirePackage{booktabs}
+\RequirePackage{tabularx}
+\RequirePackage{xcolor}
+\RequirePackage{amsmath}
+\RequirePackage{cite}
+\RequirePackage[font=small,labelfont=bf,skip=4pt]{caption}
+\RequirePackage{url}
+\RequirePackage[hidelinks,breaklinks]{hyperref}
+
+\definecolor{vislink}{RGB}{0,80,150}
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=vislink,urlcolor=vislink}
+
+% --- Body text: 9pt on 10pt, VGTC-like -------------------------------------
+\renewcommand{\normalsize}{\fontsize{9}{10}\selectfont}
+\renewcommand{\small}{\fontsize{8}{9}\selectfont}
+\renewcommand{\footnotesize}{\fontsize{8}{9}\selectfont}
+\renewcommand{\scriptsize}{\fontsize{7}{8}\selectfont}
+\normalsize
+
+% --- Section headings: small caps, tight spacing ---------------------------
+\RequirePackage{titlesec}
+\titleformat{\section}{\normalfont\fontsize{9}{10}\bfseries\scshape}{\thesection}{0.6em}{\uppercase}
+\titleformat{\subsection}{\normalfont\fontsize{9}{10}\bfseries}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}[runin]{\normalfont\fontsize{9}{10}\itshape}{}{0em}{}[.]
+\titlespacing*{\section}{0pt}{7pt plus 2pt minus 1pt}{3pt}
+\titlespacing*{\subsection}{0pt}{5pt plus 1pt minus 1pt}{2pt}
+\titlespacing*{\subsubsection}{0pt}{4pt plus 1pt}{0.5em}
+
+\setlength{\parindent}{1em}
+\setlength{\parskip}{0pt}
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
+\setlength{\abovecaptionskip}{4pt}
+\setlength{\belowcaptionskip}{0pt}
+
+% --- Title block -----------------------------------------------------------
+\newcommand{\vistitle}[1]{\gdef\@vistitle{#1}}
+\newcommand{\visauthor}[1]{\gdef\@visauthor{#1}}
+\newcommand{\visaffil}[1]{\gdef\@visaffil{#1}}
+\newcommand{\visteaser}[1]{\gdef\@visteaser{#1}}
+\gdef\@visteaser{}
+
+\renewcommand{\maketitle}{%
+  \twocolumn[%
+    \begin{@twocolumnfalse}
+      \begin{center}
+        {\fontsize{17}{20}\selectfont\bfseries\@vistitle\par}
+        \vspace{9pt}
+        {\fontsize{10}{12}\selectfont\@visauthor\par}
+        \vspace{3pt}
+        {\fontsize{9}{11}\selectfont\itshape\@visaffil\par}
+      \end{center}
+      \vspace{10pt}
+      \@visteaser
+      \vspace{6pt}
+    \end{@twocolumnfalse}
+  ]%
+}
+
+% --- Abstract / index terms ------------------------------------------------
+\renewenvironment{abstract}{%
+  \noindent\textbf{\scshape Abstract}\quad\ignorespaces
+}{\par\vspace{4pt}}
+
+\newenvironment{indexterms}{%
+  \noindent\textbf{\scshape Index Terms}\quad\ignorespaces
+}{\par\vspace{6pt}}
+
+% --- Convenience -----------------------------------------------------------
+\newcommand{\repo}[1]{\texttt{\small #1}}
+\endinput

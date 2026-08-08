@@ -1,0 +1,25 @@
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb
+*.run.xml
+*-blx.bib
+
+# Keep the built PDF out of the tree; it is produced by `make`
+paper/*.pdf
+
+# Python
+__pycache__/
+*.pyc
+.venv/
