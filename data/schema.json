@@ -1,0 +1,714 @@
+{
+  "path": "build/vega-lite-schema.json",
+  "releases": [
+    {
+      "tag": "v2.0.0",
+      "date": "2017-10-31",
+      "bytes": 314796,
+      "definitions": 170
+    },
+    {
+      "tag": "v2.0.1",
+      "date": "2017-11-05",
+      "bytes": 266070,
+      "definitions": 146
+    },
+    {
+      "tag": "v2.0.2",
+      "date": "2017-11-29",
+      "bytes": 270165,
+      "definitions": 146
+    },
+    {
+      "tag": "v2.0.3",
+      "date": "2017-12-01",
+      "bytes": 270173,
+      "definitions": 146
+    },
+    {
+      "tag": "v2.0.4",
+      "date": "2018-01-12",
+      "bytes": 270094,
+      "definitions": 146
+    },
+    {
+      "tag": "v2.1.0",
+      "date": "2018-01-25",
+      "bytes": 306289,
+      "definitions": 163
+    },
+    {
+      "tag": "v2.1.1",
+      "date": "2018-01-25",
+      "bytes": 306289,
+      "definitions": 163
+    },
+    {
+      "tag": "v2.1.2",
+      "date": "2018-01-25",
+      "bytes": 306289,
+      "definitions": 163
+    },
+    {
+      "tag": "v2.1.3",
+      "date": "2018-02-06",
+      "bytes": 314204,
+      "definitions": 164
+    },
+    {
+      "tag": "v2.2.0",
+      "date": "2018-03-06",
+      "bytes": 317197,
+      "definitions": 168
+    },
+    {
+      "tag": "v2.3.0",
+      "date": "2018-03-12",
+      "bytes": 324377,
+      "definitions": 167
+    },
+    {
+      "tag": "v2.3.1",
+      "date": "2018-03-12",
+      "bytes": 324377,
+      "definitions": 167
+    },
+    {
+      "tag": "2.4.0",
+      "date": "2018-04-24",
+      "bytes": 384916,
+      "definitions": 177
+    },
+    {
+      "tag": "v2.4.0",
+      "date": "2018-04-24",
+      "bytes": 384916,
+      "definitions": 177
+    },
+    {
+      "tag": "v2.4.1",
+      "date": "2018-04-25",
+      "bytes": 384916,
+      "definitions": 177
+    },
+    {
+      "tag": "v2.4.2",
+      "date": "2018-05-04",
+      "bytes": 385278,
+      "definitions": 177
+    },
+    {
+      "tag": "v2.4.3",
+      "date": "2018-05-05",
+      "bytes": 374162,
+      "definitions": 176
+    },
+    {
+      "tag": "v2.5.0",
+      "date": "2018-05-30",
+      "bytes": 389223,
+      "definitions": 182
+    },
+    {
+      "tag": "v2.5.1",
+      "date": "2018-06-04",
+      "bytes": 389223,
+      "definitions": 182
+    },
+    {
+      "tag": "v2.5.2",
+      "date": "2018-06-07",
+      "bytes": 389223,
+      "definitions": 182
+    },
+    {
+      "tag": "v2.6.0",
+      "date": "2018-07-02",
+      "bytes": 429587,
+      "definitions": 195
+    },
+    {
+      "tag": "v3.0.0",
+      "date": "2019-03-23",
+      "bytes": 668956,
+      "definitions": 291
+    },
+    {
+      "tag": "v3.0.1",
+      "date": "2019-03-25",
+      "bytes": 668851,
+      "definitions": 291
+    },
+    {
+      "tag": "v3.0.2",
+      "date": "2019-03-25",
+      "bytes": 664925,
+      "definitions": 284
+    },
+    {
+      "tag": "v3.0.3",
+      "date": "2019-03-27",
+      "bytes": 664947,
+      "definitions": 284
+    },
+    {
+      "tag": "v3.1.0",
+      "date": "2019-04-01",
+      "bytes": 670860,
+      "definitions": 286
+    },
+    {
+      "tag": "v3.2.0",
+      "date": "2019-04-13",
+      "bytes": 651024,
+      "definitions": 284
+    },
+    {
+      "tag": "v3.2.1",
+      "date": "2019-04-16",
+      "bytes": 650797,
+      "definitions": 284
+    },
+    {
+      "tag": "v3.3.0",
+      "date": "2019-05-26",
+      "bytes": 645155,
+      "definitions": 278
+    },
+    {
+      "tag": "v2.7.0",
+      "date": "2019-06-20",
+      "bytes": 429587,
+      "definitions": 195
+    },
+    {
+      "tag": "v3.4.0",
+      "date": "2019-07-25",
+      "bytes": 678330,
+      "definitions": 273
+    },
+    {
+      "tag": "v4.0.0",
+      "date": "2019-12-06",
+      "bytes": 791270,
+      "definitions": 348
+    },
+    {
+      "tag": "v4.0.2",
+      "date": "2019-12-12",
+      "bytes": 790991,
+      "definitions": 347
+    },
+    {
+      "tag": "v4.1.0",
+      "date": "2020-01-30",
+      "bytes": 822000,
+      "definitions": 353
+    },
+    {
+      "tag": "v4.1.1",
+      "date": "2020-02-01",
+      "bytes": 822000,
+      "definitions": 353
+    },
+    {
+      "tag": "v4.2.0",
+      "date": "2020-02-10",
+      "bytes": 835295,
+      "definitions": 367
+    },
+    {
+      "tag": "v4.3.0",
+      "date": "2020-02-13",
+      "bytes": 838697,
+      "definitions": 367
+    },
+    {
+      "tag": "v4.3.1",
+      "date": "2020-02-14",
+      "bytes": 838697,
+      "definitions": 367
+    },
+    {
+      "tag": "v4.4.0",
+      "date": "2020-02-19",
+      "bytes": 836579,
+      "definitions": 372
+    },
+    {
+      "tag": "v4.5.0",
+      "date": "2020-03-03",
+      "bytes": 834485,
+      "definitions": 370
+    },
+    {
+      "tag": "v4.5.1",
+      "date": "2020-03-03",
+      "bytes": 834485,
+      "definitions": 370
+    },
+    {
+      "tag": "v4.6.0",
+      "date": "2020-03-11",
+      "bytes": 839739,
+      "definitions": 368
+    },
+    {
+      "tag": "v4.7.0",
+      "date": "2020-03-13",
+      "bytes": 842703,
+      "definitions": 368
+    },
+    {
+      "tag": "v4.8.0",
+      "date": "2020-03-20",
+      "bytes": 874994,
+      "definitions": 376
+    },
+    {
+      "tag": "v4.8.1",
+      "date": "2020-03-22",
+      "bytes": 874994,
+      "definitions": 376
+    },
+    {
+      "tag": "v4.9.0",
+      "date": "2020-03-31",
+      "bytes": 973781,
+      "definitions": 395
+    },
+    {
+      "tag": "v4.10.0",
+      "date": "2020-04-06",
+      "bytes": 1001525,
+      "definitions": 400
+    },
+    {
+      "tag": "v4.10.1",
+      "date": "2020-04-06",
+      "bytes": 1001525,
+      "definitions": 400
+    },
+    {
+      "tag": "v4.10.2",
+      "date": "2020-04-09",
+      "bytes": 1009405,
+      "definitions": 400
+    },
+    {
+      "tag": "v4.10.3",
+      "date": "2020-04-13",
+      "bytes": 1009999,
+      "definitions": 400
+    },
+    {
+      "tag": "v4.10.4",
+      "date": "2020-04-13",
+      "bytes": 1009999,
+      "definitions": 400
+    },
+    {
+      "tag": "v4.10.5",
+      "date": "2020-04-20",
+      "bytes": 1010433,
+      "definitions": 400
+    },
+    {
+      "tag": "v4.11.0",
+      "date": "2020-04-21",
+      "bytes": 1011887,
+      "definitions": 400
+    },
+    {
+      "tag": "v4.12.0",
+      "date": "2020-05-05",
+      "bytes": 1041814,
+      "definitions": 393
+    },
+    {
+      "tag": "v4.12.1",
+      "date": "2020-05-15",
+      "bytes": 1041814,
+      "definitions": 393
+    },
+    {
+      "tag": "v4.12.2",
+      "date": "2020-05-19",
+      "bytes": 1044571,
+      "definitions": 393
+    },
+    {
+      "tag": "v4.13.0",
+      "date": "2020-05-29",
+      "bytes": 1044309,
+      "definitions": 394
+    },
+    {
+      "tag": "v4.13.1",
+      "date": "2020-06-04",
+      "bytes": 1044309,
+      "definitions": 394
+    },
+    {
+      "tag": "v4.14.0",
+      "date": "2020-07-22",
+      "bytes": 1603015,
+      "definitions": 389
+    },
+    {
+      "tag": "v4.14.1",
+      "date": "2020-07-29",
+      "bytes": 1603531,
+      "definitions": 389
+    },
+    {
+      "tag": "v4.15.0",
+      "date": "2020-09-01",
+      "bytes": 1600961,
+      "definitions": 389
+    },
+    {
+      "tag": "v4.16.0",
+      "date": "2020-09-23",
+      "bytes": 1813475,
+      "definitions": 397
+    },
+    {
+      "tag": "v4.16.1",
+      "date": "2020-09-23",
+      "bytes": 1813475,
+      "definitions": 397
+    },
+    {
+      "tag": "v4.16.2",
+      "date": "2020-09-23",
+      "bytes": 1813475,
+      "definitions": 397
+    },
+    {
+      "tag": "v4.16.3",
+      "date": "2020-09-26",
+      "bytes": 1813475,
+      "definitions": 397
+    },
+    {
+      "tag": "v4.16.4",
+      "date": "2020-09-26",
+      "bytes": 1813475,
+      "definitions": 397
+    },
+    {
+      "tag": "v4.16.5",
+      "date": "2020-09-26",
+      "bytes": 1813475,
+      "definitions": 397
+    },
+    {
+      "tag": "v4.16.6",
+      "date": "2020-09-26",
+      "bytes": 1813475,
+      "definitions": 397
+    },
+    {
+      "tag": "v4.16.7",
+      "date": "2020-09-26",
+      "bytes": 1813475,
+      "definitions": 397
+    },
+    {
+      "tag": "v4.16.8",
+      "date": "2020-09-29",
+      "bytes": 1813475,
+      "definitions": 397
+    },
+    {
+      "tag": "v4.17.0",
+      "date": "2020-10-13",
+      "bytes": 1813485,
+      "definitions": 397
+    },
+    {
+      "tag": "v5.0.0",
+      "date": "2021-02-24",
+      "bytes": 1700488,
+      "definitions": 384
+    },
+    {
+      "tag": "v5.1.0",
+      "date": "2021-04-16",
+      "bytes": 1713077,
+      "definitions": 391
+    },
+    {
+      "tag": "v5.1.1",
+      "date": "2021-09-06",
+      "bytes": 1712241,
+      "definitions": 392
+    },
+    {
+      "tag": "v5.2.0",
+      "date": "2021-11-23",
+      "bytes": 1787500,
+      "definitions": 396
+    },
+    {
+      "tag": "v5.3.0",
+      "date": "2022-07-04",
+      "bytes": 1789798,
+      "definitions": 396
+    },
+    {
+      "tag": "v5.4.0",
+      "date": "2022-07-25",
+      "bytes": 1789886,
+      "definitions": 397
+    },
+    {
+      "tag": "v5.5.0",
+      "date": "2022-08-15",
+      "bytes": 1790414,
+      "definitions": 397
+    },
+    {
+      "tag": "v5.6.0",
+      "date": "2022-10-14",
+      "bytes": 1791271,
+      "definitions": 397
+    },
+    {
+      "tag": "v5.6.1",
+      "date": "2023-02-13",
+      "bytes": 1791325,
+      "definitions": 397
+    },
+    {
+      "tag": "v5.7.0",
+      "date": "2023-04-14",
+      "bytes": 1791124,
+      "definitions": 397
+    },
+    {
+      "tag": "v5.7.1",
+      "date": "2023-04-17",
+      "bytes": 1791124,
+      "definitions": 397
+    },
+    {
+      "tag": "v5.8.0",
+      "date": "2023-05-01",
+      "bytes": 1802171,
+      "definitions": 411
+    },
+    {
+      "tag": "v5.9.0",
+      "date": "2023-05-05",
+      "bytes": 1805597,
+      "definitions": 412
+    },
+    {
+      "tag": "v5.9.1",
+      "date": "2023-05-15",
+      "bytes": 1805597,
+      "definitions": 412
+    },
+    {
+      "tag": "v5.9.2",
+      "date": "2023-05-16",
+      "bytes": 1805597,
+      "definitions": 412
+    },
+    {
+      "tag": "v5.9.3",
+      "date": "2023-05-18",
+      "bytes": 1806127,
+      "definitions": 413
+    },
+    {
+      "tag": "v5.10.0",
+      "date": "2023-06-20",
+      "bytes": 1806685,
+      "definitions": 414
+    },
+    {
+      "tag": "v5.11.0",
+      "date": "2023-06-21",
+      "bytes": 1807609,
+      "definitions": 414
+    },
+    {
+      "tag": "v5.11.1",
+      "date": "2023-06-26",
+      "bytes": 1807609,
+      "definitions": 414
+    },
+    {
+      "tag": "v5.12.0",
+      "date": "2023-06-29",
+      "bytes": 1815888,
+      "definitions": 416
+    },
+    {
+      "tag": "v5.13.0",
+      "date": "2023-07-06",
+      "bytes": 1816311,
+      "definitions": 416
+    },
+    {
+      "tag": "v5.14.0",
+      "date": "2023-07-19",
+      "bytes": 1816349,
+      "definitions": 416
+    },
+    {
+      "tag": "v5.14.1",
+      "date": "2023-07-20",
+      "bytes": 1816349,
+      "definitions": 416
+    },
+    {
+      "tag": "v5.15.0",
+      "date": "2023-09-13",
+      "bytes": 1817293,
+      "definitions": 416
+    },
+    {
+      "tag": "v5.15.1",
+      "date": "2023-10-02",
+      "bytes": 1817293,
+      "definitions": 416
+    },
+    {
+      "tag": "v5.16.0",
+      "date": "2023-10-09",
+      "bytes": 1817097,
+      "definitions": 416
+    },
+    {
+      "tag": "v5.16.1",
+      "date": "2023-10-12",
+      "bytes": 1817097,
+      "definitions": 416
+    },
+    {
+      "tag": "v5.16.2",
+      "date": "2023-11-08",
+      "bytes": 1817097,
+      "definitions": 416
+    },
+    {
+      "tag": "v5.16.3",
+      "date": "2023-11-09",
+      "bytes": 1817097,
+      "definitions": 416
+    },
+    {
+      "tag": "v5.17.0",
+      "date": "2024-03-11",
+      "bytes": 1817604,
+      "definitions": 416
+    },
+    {
+      "tag": "v5.18.0",
+      "date": "2024-04-09",
+      "bytes": 1818182,
+      "definitions": 416
+    },
+    {
+      "tag": "v5.18.1",
+      "date": "2024-05-07",
+      "bytes": 1818182,
+      "definitions": 416
+    },
+    {
+      "tag": "v5.19.0",
+      "date": "2024-06-13",
+      "bytes": 1846508,
+      "definitions": 452
+    },
+    {
+      "tag": "v5.20.0",
+      "date": "2024-07-30",
+      "bytes": 1847283,
+      "definitions": 452
+    },
+    {
+      "tag": "v5.20.1",
+      "date": "2024-07-31",
+      "bytes": 1847283,
+      "definitions": 452
+    },
+    {
+      "tag": "v5.21.0",
+      "date": "2024-08-28",
+      "bytes": 1847900,
+      "definitions": 452
+    },
+    {
+      "tag": "v5.23.0",
+      "date": "2024-12-11",
+      "bytes": 1873290,
+      "definitions": 456
+    },
+    {
+      "tag": "v6.0.0",
+      "date": "2025-03-28",
+      "bytes": 1879221,
+      "definitions": 458
+    },
+    {
+      "tag": "v6.0.1",
+      "date": "2025-03-28",
+      "bytes": 1879221,
+      "definitions": 458
+    },
+    {
+      "tag": "v6.0.2",
+      "date": "2025-03-28",
+      "bytes": 1879221,
+      "definitions": 458
+    },
+    {
+      "tag": "v6.1.0",
+      "date": "2025-03-28",
+      "bytes": 1879221,
+      "definitions": 458
+    },
+    {
+      "tag": "v6.2.0",
+      "date": "2025-06-27",
+      "bytes": 1879222,
+      "definitions": 458
+    },
+    {
+      "tag": "v6.3.1",
+      "date": "2025-09-09",
+      "bytes": 1879222,
+      "definitions": 458
+    },
+    {
+      "tag": "v6.4.0",
+      "date": "2025-09-17",
+      "bytes": 1879222,
+      "definitions": 458
+    },
+    {
+      "tag": "v6.4.1",
+      "date": "2025-09-23",
+      "bytes": 1879222,
+      "definitions": 458
+    },
+    {
+      "tag": "v6.4.2",
+      "date": "2026-01-13",
+      "bytes": 1879222,
+      "definitions": 458
+    },
+    {
+      "tag": "v6.4.3",
+      "date": "2026-04-24",
+      "bytes": 1879222,
+      "definitions": 458
+    }
+  ],
+  "tags_without_schema": 60
+}

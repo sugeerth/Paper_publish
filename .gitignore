@@ -16,10 +16,13 @@
 *.run.xml
 *-blx.bib
 
-# Keep the built PDF out of the tree; it is produced by `make`
-paper/*.pdf
+# paper/main.pdf is committed deliberately, so the paper can be read without a
+# TeX installation. Everything else LaTeX emits is build output.
 
 # Python
 __pycache__/
 *.pyc
 .venv/
+
+# Local clone cache for scripts/analyze_history.py
+.cache/

@@ -1,0 +1,335 @@
+\documentclass[9pt,twocolumn,letterpaper]{article}
+\usepackage{visstyle}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+\input{numbers}
+
+\vistitle{Who Maintains the Grammar?\\Bots, Bus Factors, and the Afterlife of Visualization Research Software}
+\visauthor{Anonymous Submission}
+\visaffil{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The visualization community increasingly ships software with its papers, and
+some of that software has become infrastructure that the rest of the field
+builds on. We know a good deal about whether research code is \emph{released};
+we know very little about whether it is \emph{maintained}. We mine the full
+commit histories of \ecorepos{} repositories in the Protovis\,$\rightarrow$\,D3\,%
+$\rightarrow$\,Vega\,$\rightarrow$\,Vega-Lite\,$\rightarrow$\,Mosaic lineage,
+together with ten comparison toolkits, and report four measurements. Effort is
+extraordinarily concentrated: \ecobusfifty{} people account for half of
+\ecocommits{} human commits by \ecohumans{} people. Human effort collapses
+rather than plateaus: Vega-Lite fell from \vlpeak{} human commits in
+\vlpeakyear{} to \vlrecent{} in the last twelve months, a \vldecline\% decline.
+Automation fills the vacuum: \vlbotshare\% of Vega-Lite's recent commits are
+written by bots, and in three sibling repositories bots write more than four
+commits in five. And award-winning artifacts go dormant early --- Voyager's
+last human commit predates its Test-of-Time award by four years. We argue that
+release-time reproducibility checks measure the wrong moment, and sketch a
+lightweight maintenance disclosure that would make the situation legible.
+\end{abstract}
+
+\begin{indexterms}
+Visualization software, research software engineering, repository mining,
+reproducibility, sustainability, grammars of graphics.
+\end{indexterms}
+
+\section{Introduction}
+
+A visualization paper that ships code is now the norm rather than the
+exception, and the community has built real machinery to encourage it: the
+Graphics Replicability Stamp Initiative, IEEE VIS Open Practices, and a
+growing literature on whether artifacts are available and whether they
+run~\cite{isenberg2024stamps}. That machinery evaluates a single instant --- the
+moment of publication. It asks whether the code was released and whether a
+reviewer could execute it.
+
+For most papers that is the right question, because most research prototypes
+are arguments rather than products. But a handful of systems escape that
+category. Vega-Lite~\cite{satyanarayan2017vegalite} is not merely a paper with
+an artifact attached; it is the substrate that a substantial part of the
+field's subsequent empirical work runs on, from natural-language charting
+interfaces to notebook toolchains. When a research system becomes
+infrastructure, availability at publication time stops being the interesting
+property. The interesting property is whether anyone is still there.
+
+Nobody has measured that. This paper does, for the best-documented lineage the
+visualization community has: five generations of published systems from one
+research group, each with its own paper at a visualization venue, spanning
+seventeen years of continuous version control. We mine the commit histories of
+\ecorepos{} repositories in that lineage plus ten widely-used comparison
+toolkits, and ask who is actually writing the commits.
+
+The answer is uncomfortable, and it is not simply a story of software aging.
+Our contributions are: (1) the first longitudinal measurement of maintenance
+effort across a visualization research lineage; (2) four principal findings --- extreme
+effort concentration, collapse rather than plateau of human contribution, bot
+substitution, and early dormancy of award-winning artifacts --- each quantified
+against comparison toolkits that show the pattern is contingent, not
+inevitable; and (3) a concrete, cheap proposal for making maintenance status
+visible at the moment readers actually need it.
+
+\section{Related Work}
+
+\subsubsection{Artifact availability}
+Isenberg's study of reproducibility stamps~\cite{isenberg2024stamps}
+characterizes how visualization papers release code and how that practice has
+spread. It is the closest neighbour to this work and, we think, exactly half of
+the picture: it measures release, we measure survival. The community has
+precedent for turning its own output into
+data~\cite{isenberg2017vispubdata,chen2021vis30k}, but it has aimed that
+instrument at papers and figures rather than at code.
+
+\subsubsection{Mining visualization artifacts}
+Prior work has mined visualization \emph{artifacts and usage}: corpora of D3
+visualizations crawled from the web~\cite{hoque2020searching}, Stack Overflow
+questions about D3, and studies of how Observable users decompose code. These
+treat the toolkit as a fixed backdrop and study what people make with it. We
+invert this and study the toolkit's own repository.
+
+\subsubsection{Sustainability in software engineering}
+Bus factor and contributor concentration are standard instruments in software
+engineering, as are studies of why open-source projects fail~%
+\cite{coelho2017fail,avelino2016truck,hassan2008road}. Concentration around one
+or two maintainers is unremarkable for open source in general. Our claim is not
+that the Vega ecosystem is unusual \emph{as open source}; it is that a field
+which has made this software load-bearing has never checked, and that the
+numbers are worse than the field's reliance on them would justify.
+
+\subsubsection{The research--practice gap}
+The VisGap workshop has convened at EuroVis annually since 2022 to discuss the
+distance between visualization research and visualization software. That
+discussion has been conducted almost entirely through position papers and
+experience reports. We offer it a quantitative baseline.
+
+\section{Corpus and Method}
+
+We study \ecorepos{} repositories from a single research lineage ---
+Protovis~\cite{bostock2009protovis}, D3~\cite{bostock2011d3},
+Vega~\cite{satyanarayan2016reactivevega},
+Vega-Lite~\cite{satyanarayan2017vegalite} and Mosaic~\cite{heer2024mosaic},
+plus the prototypes and support packages published alongside them
+(Lyra, Voyager~\cite{wongsuphasawat2016voyager}, Draco~\cite{moritz2019draco},
+Falcon, Altair~\cite{vanderplas2018altair}, and the editor, embed, tooltip and
+datasets packages) --- and ten comparison toolkits
+(Matplotlib~\cite{hunter2007matplotlib}, Bokeh, plotly.py, Chart.js,
+ECharts~\cite{li2018echarts}, deck.gl, ggplot2~\cite{wickham2010layered},
+Observable Plot, Gephi, and the ten \repo{d3-*} core modules analysed as one
+family). The lineage was chosen because it is the only case we know of in which
+every generation has a paper at a visualization venue, which makes research
+provenance a controlled property rather than a judgement call. It is also a
+lineage with an unusually explicit intellectual debt: each generation refines a
+grammar of graphics~\cite{wilkinson2005grammar} into executable form, which is
+part of why its artifacts became infrastructure rather than demonstrations.
+
+Each repository is cloned blobless and its full history walked with
+\repo{git log --no-merges}. Merge commits are excluded as bookkeeping. Author
+names are lower-cased and passed through a small, explicit alias table that
+merges handle/real-name pairs for the same person; this is the only manual
+judgement in the pipeline, and it is conservative in the direction that
+\emph{reduces} apparent concentration. Bot commits are identified by author
+name and reported separately rather than discarded, because their share is
+itself a result. All windows are measured against a pinned snapshot date of
+\snapshot{}, so re-running the analysis reproduces the numbers below rather
+than drifting.
+
+Commit counts are a crude proxy for effort, and we lean on them only for
+order-of-magnitude claims and for changes over time within a single repository,
+where the proxy's biases are at least stable. Section~\ref{sec:threats}
+revisits this.
+
+\begin{figure}[t]
+\centering
+\input{../figures/bots.tex}
+\caption{Commits to \repo{vega/vega-lite} per year, separated into human and
+automated authorship. Human contribution peaks in \vlpeakyear{} and declines by
+\vldecline\% to \vlrecent{} commits in the last twelve months; bots, absent
+before 2019, now write \vlbotshare\% of the repository's commits. The final bar
+covers a partial year, to the \snapshot{} snapshot.}
+\label{fig:bots}
+\end{figure}
+
+\section{Findings}
+
+\subsection{Half the ecosystem is three people}
+
+Across the \ecorepos{} lineage repositories there are \ecocommits{} human
+commits from \ecohumans{} distinct people. Half of that work was done by
+\ecobusfifty{} of them and eighty percent by \ecobuseighty{}; the top three
+contributors alone write \ecotopthree\% of all commits, and one person has
+committed to all \ecorepos{} repositories. In the last twelve months the whole
+ecosystem received \ecorecent{} human commits from \ecorecenthumans{} people.
+
+The D3 family is more concentrated still: of \dthreecommits{} human commits a
+single author wrote \dthreetop\%, and the last twelve months brought
+\dthreerecent{} human commits across all eleven repositories combined. Ten of
+the \repo{d3-*} core modules share a last human commit in 2023 or 2024.
+
+\subsection{Contribution collapses, it does not plateau}
+
+Figure~\ref{fig:bots} shows the shape of the decline. If Vega-Lite were simply
+a finished piece of software we would expect contribution to fall to a low,
+stable floor. Instead it falls by \vldecline\% from its \vlpeakyear{} peak and
+keeps falling, while the project's own backlog grows: at the snapshot date
+Vega-Lite had 718 open and 2{,}872 closed issues, a 20\% open ratio, against
+D3's 5 open issues.\footnote{Issue counts come from the GitHub API on the
+snapshot date and, unlike everything else reported here, are not reproducible
+from the git history; they are recorded in \repo{data/issues.json}.} D3 can
+reasonably be described as finished. A project with a fifth of its issues
+outstanding and two maintainers cannot.
+
+\subsection{Bots have replaced people}
+
+Before 2019 no commit in Vega-Lite was written by a bot. Bots reached 63\% of
+commits in 2021, and over the last twelve months they account for
+\vlbotshare\%. The pattern is sharper in the support packages that downstream
+users actually depend on: bots write 95.9\% of recent commits to
+\repo{vega-tooltip}, 87.8\% to \repo{vega-embed}, and 81.1\% to
+\repo{vega-datasets}. In three repositories the all-time leading committer is
+now Dependabot.
+
+This is not nothing --- dependency bumps are real maintenance, and a project
+whose bots keep running is in better shape than one whose bots have stopped.
+But it is maintenance that cannot triage an issue, review a design proposal, or
+decide what the grammar should mean.
+
+\subsection{The grammar stopped growing}
+
+Vega-Lite ships a machine-readable JSON Schema with every release, which makes
+its expressiveness measurable rather than arguable --- a property no other
+visualization grammar we know of provides. Across \schemareleases{} releases
+the schema grew from \schemafirstdefs{} definitions and \schemafirstkb\,KB at
+\schemafirsttag{} (\schemafirstyear{}, the release accompanying the paper) to
+\schemapeakdefs{} definitions and \schemalastmb\,MB --- and then stopped. The
+schema has been byte-identical across the last \schemafrozen{} releases, from
+\schemafrozenfrom{} (\schemafrozenfromdate{}) to \schemafrozento{}. Whatever the
+project is now doing, it is not extending the grammar.
+
+\begin{figure}[t]
+\centering
+\input{../figures/timeline.tex}
+\caption{Active lifetime of each published system in the lineage, from first
+commit to last commit by a human. Systems with no human commit in the twelve
+months before the snapshot are marked in grey. \ndormant{} of the
+\ntimeline{} are dormant by that measure, among them a best-paper winner
+(Draco) and a test-of-time winner (Voyager).}
+\label{fig:timeline}
+\end{figure}
+
+\subsection{Awards arrive after the lights go out}
+
+Figure~\ref{fig:timeline} places each published system on a timeline from its
+first commit to its last human commit. Of the \ntimeline{}, \ndormant{} have
+received no human commit in the last twelve months: Protovis since
+\protovislast{}, Lyra since \lyralast{}, Draco --- a best-paper winner --- since
+\dracolast{}, and Falcon since \falconlast{}.
+
+The sharpest case is Voyager~\cite{wongsuphasawat2016voyager}, which received
+the InfoVis Test-of-Time award in 2025. Its last human commit was
+\voyagerlast{}: the artifact had been dormant for four years at the moment the
+community honoured its durability. The award was for the ideas, and the ideas
+have indeed lasted. But the gap between what we celebrate and what we sustain
+is precisely the gap this paper is about.
+
+\subsection{The pattern is contingent, not inevitable}
+
+Table~\ref{tab:maintenance} makes clear that this is not simply what happens to
+ten-year-old visualization software. Matplotlib, older still and far larger,
+received \mplrecent{} human commits in the same twelve months with a bus factor
+of \mplbus{}. ECharts and Bokeh, both foundation- or company-governed,
+remain healthily active. What distinguishes them is not age or language but
+governance: they have an institutional home that outlives any individual
+contributor, and research-group software generally does not.
+
+Effort in the lineage has not disappeared so much as migrated. Mosaic, the
+newest generation, received \mosaicrecent{} human commits in the last twelve
+months --- more than Vega-Lite and Vega combined. The lab is still producing
+excellent research software. It is producing the \emph{next} one.
+
+\begin{table}[t]
+\centering
+\caption{Maintenance profile at \snapshot{}. \emph{Bus\,50} is the number of
+authors accounting for half of all human commits; \emph{Top} is the leading
+author's share; \emph{12mo} counts human commits in the last twelve months and
+\emph{Bot} the share of commits in that window written by bots.}
+\label{tab:maintenance}
+\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Repository & Commits & Authors & Bus\,50 & Top & 12mo & Bot \\
+\midrule
+\input{../figures/maintenance-table.tex}
+\end{tabular}
+\end{table}
+
+\section{Discussion}
+
+\subsubsection{We are measuring the wrong moment}
+Reproducibility stamps and artifact-availability checks certify a system at
+publication, when enthusiasm and funding are at their peak and the student who
+wrote it has not yet graduated. Every system in our corpus would have passed
+such a check. The information a reader needs in 2026 --- is this maintained, by
+whom, and should I build on it --- is exactly what the badge does not carry.
+
+\subsubsection{A maintenance disclosure}
+We propose something deliberately small, because proposals that require
+sustained volunteer labour are self-defeating given the finding above. Every
+number in this paper was computed from public git history by a script that runs
+in minutes. A venue could attach to each artifact a generated, dated line
+reporting human commits in the last twelve months, distinct recent authors, bot
+share, and date of last human commit --- and, critically, recompute it on the
+digital library page rather than freezing it at publication. This is not a
+quality judgement and should not be read as one. Dormant is not the same as
+bad: Protovis is dormant because D3 replaced it, which is a success. The point
+is to make the distinction between \emph{finished}, \emph{superseded} and
+\emph{abandoned} visible instead of leaving each reader to guess.
+
+\subsubsection{An honest tension}
+Researchers are rewarded for the next paper, not for the previous system's
+issue tracker, and we do not think individual authors are at fault here --- the
+migration of effort to Mosaic is exactly what the incentive structure asks for.
+If the community wants its infrastructure maintained, the realistic routes are
+institutional homes for the few systems that become load-bearing, or explicit
+acknowledgement that research software has a half-life and planning for
+succession rather than pretending otherwise.
+
+\section{Threats to Validity}
+\label{sec:threats}
+
+Commit counts measure activity, not value; a single well-judged commit can be
+worth a hundred. We use them for large ratios and within-repository trends
+rather than cross-project quality comparisons, but the proxy remains crude, and
+work that never reaches a commit --- issue triage, design review, user support
+--- is invisible to it. Our alias table merges identities we could confirm and
+will have missed others, which biases concentration \emph{downward}, making our
+central finding conservative. Bot classification by author name will
+misclassify humans committing through automation. The twelve-month window is a
+choice; a longer window softens the picture, a shorter one sharpens it.
+Finally, one lineage is not the field --- it is the best-documented case, not a
+random sample, and the comparison toolkits are a convenience sample of widely
+used projects rather than a systematic one. We report a pattern within a
+well-characterized corpus and do not claim it generalizes to visualization
+research software as a whole.
+
+\section{Conclusion}
+
+We measured who maintains the visualization community's most-used research
+software and found \ecobusfifty{} people behind half of it, human contribution
+down \vldecline\% in its flagship project, bots writing the majority of recent
+commits, a grammar that has stopped growing, and a test-of-time award given to
+an artifact that had been dormant for four years. Comparison with
+foundation-governed toolkits of the same age shows none of this is a law of
+software aging.
+
+Our field has taught itself to release code. The measurements here suggest the
+harder and now more urgent question is what happens in the decade afterwards.
+
+{\small
+\bibliographystyle{abbrv}
+\bibliography{refs}
+}
+
+\end{document}

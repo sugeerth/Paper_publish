@@ -1,0 +1,8 @@
+{
+  "_provenance": "Retrieved from the GitHub REST search API (issues, is:issue) on the snapshot date. Unlike data/repos.json these counts are NOT reproducible from the git clones, because issue state lives on GitHub rather than in the repository history. They are recorded here so the claim in the paper is auditable, and are reported in the paper as an API snapshot rather than as a mined measurement.",
+  "snapshot": "2026-08-08",
+  "repositories": {
+    "vega/vega-lite": { "open": 718, "closed": 2872 },
+    "d3/d3": { "open": 5, "closed": 2240 }
+  }
+}
