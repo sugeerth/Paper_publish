@@ -1,7 +1,7 @@
 LATEXMK := latexmk
 LATEXMKFLAGS := -pdf -interaction=nonstopmode -halt-on-error -file-line-error
 
-.PHONY: all paper figures history schema clean distclean watch
+.PHONY: all paper figures history schema clean distclean watch report
 
 all: figures paper
 
@@ -21,6 +21,14 @@ history:
 ## Re-measure the Vega-Lite schema across its release tags
 schema:
 	python3 scripts/schema_growth.py
+
+## Render the agent-evaluation research brief (headless Chromium, no LaTeX)
+CHROMIUM ?= /opt/pw-browsers/chromium
+report:
+	$(CHROMIUM) --headless --disable-gpu --no-sandbox --no-pdf-header-footer \
+	  --virtual-time-budget=6000 \
+	  --print-to-pdf=$(CURDIR)/agent-eval-research/report.pdf \
+	  file://$(CURDIR)/agent-eval-research/report.html
 
 watch:
 	cd paper && $(LATEXMK) $(LATEXMKFLAGS) -pvc main.tex
