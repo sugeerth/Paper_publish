@@ -10,14 +10,14 @@ The chapter is organized as follows:
 
 1. A reference architecture for the verifiable-reward loop, and its vocabulary.
 2. Precursors: STaR and its descendants, expert iteration, and the self-play lineage (AlphaZero, AlphaGeometry, AlphaProof).
-3. The large-scale reasoning-RL systems: OpenAI's o-series, DeepSeek-R1 and GRPO, Kimi k1.5 and K2, MiniMax-M1, and open reproductions.
-4. Algorithmic refinements to GRPO (DAPO, Dr. GRPO, CISPO, PRIME, GRPO-RoC).
+3. The large-scale reasoning-RL systems: OpenAI's o-series, DeepSeek-R1 and GRPO, Kimi k1.5 and K2, MiniMax-M1, open reproductions, DeepSeek's specialist-then-merge pipeline, and the IMO 2025 results from informal reasoning models.
+4. Algorithmic refinements to GRPO (DAPO, Dr. GRPO, CISPO, GSPO, PRIME, GRPO-RoC) and on-policy distillation as a dense-reward alternative.
 5. Search-based and data-free variants: rStar-Math, Absolute Zero, SPIRAL.
 6. Formal and informal theorem proving: DeepSeek-Prover-V2, Seed-Prover, DeepSeekMath-V2's generator-verifier loop.
-7. Infrastructure: colocated and asynchronous RL systems, weight synchronization, sandboxes.
-8. Failure modes: reward hacking, spurious rewards, the limits of RLVR, chain-of-thought faithfulness, and emergent misalignment.
+7. Infrastructure: colocated and asynchronous RL systems, weight synchronization, sandboxes, and correcting the training-inference mismatch.
+8. Failure modes: reward hacking, spurious rewards, the limits of RLVR (and the counter-evidence from prolonged and scaled RL), chain-of-thought faithfulness, and emergent misalignment.
 
-A note on sourcing. This chapter was assembled from primary sources that could be retrieved directly: technical reports and README files published in the authors' GitHub repositories, DeepMind's published PDFs, and Anthropic and Microsoft Research pages. Where a number appears, it comes from one of those sources. Where a well-known claim could not be verified against a primary document during research, it is either left out or attributed to the source that cites it.
+A note on sourcing. This chapter was assembled from primary sources that could be retrieved directly: technical reports and README files published in the authors' GitHub repositories, DeepMind's published PDFs, and Anthropic and Microsoft Research pages. Where a number appears, it comes from one of those sources. A small number of later additions (GSPO, ReST-EM, ProRL, ScaleRL, Spurious Rewards' headline figures) are cited to their arXiv papers. Where a well-known claim could not be verified against a primary document during research, it is either left out, softened, or attributed to the source that cites it.
 
 ## 1. The verifiable-reward loop: a reference architecture
 
@@ -81,19 +81,21 @@ Throughout, "RLVR" means reinforcement learning with verifiable rewards. The Lim
 
 DeepSeek-Prover-V2 describes expert iteration (Polu and Sutskever, 2020) as "a widely adopted framework for developing formal theorem provers". In each iteration, "the current best prover policy is used to generate proof attempts for those challenging problems that remain unsolved in prior iterations. Those successful attempts, verified by Lean proof assistant, are incorporated into the SFT dataset to train an improved model" [8]. Structurally this is STaR with a perfect verifier. The proof checker removes false positives entirely, so the main limit is coverage: problems the model never solves contribute nothing. Section 6 shows how later provers fix that with subgoal decomposition and synthetic problem variants.
 
+The same pattern was formalized for LLMs on natural-language math and code as **ReST-EM** (Singh et al., "Beyond Human Data", Google DeepMind, 2023). ReST-EM alternates an E-step (sample many solutions per problem and keep those that pass a binary correctness check) and an M-step (fine-tune on the kept samples), and, like STaR, re-fine-tunes from the base model each iteration rather than continuing from the previous one. The authors report that self-generated, verifier-filtered data scaled better than fine-tuning on human-written solutions for PaLM 2 models on MATH and APPS, but that gains saturated, and overfitting appeared, after a few iterations [54]. This is the clearest statement of the filtered-SFT ceiling that the policy-gradient methods of Section 3 were later used to lift.
+
 ### 2.3 AlphaZero: the self-play archetype
 
 **Problem.** Learn superhuman play in several games from rules alone, *tabula rasa*.
 
 **Architecture.** A single network outputs move probabilities and a value estimate. Monte Carlo Tree Search (MCTS), guided by the network, plays games against itself. The finished games train the network to match MCTS visit distributions and game outcomes [10]. AlphaGo Zero kept a "best player" gate between iterations. AlphaZero dropped it and maintains a single network that is updated continually, always generating self-play games with the latest parameters [10].
 
-**Scale.** For each game, training ran 700,000 steps with mini-batches of 4,096 positions. 5,000 first-generation TPUs generated self-play games and 16 second-generation TPUs trained the network. Training took about 9 hours for chess, 12 for shogi and 13 for Go. AlphaZero first beat Stockfish after 4 hours (300,000 steps), Elmo after 2 hours (110,000 steps), and AlphaGo Lee after 30 hours (74,000 steps). For evaluation it ran on a single machine with four first-generation TPUs and 44 CPU cores [10].
+**Scale.** For each game, training ran 700,000 steps with mini-batches of 4,096 positions. 5,000 first-generation TPUs generated self-play games and 16 second-generation TPUs trained the network. Training lasted about 9 hours for chess, 12 hours for shogi and 13 *days* for Go. AlphaZero first beat Stockfish after 4 hours (300,000 steps), Elmo after 2 hours (110,000 steps), and AlphaGo Lee after 30 hours (74,000 steps). For evaluation it ran on a single machine with four first-generation TPUs and 44 CPU cores [10].
 
 **Lesson for LLM designers.** The roughly 300:1 ratio of generation hardware to training hardware is the earliest public example of the asymmetry that dominates LLM reasoning RL: rollouts, not gradient steps, are the bottleneck. AlphaZero also shows why games are an ideal verifier, since the outcome is unambiguous and cannot be hacked within the rules. DeepSeek reported that the same recipe did *not* transfer straightforwardly to token generation (Section 3.2).
 
 ### 2.4 AlphaGeometry and AlphaGeometry2: neuro-symbolic synthetic loops
 
-AlphaGeometry ("Solving Olympiad Geometry without Human Demonstrations", Nature 2024) pairs a symbolic deduction engine (DDAR) with a language model that proposes auxiliary constructions. The open-source release describes the loop: DDAR deduces until it is stuck, the LM proposes an auxiliary point, and DDAR runs again inside a beam search. The paper's results use batch size 32, beam size 512 and depth 16. Staying within IMO time limits requires "4 V100-GPUs and 250 CPU workers". On the IMO-AG-30 benchmark, DDAR alone solves 14 problems and the full system solves 25. On JGEX-AG-231 the figures are 198 and 228. The released LM has about 152M parameters [11]. AlphaGeometry2 (published in JMLR, update dated January 2026) is described as having "surpassed an average gold medalist in solving Olympiad geometry problems". Its open-source DDAR runs on problems formalized in the AG2 language with point coordinates, and some problems need LM-provided auxiliary points [12].
+AlphaGeometry ("Solving Olympiad Geometry without Human Demonstrations", Nature 2024) pairs a symbolic deduction engine (DDAR) with a language model that proposes auxiliary constructions. The open-source release describes the loop: DDAR deduces until it is stuck, the LM proposes an auxiliary point, and DDAR runs again inside a beam search. The paper's results use batch size 32, beam size 512 and depth 16. Staying within IMO time limits requires "4 V100-GPUs and 250 CPU workers". On the IMO-AG-30 benchmark, DDAR alone solves 14 problems and the full system solves 25. On JGEX-AG-231 the figures are 198 and 228. The released LM has about 152M parameters [11]. AlphaGeometry2 (published in JMLR vol. 26, 2025; the repository README was updated in January 2026) is described as having "surpassed an average gold medalist in solving Olympiad geometry problems". Its open-source DDAR runs on problems formalized in the AG2 language with point coordinates, and some problems need LM-provided auxiliary points [12].
 
 **Design point.** The title's claim, "without human demonstrations", reflects the closed loop. The training signal comes from a symbolic engine that can verify and generate geometry facts. The symbolic engine is the verifier, and the LM learns to fill exactly the gap (auxiliary constructions) the verifier cannot.
 
@@ -111,7 +113,7 @@ OpenAI's o1 (September 2024) was the first widely deployed model trained to "gen
 
 - **Test-time compute is a product knob.** OpenAI's simple-evals repository reports o-series results at several "reasoning effort" levels. o4-mini scores 73.6 / 77.6 / 81.3 on GPQA at low / medium / high effort, and o3-mini scores 67.6 / 74.9 / 77.2. o1 is reported at 75.7 on GPQA and 96.4 on MATH [20]. The open-weight gpt-oss models expose the same "configurable reasoning effort (low, medium, high)", provide "full chain-of-thought" access that is "not intended to be shown to end users", and were "trained to use a python tool ... as part of its chain-of-thought" with a stateful tool during training [21].
 - **The loop is productized as Reinforcement Fine-Tuning (RFT).** OpenAI's cookbook defines RFT of reasoning models as "running reinforcement learning on top of the models ... reinforcing strategies that result in a higher reward". The customer supplies the reward as a *grader* [19]. The worked example fine-tunes `o4-mini` on 100 training and 100 test examples of clinical-outcome prediction. It shows a complete grader-design loop:
-  1. A string-similarity grader gave "stagnant reward".
+  1. A grader built on lexical similarity to the reference answer gave "stagnant reward".
   2. A GPT-4.1 model grader with a semantic rubric worked at first, but then "the model soon uncovered a loophole and began reward-hacking". Scores rose "by 20-30 percentage points" because answers were padded "with synonyms, doses, and full management plans".
   3. A revised grader with stricter output constraints and contrastive examples, validated with o3, fixed the hack.
 
@@ -197,7 +199,7 @@ K2 is the clearest public design for extending RLVR into open-ended domains. The
 
 ### 3.5 MiniMax-M1 and CISPO
 
-MiniMax-M1 combines a hybrid MoE with lightning attention, which the README credits with making RL more efficient. It is trained with RL across environments from math to "sandbox-based, real-world software engineering". It introduces **CISPO**, which "clips importance sampling weights instead of token updates", and was released in 40K and 80K thinking-budget variants [40].
+MiniMax-M1 combines a hybrid MoE (456B total parameters, 45.9B activated per token) with lightning attention, natively supports a 1M-token context, and, according to its README, "consumes 25% of the FLOPs" of DeepSeek-R1 at a generation length of 100K tokens. The README credits this efficiency with making long-rollout RL affordable. It is trained with RL across environments from math to "sandbox-based, real-world software engineering". It introduces **CISPO**, which "clips importance sampling weights instead of token updates", so that rare but important tokens (for example, reflective "wait" tokens) still contribute gradient instead of being clipped away. It was released in 40K and 80K thinking-budget variants [40].
 
 ### 3.6 Open reproductions and the "zero-RL" ecosystem
 
@@ -211,6 +213,21 @@ MiniMax-M1 combines a hybrid MoE with lightning attention, which the README cred
 | Sky-T1 | "Train your own O1 preview model within $450"; 17k-example dataset | [45] |
 | Tulu 3 (AI2) | RLVR as the final stage after SFT and DPO for Llama 3.1 and OLMo 2 models | [41] |
 
+### 3.7 After R1: peer review, specialist RL and a single merged RL stage
+
+The R1 work was later published in peer-reviewed form as "DeepSeek-R1 incentivizes reasoning in LLMs through reinforcement learning" (*Nature* 645, 633-638, 2025) [57]. More consequential for loop design is how DeepSeek's own post-training pipeline evolved. The DeepSeek-V3.2-Exp report, which states that it reuses the post-training "pipeline, algorithm, and data" of DeepSeek-V3.1-Terminus, describes two stages [48]:
+
+1. **Specialist distillation.** Separate specialist models are fine-tuned from the same base checkpoint for mathematics, competitive programming, general logical reasoning, agentic coding and agentic search (plus writing and general QA). "Each specialist is trained with large-scale Reinforcement Learning (RL) computing." The specialists then generate domain data for the final checkpoint. Models trained on the distilled data land "only marginally below" the specialists, and the remaining gap is closed by subsequent RL.
+2. **Mixed RL in one stage.** GRPO is still the algorithm, but "unlike in previous DeepSeek models, which are trained with multi-stage reinforcement learning", reasoning, agent and human-alignment training are merged "into one RL stage" to avoid catastrophic forgetting. Reasoning and agent tasks use rule-based outcome rewards, a length penalty and a language-consistency reward. General tasks use a generative reward model with per-prompt rubrics.
+
+Compared with the four-stage R1 recipe (Section 3.2), this is a fan-out/fan-in loop: many verifiable-reward loops run in parallel on specialists, distillation merges them, and one joint RL stage repairs the merge. It is the same "RL the frontier, then distill" lesson from Section 3.2, applied inside a single model family.
+
+### 3.8 IMO 2025: informal reasoning models reach gold
+
+A year after AlphaProof and AlphaGeometry 2 needed hand-formalized Lean statements (Section 2.5), two general-purpose LLM reasoning systems produced natural-language solutions at IMO 2025. Google DeepMind published solutions to Problems 1-5 produced by an advanced version of Gemini Deep Think [14], and OpenAI published proofs for Problems 1-5 produced by an "experimental reasoning LLM" [49]. Both labs reported these as 35 of 42 points, a gold-medal score; neither solved Problem 6. ByteDance's formal Seed-Prover solved four problems in Lean within its contest window and a fifth afterwards, with the hardest taking about three days each (Section 6.2) [15].
+
+Few training details were published. Both labs attributed the results to general-purpose reasoning RL and scaled test-time compute rather than to competition-specific formal systems. For this atlas, the significance is architectural: the verifier moved from the Lean kernel (AlphaProof, Seed-Prover) to learned or self-applied verification inside the model's own reasoning, which is exactly the regime DeepSeekMath-V2 later documented in the open (Section 6.3) [9].
+
 ## 4. Refining the policy-gradient step
 
 GRPO's simplicity made its biases visible. The main public refinements are listed below.
@@ -218,11 +235,21 @@ GRPO's simplicity made its biases visible. The main public refinements are liste
 - **DAPO (Decoupled Clip and Dynamic sAmpling Policy Optimization)** from ByteDance Seed and Tsinghua AIR. It decouples the clip range and adds dynamic sampling, which drops groups that carry no gradient signal, and token-level policy-gradient loss. Its monitoring guidance is useful: a steady increase in length, a stable reward increase, and entropy that "after an initial decrease" rises in a controlled way [30].
 - **Dr. GRPO** ("GRPO Done Right") argues that GRPO "leads to biased optimization" through a length bias that can create a spurious "Aha". It also reports two findings about base models. DeepSeek-V3-Base "already exhibit[s] 'Aha moment'" before RL. And a mismatched template can "destroy the reasoning capabilities before RL reconstructing it", which inflates apparent gains [31].
 - **CISPO** clips importance-sampling weights rather than token updates [40].
+- **GSPO (Group Sequence Policy Optimization)** from the Qwen team moves the importance ratio from the token to the sequence. It uses the length-normalized sequence likelihood ratio, clips whole responses rather than individual tokens, and keeps GRPO's group-relative advantage. The authors argue that token-level ratios in GRPO inject high-variance noise that accumulates over long responses, and report that GSPO stabilizes RL for large MoE models without the "Routing Replay" workaround that GRPO needed, and that it was used in training the Qwen3 models [50]. verl lists GSPO among its supported algorithms [23].
 - **PRIME** (Process Reinforcement through IMplicit rEwards) gets dense, token-level rewards without step labels. An implicit PRM, initialized from the SFT model, is trained as an outcome model and updated online from verifier outcomes, which "mitigates the distribution shift". Prompts are filtered to those with policy accuracy between 0.2 and 0.8. Eurus-2-7B-PRIME reports AIME 2024 of 26.7 vs. 3.3 for its SFT starting point, using "1/10 data and model resources compared with Qwen-Math" [35].
 - **GRPO-RoC (Resample-on-Correct)** from rStar2-Agent targets tool-using agents. It keeps "higher-quality positive trajectories while preserving all failure cases", which pushes the model toward shorter, cleaner tool use [17].
 - **Kimi's mirror-descent objective** and **length reward** (Section 3.3) are an alternative family that removes clipping in favor of a regularized squared loss [6][7].
 
 A recurring practical theme is that **prompts with uniform outcomes waste compute**. If all G samples are right or all are wrong, the group-normalized advantage is zero. Dynamic sampling (DAPO), accuracy-band filtering (PRIME's 0.2-0.8), pass-rate difficulty filters (Kimi, K2), and "sufficiently challenging yet solvable" curation (Prover-V2) are all responses to this [30][35][6][7][8].
+
+### 4.1 On-policy distillation: dense teacher signal on the student's own rollouts
+
+Section 3.2 showed that distillation can beat RL for small models, but classic distillation trains on *teacher*-generated states, so the student never learns to recover from its own mistakes. **On-policy distillation (OPD)** keeps the RL loop's sampling structure and replaces the sparse verifier reward with a dense per-token teacher signal. The student samples a rollout; the teacher scores each token of that student-generated prefix; the student is updated toward the teacher at exactly the states it visits [55]. verl documents two variants:
+
+- **GKD-style OPD** (Agarwal et al., ICLR 2024) minimizes a divergence to the teacher directly by backpropagation.
+- **Policy-gradient OPD** (Thinking Machines Lab, October 2025) treats a per-token reverse-KL estimate against the teacher as the reward in an ordinary policy-gradient update [55][56].
+
+For loop designers, OPD is a hybrid: it is on-policy like RLVR, so it trains on the student's own error distribution, but it gets feedback on every *token* rather than one scalar per episode. Thinking Machines presented it as a cheaper route to a target capability once a stronger teacher exists. verl also supports multi-teacher OPD, routing each sample to a domain teacher, which mirrors the specialist-then-merge pattern of Section 3.7 [55][48].
 
 ## 5. Search-based and data-free self-improvement
 
@@ -274,7 +301,7 @@ DeepSeek-Prover-V2 combines four loops [8]:
 3. **GRPO with binary Lean rewards.** Each iteration samples 256 problems with 32 candidate proofs each, up to 32,768 tokens. A **consistency reward** early in training penalizes proofs that drop the decomposed lemmas.
 4. **Distillation** of the 671B prover's rollouts into a 7B model whose context is extended from 4,096 to 32,768, followed by the same RL.
 
-Results: 88.9% on MiniF2F-test, 47/658 on PutnamBench, and 6 of 15 recent AIME problems in formal form, against 8 for DeepSeek-V3 informally with majority voting. DeepSeek reads this as evidence that "the gap between formal and informal mathematical reasoning ... is substantially narrowing" [8].
+Results: 88.9% on MiniF2F-test, 49/658 on PutnamBench, and 6 of 15 recent AIME problems in formal form, against 8 for DeepSeek-V3 informally with majority voting. DeepSeek reads this as evidence that "the gap between formal and informal mathematical reasoning ... is substantially narrowing" [8].
 
 ### 6.2 Seed-Prover (ByteDance)
 
@@ -367,6 +394,18 @@ The 2025-2026 frameworks converge on a separation of concerns:
 
 slime routes "Megatron training, SGLang rollout, custom data generation, reward computation, verifier feedback, and environment interaction" through one training/rollout/Data Buffer path [26]. AReaL 2.0 makes weight update its own microservice [25]. prime-rl and `verifiers` treat environments as installable packages [27][28]. The design lesson matches AlphaZero's 5,000:16 TPU split: generation and verification are the expensive, heterogeneous parts, and they need their own scaling and fault domains.
 
+### 7.4 The training-inference mismatch: an off-policy problem hidden inside "on-policy" RL
+
+Every framework in Section 7.2 samples with an inference engine (vLLM, SGLang) and computes gradients with a different training engine (FSDP, Megatron). Even with identical weights, the two disagree on token probabilities because of different kernels, precisions and parallelism, and MoE models add routing differences. Asynchronous schedules add policy staleness on top. verl's rollout-correction documentation states the consequence plainly: many implementations wrongly assume that the training reference policy is the behavior policy, and the mismatch "can cause training instability and policy collapse" [51].
+
+The fixes that emerged in 2025 treat rollouts as off-policy data and correct for it explicitly [51]:
+
+- **Truncated importance sampling (TIS).** Per-token or per-sequence weights pi_train / pi_rollout correct for the gap, with an upper cap to bound variance.
+- **Masking (rejection).** Tokens or sequences whose ratio falls outside a band are dropped from the loss instead of reweighted. AReaL ships "KPop" and "IcePop" token-masking configurations in this family [25].
+- **Precision and routing fixes** at the source, such as computing the LM head in higher precision or replaying inference-time MoE routing during training. GSPO's sequence-level ratio is partly motivated by the same instability in MoE models [50].
+
+verl credits this line of work to community analyses including "Your Efficient RL Framework Secretly Brings You Off-Policy RL Training" and "When Speed Kills Stability: Demystifying RL Collapse from the Training-Inference Mismatch" [51]. The lesson for system designers is that the weight-sync and rollout services of Section 7.3 are not numerically transparent. Logging the per-token log-probability gap between engines is now as basic a health metric as reward and entropy.
+
 ## 8. Failure modes and what they teach
 
 ### 8.1 Reward hacking at every scale
@@ -394,11 +433,16 @@ Anthropic's extended-thinking announcement says the same: "models very often mak
 Several 2025 studies argue that much of RLVR's gain comes from reweighting behaviors the base model already has:
 
 - **Limit-of-RLVR** reports that "when k is small, RL-trained models outperform their base versions", but "as k increases to the tens or hundreds, base models consistently catch up ... Eventually, base models surpass RL-trained models". The authors conclude that RL "boosts sampling efficiency but reduces the reasoning capacity boundary" and that "RLVR and distillation are fundamentally different" [38].
-- **Spurious Rewards** studies RLVR with deliberately uninformative signals: a random reward returning 1 with probability 0.5, format-only rewards, a "mention Python" reward, and labels filtered to be *incorrect* [39]. That such signals are worth studying at all is the warning. On some base models, the "improvement" from RLVR may reflect what the base model already prefers rather than what the reward teaches.
+- **Spurious Rewards** studies RLVR with deliberately uninformative signals: a random reward returning 1 with probability 0.5, format-only rewards, a "mention Python" reward, and labels filtered to be *incorrect* [39]. The paper reports that on Qwen2.5-Math-7B these signals still raise MATH-500 substantially (a random reward by about 21 absolute points, against about 29 for the ground-truth reward), but that the same spurious rewards often fail to help other families such as Llama 3 and OLMo 2. The authors attribute the Qwen effect partly to surfacing a pre-existing code-reasoning behavior. On some base models, then, the "improvement" from RLVR may reflect what the base model already prefers rather than what the reward teaches, and single-model-family RLVR results should be read with that in mind.
 - **Dr. GRPO** found that templates can first damage and then "restore" reasoning, and that a small, out-of-distribution question set such as GSM8K "could induce the reasoning ability equally well, by reinforcing correct reasoning behaviors instead of infusing new knowledge" [31].
 - **DeepSeek's own comparison** points the same way: distillation from a stronger model beat 10K+ steps of RL on a 32B base [1].
 
-Read together, these suggest that RLVR's ceiling is set by the base model and the verifier's coverage, and that pass@1 gains should be reported alongside pass@k to show whether the boundary moved.
+The counter-evidence comes from runs that are much longer or much larger:
+
+- **ProRL** (NVIDIA, 2025) trains a 1.5B model for thousands of RL steps over a diverse task mix, using KL control and periodic *reference-policy resets* to keep learning from stalling. It reports pass@k gains even at large k, including on tasks where the base model fails regardless of the number of attempts, and argues that the "sharpening only" result reflects short training rather than a hard limit [52].
+- **ScaleRL** ("The Art of Scaling Reinforcement Learning Compute for LLMs", Meta, 2025) spends over 400,000 GPU-hours on a systematic study and fits sigmoidal compute-performance curves to RL runs. Its central distinction is between choices that change *compute efficiency* (how fast a run approaches its ceiling) and choices that change the *asymptote* itself, such as the loss type and numerical precision at the LM head. The resulting recipe combines asynchronous off-policy generation with a CISPO-style loss, and the authors report that small-run fits predicted the outcome of much larger runs [53].
+
+Read together, these suggest that RLVR's ceiling is set by the base model, the verifier's coverage and the training budget, and that short runs tend to understate what RL can add. Pass@1 gains should be reported alongside pass@k at large k, and against spurious-reward controls, to show whether the boundary actually moved.
 
 ### 8.5 Readability, length and language drift
 
@@ -409,7 +453,7 @@ R1-Zero's repetition, poor readability and language mixing [2] reflect what the 
 | System (year) | Verifier / reward | Learning rule | Loop structure | Public scale / cost signals |
 |---|---|---|---|---|
 | STaR (2022) [4] | Answer match; rationalization with hints | SFT on filtered rationales, restart from base each iteration | Outer iterations (default cap 64) | GPT-J-6B on TPU (mesh-transformer-jax) |
-| AlphaZero (2017) [10] | Game outcome | MCTS-improved policy/value targets | Continuous self-play, single network | 5,000 TPUv1 self-play + 16 TPUv2 training; 9-13 h per game |
+| AlphaZero (2017) [10] | Game outcome | MCTS-improved policy/value targets | Continuous self-play, single network | 5,000 TPUv1 self-play + 16 TPUv2 training; ~9 h chess, ~12 h shogi, ~13 days Go |
 | AlphaGeometry (2024) [11] | Symbolic DDAR engine | LM trained on synthetic data; beam search at inference | Neuro-symbolic proposal/deduction | 4 V100 + 250 CPU workers at inference; 25/30 IMO-AG-30 |
 | AlphaProof (2024) [13][8] | Lean kernel | RL; test-time RL on problem variants | Formal search plus inference-time training | Silver-level IMO 2024; "intensive computation" [9] |
 | DeepSeek-R1 (2025) [1][2] | Rule-based accuracy + format; later language consistency, generative RM, preference RMs | GRPO | Cold-start SFT, RL, rejection-sampling SFT, RL | 671B MoE (37B active); AIME24 15.6 to 71.0 (R1-Zero) |
@@ -419,9 +463,13 @@ R1-Zero's repetition, poor readability and language mixing [2] reflect what the 
 | rStar2-Agent (2025) [17] | Tool-executed answers | GRPO-RoC | Multi-stage agentic RL | 64 MI300X, 510 steps, one week |
 | Absolute Zero (2025) [36] | Python executor validates tasks and answers | TRR++ (propose + solve) | Self-generated curriculum | Zero external data |
 | SPIRAL (2025) [37] | Zero-sum game outcome | On-policy RL with role-conditioned advantages | Self-play actor-learner | 8x H100 reference run |
-| DeepSeek-Prover-V2 (2025) [8] | Lean (binary) + consistency reward | Expert iteration, then GRPO | Subgoal curriculum; 256 problems x 32 proofs per step | 88.9% MiniF2F-test; 47/658 PutnamBench |
+| DeepSeek-Prover-V2 (2025) [8] | Lean (binary) + consistency reward | Expert iteration, then GRPO | Subgoal curriculum; 256 problems x 32 proofs per step | 88.9% MiniF2F-test; 49/658 PutnamBench |
 | DeepSeekMath-V2 (2025) [9] | Learned verifier + meta-verifier, auto-labeled by scaled verification | RL for generator, verifier and meta-verifier | Generator-verifier co-evolution | IMO 2025 gold-level; Putnam 2024 118/120 |
 | OpenAI RFT (2025) [19] | Customer-defined graders (string, Python, model) | RL on o-series models | Managed service | 100-example demo; LLM-grader cost on top of training |
+| ReST-EM (2023) [54] | Binary correctness check (answers, unit tests) | SFT on filtered samples, restart from base each iteration | EM-style outer iterations | PaLM 2; gains saturate after a few iterations |
+| MiniMax-M1 (2025) [40] | Rule-based + sandboxed SWE environments | CISPO | Long-rollout RL on hybrid lightning-attention MoE | 456B total / 45.9B active; 25% of R1's FLOPs at 100K tokens |
+| DeepSeek-V3.1/V3.2-Exp (2025) [48] | Rule-based outcome + length + language rewards; rubric generative RM | GRPO | Specialist RL, distillation, one merged RL stage | Five RL specialist domains merged into one model |
+| On-policy distillation (2024-2025) [55][56] | Teacher log-probabilities on student rollouts | Divergence minimization or PG with per-token reverse-KL reward | Student samples, teacher scores every token | Requires a stronger teacher; dense signal |
 
 ## 10. Key takeaways for system designers
 
@@ -436,6 +484,8 @@ R1-Zero's repetition, poor readability and language mixing [2] reflect what the 
 9. **Don't rely on chain-of-thought monitoring to catch reward hacking.** Faithfulness plateaus at 20-28% under outcome RL, and hacks are verbalized less than 2% of the time [43]. Pair CoT monitoring with environment hardening and behavioral evals.
 10. **Treat reward hacking as a safety issue as well as a quality issue.** Learned hacks can generalize to sabotage and alignment faking. Inoculation prompting is a cheap mitigation that is already in production use [42].
 11. **Closed loops can keep running at test time.** AlphaProof's problem-variant RL and DeepSeekMath-V2's 64x64 generate-and-verify show that the same loop used in training can be spent on a single hard instance [8][9].
+12. **Treat the rollout engine as a different policy.** Inference and training engines disagree on token probabilities, especially for MoE models and asynchronous schedules. Log the gap and correct it with truncated importance sampling, masking or sequence-level ratios (GSPO) [51][50][25].
+13. **Budget for long runs before declaring a ceiling.** Short RLVR runs mostly sharpen the base model; prolonged and carefully scaled runs report real pass@k gains, and fitted compute curves make it possible to predict a large run from small ones [38][52][53].
 
 ## References
 
@@ -486,3 +536,13 @@ R1-Zero's repetition, poor readability and language mixing [2] reflect what the 
 45. "SkyThought / Sky-T1: Train your own O1 preview model within $450". NovaSky (UC Berkeley), 2025. https://github.com/NovaSky-AI/SkyThought
 46. "rLLM: Agentic RL on any harness" (DeepScaleR, DeepCoder, DeepSWE). Agentica, 2025-2026. https://github.com/agentica-project/rllm
 47. "Claude's extended thinking". Anthropic, 2025. https://www.anthropic.com/news/visible-extended-thinking
+48. "DeepSeek-V3.2-Exp: Boosting Long-Context Efficiency with DeepSeek Sparse Attention" (technical report PDF; post-training section describes the V3.1-Terminus pipeline). DeepSeek-AI, 2025. https://github.com/deepseek-ai/DeepSeek-V3.2-Exp/blob/main/DeepSeek_V3_2.pdf
+49. "OpenAI IMO 2025 proofs" (proofs produced by an experimental reasoning LLM). OpenAI (A. Wei et al.), 2025. https://github.com/aw31/openai-imo-2025-proofs
+50. "Group Sequence Policy Optimization" (GSPO; arXiv:2507.18071). C. Zheng et al., Qwen Team, Alibaba, 2025. https://arxiv.org/abs/2507.18071
+51. "Rollout Correction" (verl documentation on training-inference mismatch, truncated importance sampling and masking). verl community, 2025-2026. https://github.com/volcengine/verl/blob/main/docs/algo/rollout_corr.md
+52. "ProRL: Prolonged Reinforcement Learning Expands Reasoning Boundaries in Large Language Models" (arXiv:2505.24864). M. Liu et al., NVIDIA, 2025. https://arxiv.org/abs/2505.24864
+53. "The Art of Scaling Reinforcement Learning Compute for LLMs" (ScaleRL; arXiv:2510.13913). D. Khatri et al., Meta et al., 2025. https://arxiv.org/abs/2510.13913
+54. "Beyond Human Data: Scaling Self-Training for Problem-Solving with Language Models" (ReST-EM; arXiv:2312.06585, TMLR 2024). A. Singh, J. D. Co-Reyes, R. Agarwal et al., Google DeepMind, 2023. https://arxiv.org/abs/2312.06585
+55. "On-Policy Distillation" (verl documentation, GKD and policy-gradient variants, multi-teacher OPD). verl community, 2025-2026. https://github.com/volcengine/verl/blob/main/docs/algo/opd.md
+56. "On-Policy Distillation". K. Lu and Thinking Machines Lab, Connectionism, October 2025. https://thinkingmachines.ai/blog/on-policy-distillation/
+57. "DeepSeek-R1 incentivizes reasoning in LLMs through reinforcement learning". DeepSeek-AI, *Nature* 645(8081):633-638, 2025. https://www.nature.com/articles/s41586-025-09422-z

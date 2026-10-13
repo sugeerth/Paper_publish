@@ -7,12 +7,13 @@ A "data engine" (also called a data flywheel, a continuous learning machine or a
 This chapter surveys the publicly documented designs:
 
 - **Tesla's Autopilot/FSD data engine**: shadow mode, fleet-deployed trigger classifiers, offline multi-trip auto-labeling, and, from 2025, a learned neural world simulator for evaluation [1][2][5][8][15].
-- **Waymo**: fleet log search (Content Search), large-scale simulation, and the 2025 to 2026 "Driver / Simulator / Critic" architecture built on the Waymo Foundation Model, with the Genie-3-based Waymo World Model [17][18][19][20].
+- **Waymo**: fleet log search (Content Search), offboard auto-labeling, large-scale simulation, the EMMA end-to-end research model, and the 2025 to 2026 "Driver / Simulator / Critic" architecture built on the Waymo Foundation Model, with the Genie-3-based Waymo World Model [17][18][19][20][65][67].
 - **Wayve**: an end-to-end "fleet learning loop" fed by diverse fleets, plus generative (GAIA-1, GAIA-2) and reconstructive (PRISM-1, Ghost Gym) simulation [26][27][28][29][30].
 - **Cruise**: the Continuous Learning Machine (CLM), a self-supervised loop for motion prediction that mined errors and auto-labeled them from future observations [32][33][36].
 - **Scale AI**: the data engine as a vendor product (Nucleus, model-assisted debugging, SiaSearch, and the 2025 "Data Engine for Physical AI") [37][38][39][41].
-- **NVIDIA**: the AI Blueprint for data flywheels (LLM-agent distillation on NeMo microservices), and the physical-AI stack (Cosmos Curator, Cosmos Transfer/Predict, Cosmos-Drive-Dreams, AlpaSim, Alpamayo, Physical AI Data Factory Blueprint) [43][45][47][48][50][51][52].
-- **Other fleet-learning architectures**: Mobileye REM crowdsourced mapping, comma.ai's world-model-trained openpilot, and others [53][54][55].
+- **NVIDIA**: the AI Blueprint for data flywheels (LLM-agent distillation on NeMo microservices), and the physical-AI stack (Cosmos Curator, Cosmos Transfer/Predict, Cosmos-Drive-Dreams, AlpaSim, Alpamayo, Physical AI Data Factory Blueprint), now closed with AlpaGym closed-loop RL [43][45][47][48][50][51][52][60][61].
+- **Other fleet-learning architectures**: Mobileye REM crowdsourced mapping, comma.ai's world-model-trained openpilot, robot fleets learning from deployment (Physical Intelligence's π\*0.6), and OEM programs [53][54][55][59][68].
+- **Open evaluation benchmarks** for the gate stage of the loop: NAVSIM (pseudo-simulation) and Bench2Drive (closed loop) [63][64].
 
 A note on sourcing. Many of these companies publish only through keynote talks, blog posts and patents. Where a number comes from a secondary recap and not from the company itself, the text says so and marks it approximate.
 
@@ -86,7 +87,7 @@ At AI Day 2021, Ashok Elluswamy presented the auto-labeling pipeline. Tesla's in
 - **Label in 4D vector space instead of per-image.** Labeling reconstructed 3D scenes over time, across all cameras at once, was reported to raise throughput about 100-fold over per-image 2D labeling [9].
 - **Offline auto-labeling with hindsight.** Large offline networks and reconstruction, which can look at the past and the future of a clip, produce labels for the online network. Tesla reported collecting and auto-labeling 10,000 clips in about a week, which Elluswamy said would have taken months by hand [9][11].
 
-At AI Day 2022 the pipeline added **multi-trip reconstruction**. Clips from many vehicles passing the same location are fused into a single 3D reconstruction, and offline networks then label lanes, road edges and other structure as vectors for the online stack [13]. Secondary recaps of AI Day 2022 report figures that should be treated as approximate and unverified: auto-labeling 10k trips in about 12 hours of cluster time, against an estimated about 5 million hours of manual labeling, and a training infrastructure of about 14,000 GPUs [12]. Auto-labels covered road texture, walls, barriers, static objects, objects moving through occlusion, pedestrians, motorcycles and parked cars [12].
+Tesla had already shown fusing several clips of one intersection at AI Day 2021. At AI Day 2022 it described **multi-trip reconstruction** as the main auto-labeling engine for lanes and static structure. Clips from many vehicles passing the same location are fused into a single 3D reconstruction, and offline networks then label lanes, road edges and other structure as vectors for the online stack [13]. Secondary recaps of AI Day 2022 report figures that should be treated as approximate and unverified: auto-labeling 10k trips in about 12 hours of cluster time, against an estimated about 5 million hours of manual labeling, and a training infrastructure of about 14,000 GPUs [12]. Auto-labels covered road texture, walls, barriers, static objects, objects moving through occlusion, pedestrians, motorcycles and parked cars [12].
 
 Tesla's patent family "Generating ground truth for machine learning from time series elements" puts the hindsight principle in legal terms. It covers receiving sensor data as a time series, deriving ground truth from portions of the series, and training a model to predict that ground truth from a single element. A dependent claim ties this to lane lines. The family includes US 10,997,461 (filed 2019, granted 2021) and US 12,223,428 (granted February 2025). Elluswamy and Karpathy are among the inventors [14].
 
@@ -164,7 +165,15 @@ Waymo's August 2026 post "10 AI Lessons from Driving 200+ Million Fully Autonomo
 - The Driver should combine fast control with higher-level reasoning, alongside separate onboard verification and independent evaluation.
 - Neither billions of simulated miles nor millions of human-supervised miles substitute for what a system learns when it operates with no human backup. Electrek read this as a direct critique of the L2-to-L4 path [21].
 
-### 2.7 Lessons
+### 2.7 Offboard auto-labeling, EMMA and open end-to-end data
+
+Three public Waymo results fill in parts of the loop that the blog posts only name.
+
+- **Offboard auto-labeling (2021).** Qi et al.'s "Offboard 3D Object Detection from Point Cloud Sequences" (CVPR 2021) is Waymo's published version of hindsight labeling. An offboard detector sees the whole lidar sequence, past and future, and tracks objects across it. It then refines each object's box using every frame in which the object appears, producing labels that approach human quality for training onboard models [67]. It is the Waymo counterpart to Tesla's offline auto-labeler (section 1.3).
+- **EMMA (October 2024).** "EMMA: End-to-End Multimodal Model for Autonomous Driving" fine-tunes a Gemini-based multimodal model to map raw camera input directly to planner trajectories, perception objects and road-graph elements, all written as text [65]. It is a research model, not the deployed Driver. It shows the large teacher-model direction that the 2025 Driver / Simulator / Critic architecture later made explicit. The paper also lists its own limits: camera-only input and too few frames for long temporal context.
+- **Open end-to-end data.** The Waymo Open Dataset now ships an End-to-End Driving dataset of camera data with high-level routing commands, alongside the Perception dataset and the Motion dataset (103,354 scenes) [66]. Waymo's 2025 release of this set (WOD-E2E) was presented as focused on rare, long-tail scenarios. The repository README does not state that framing, so treat it as Waymo's description. This lets outside groups test end-to-end policies on the kind of rare events Waymo's own data engine mines.
+
+### 2.8 Lessons
 
 Waymo's design shows the flywheel moving from *data selection* to *signal generation*. Content Search optimized retrieval. The 2025 to 2026 architecture instead uses a learned Critic to label the system's *own behavior*, and learned simulators to generate counterfactuals. The scarce resource becomes a trustworthy evaluator rather than raw data. The main open risk, which Waymo acknowledges through its "virtual driver's test" framing [23], is whether simulator and critic judgments transfer to real-world outcomes.
 
@@ -231,7 +240,7 @@ Cruise said the loop let it update its models as often as about twice a week, co
 
 ### 4.3 Lessons and status
 
-The CLM is the purest example of a **self-supervised data engine**. When the target is "what happens next", the fleet labels itself and the only cost is compute. It does not extend to tasks whose ground truth is never observed, such as the counterfactual "what *should* the AV have done". That gap is what learned critics such as Waymo's are now meant to fill. Cruise's robotaxi program was later wound down by GM, so the CLM is a historical reference design [33].
+The CLM is the purest example of a **self-supervised data engine**. When the target is "what happens next", the fleet labels itself and the only cost is compute. It does not extend to tasks whose ground truth is never observed, such as the counterfactual "what *should* the AV have done". That gap is what learned critics such as Waymo's are now meant to fill. Cruise suspended driverless operations after an October 2023 pedestrian-dragging incident. In December 2024 GM announced it would stop funding Cruise's robotaxi work and fold the team into its personal-vehicle driver-assistance program [69]. The CLM is therefore a historical reference design. Its error-mining idea survives in the ADAS work that absorbed the team.
 
 ## 5. Scale AI: the data engine as a product
 
@@ -313,9 +322,9 @@ For autonomous vehicles and robots, NVIDIA's stack covers the curate, augment, s
 
 - **Curation.** Cosmos Curator (on the Ray-based Cosmos-Xenna streaming framework, deployable locally, on Slurm or on NVIDIA Cloud Functions) does video splitting, annotation, filtering, de-duplication and dataset generation [48]. NVIDIA reported that its NeMo Curator video pipeline could process 20M hours of video in days instead of years, an 89x speedup on 1K GPUs over unoptimized CPU pipelines at equal power. Launch coverage cited 20M hours in 14 days on Blackwell (approximate, configuration-dependent) [49][45].
 - **Augmentation and generation.** The Omniverse Blueprint for AV simulation uses **Cosmos Transfer** to multiply physically based sensor data across weather and lighting. Foretellix is one user. **Cosmos Predict** expands multi-sensor views and is used by Nexar and Oxa [45][46]. NVIDIA's developer blog describes the goal as an AV data flywheel that generates synthetic data, augments sensor datasets, fills coverage gaps, and builds a validation toolchain [46].
-- **Cosmos-Drive-Dreams.** This open pipeline renders HD-map, bounding-box or lidar-depth condition videos from labeled clips. A VLM rewrites captions into many variations. Cosmos-Transfer1-7B-AV generates 121-frame front-view videos, which a Single2MultiView model expands to multi-camera. VLM-based filtering was listed as forthcoming. NVIDIA released labels for 5,843 ten-second clips and 81,802 synthetic videos (about 3 TB in total) [47].
-- **Closed-loop evaluation: AlpaSim.** An open-source microservice simulator (gRPC, independently scalable services, Slurm multi-node). Its renderer is pluggable, with NuRec neural reconstruction as the default and video-model rendering as an option. It ships with Alpamayo-R1/1.5 and other policies [52].
-- **Policy: Alpamayo.** A 10B-parameter reasoning VLA: a Cosmos-Reason backbone plus an action expert. Its "Chain-of-Causation" reasoning traces were produced by hybrid auto-labeling with humans in the loop. Alpamayo 1.5 followed in March 2026 [51].
+- **Cosmos-Drive-Dreams.** This open pipeline renders HD-map, bounding-box or lidar-depth condition videos from labeled clips. A VLM (Qwen3) rewrites captions into many variations. Cosmos-Transfer1-7B-Sample-AV generates 121-frame front-view videos, which a Single2MultiView model expands to multi-camera. The final VLM-based filtering step is still marked "coming soon" in the repository. NVIDIA released labels for 5,843 ten-second clips and 81,802 synthetic videos, about 3 TB in total, of which the synthetic video is about 700 GB [47].
+- **Closed-loop evaluation: AlpaSim.** An open-source microservice simulator. Its services talk over gRPC, scale independently and can run multi-node on Slurm. Its renderer is pluggable: NuRec neural reconstruction is the default, and a video-model renderer (OmniDreams via FlashDreams) is supported. Bundled policies include Alpamayo-R1, Alpamayo 1.5, VaVAM and a provisional TransFuser [52].
+- **Policy: Alpamayo.** Alpamayo-R1 is a 10B-parameter reasoning VLA: a Cosmos-Reason backbone plus an action expert. It was renamed Alpamayo 1 after NVIDIA's CES 2026 announcement. Its "Chain-of-Causation" (CoC) reasoning traces were produced by hybrid auto-labeling with humans in the loop. Alpamayo 1.5 (March 2026, also 10B) adds RL post-training, navigation conditioning, visual question answering and flexible camera counts [51][62].
 - **Physical AI Data Factory Blueprint (GTC, March 2026).** An open reference architecture that automates creation, augmentation and evaluation of datasets using Cosmos Curator, Cosmos Transfer and **Cosmos Evaluator**, a Cosmos-Reason-based scorer that filters generated data for physical accuracy and training readiness. NVIDIA said it uses the blueprint to train and evaluate Alpamayo. Uber is listed as an early user [50].
 
 ```
@@ -332,7 +341,17 @@ For autonomous vehicles and robots, NVIDIA's stack covers the curate, augment, s
                                         +--> metrics --> retrain policy --> deploy
 ```
 
-### 6.3 Lessons
+### 6.3 Closing the policy loop: CoC auto-labeling, AlpaGym and Alpamayo 2 (2026)
+
+By mid-2026 NVIDIA had linked the pieces above into a loop for driving policies, not only for data. The Alpamayo Recipes hub describes three parts [60][61]:
+
+- **Reasoning auto-labels.** A CoC auto-labeling pipeline writes reasoning labels for driving clips. The labels go into NVIDIA's Physical AI open dataset and are described as the basis for training larger reasoning models [60].
+- **Closed-loop RL.** **AlpaGym** "runs a policy in closed loop inside a simulator, scores the resulting drives, and trains on them". A host control plane submits Slurm jobs. A runtime inside the GPU container drives AlpaSim episodes over gRPC, computes reward terms (the example run uses a `progress_safety` reward) and takes GRPO steps through Cosmos-RL. At the time of writing it supports only Alpamayo 1.5 and is labeled early-stage [61]. Open-loop RL and SFT recipes for Alpamayo 1 and 1.5 live in the recipes repository [60].
+- **Scale-up.** The hub lists **Alpamayo 2 Super**, a 34B model on a Cosmos 3 backbone with 360-degree surround-view input and meta-action outputs, trained on more than 110,000 hours of driving data [60].
+
+The open AV loop now has every stage in the generic diagram as a separate component: curation (Cosmos Curator), labeling (CoC auto-labeler), generation (Cosmos Transfer/Predict), closed-loop simulation (AlpaSim), RL (AlpaGym) and the policy (Alpamayo). NVIDIA's documents do not themselves call this a flywheel. Treating it as one is this chapter's reading. The repositories also do not report how well AlpaSim scores predict real-road outcomes.
+
+### 6.4 Lessons
 
 NVIDIA's two blueprints share one structural idea. **The flywheel is a DAG of independently deployable services** (log store, curator, generator, trainer, evaluator, deployment manager) joined by a dataset registry. Swapping any one stage, for example the renderer in AlpaSim or the judge in the LLM flywheel, does not disturb the others. They also share a weakness: **automated judges** (LLM-as-judge, Cosmos Evaluator) become the de facto spec, and their errors propagate silently unless humans audit samples.
 
@@ -347,16 +366,30 @@ Mobileye's Road Experience Management turns millions of ADAS-equipped cars into 
 comma.ai's openpilot ships to real users and follows a world-model-centric design:
 
 - **commaVQ (2023).** A VQ-VAE tokenizer (128 tokens of 10 bits per frame) and a GPT world model trained on 3 million minutes of driving video. comma released 100,000 minutes of tokenized video [54].
-- **openpilot 0.10.** Replaced hand-coded MPC with on-policy training in a *reprojective* simulator.
-- **openpilot 0.11.** Trained using videos and plans generated from a learned world model. comma calls it the first real-world robotics agent shipped to users that was fully trained in a learned simulation [54].
+- **openpilot 0.9.9 (May 2025).** A new training architecture that uses parts of comma's MLSIM simulator [59].
+- **openpilot 0.10 (August 2025).** Training followed the architecture in "Learning to Drive from a World Model", which the release notes call comma's CVPR paper. The longitudinal MPC in Experimental mode was replaced by end-to-end planning from the world model. The lateral-MPC action used as the training objective was replaced the same way. Point releases 0.10.1 and 0.10.3 doubled world-model parameters, used four times as many training segments, and added an on-policy training physics-noise model [59].
+- **openpilot 0.11 (March 2026).** The release notes say the driving model was "fully trained using a learned simulator" [59]. comma's blog calls it the first real-world robotics agent shipped to users that was fully trained in a learned simulation [54]. That is the company's own claim. 0.11.2 (August 2026) shipped an 880M-parameter driving model, with support for big models on an external GPU [59].
 
-The accompanying paper, "Learning to Drive from a World Model" (arXiv 2504.19077), compares the reprojective and world-model simulators for on-policy training from real data [54].
+The paper (arXiv 2504.19077) compares a *reprojective* simulator with a learned world-model simulator for on-policy training from real driving data [54]. The cadence above (a new world-model-trained driving model every few months, shipped to a user fleet that then produces the next round of training video) is the clearest open example of a consumer-fleet flywheel whose evaluation and training both run inside a learned simulator.
 
-### 7.3 OEM programs and the generalized loop
+### 7.3 Robot fleets learning from deployment
+
+The same loop is moving from cars to general-purpose robots. Scale's physical-AI data engine (section 5.2) sells the collection side. In November 2025 Physical Intelligence described π\*0.6, a VLA improved with a method it calls Recap (RL with Experience and Corrections via Advantage-conditioned Policies). The model is first trained by imitation. It is then deployed on real tasks. Autonomous rollouts, human teleoperated corrections and a learned value function are fed back to train an advantage-conditioned policy, so the robot improves from its own deployment experience [68]. Its open-source base models (π0, π0-FAST, π0.5) are pre-trained on more than 10,000 hours of robot data [70]. Structurally this is the Waymo outer loop at robot scale: deployment data, a learned critic that scores behavior, and retraining toward behavior the critic rates better. It also has the same open risk, which is whether the critic's judgments stay calibrated as the policy drifts. The π\*0.6 figures come from the company's own report and were not independently checked for this chapter.
+
+### 7.4 OEM programs and the generalized loop
 
 The flywheel framing has spread to automakers. Hyundai Motor Group, for example, describes an AI-powered data flywheel of continuous collection, training, validation and deployment [55]. Motional published a "Learning every mile driven" explainer in the same genre [58].
 
-## 8. Comparison
+## 8. Open benchmarks for the evaluation half of the loop
+
+Every flywheel above depends on an evaluation gate, and most companies keep theirs private. Two open benchmarks from 2024 to 2026 show how the research community closes that part of the loop, and they bear directly on gate design.
+
+- **NAVSIM v1 and v2.** NAVSIM v1 (NeurIPS 2024 Datasets and Benchmarks) is *non-reactive* simulation on real logs. A planner's trajectory is scored by simulation-based metrics (the PDM score) rather than by L2 distance to the logged path [63]. NAVSIM v2 (CoRL 2025) adds **pseudo-simulation**: real data is augmented with synthetic observations, generated by 3D Gaussian splatting near the planned trajectory, so error recovery can be scored without running a sequential closed loop. The authors report strong correlation with closed-loop simulation at about 6x less compute. It was the main evaluation framework for the 2025 NAVSIM end-to-end driving challenge [63]. This is a practical middle point for a release gate: cheaper than full closed-loop runs, and far more predictive than open-loop error.
+- **Bench2Drive.** A CARLA closed-loop benchmark (NeurIPS 2024 Datasets and Benchmarks) with 220 short evaluation routes covering 44 interactive scenarios, plus an official training set (Base 1,000 clips; Full 13,638 clips after a July 2024 cleanup) [64]. Its maintainers argue that open-loop L2 error on nuScenes "is not a meaningful indicator" and that reviewers should stop asking for it [64]. The August 2026 v0.0.4 update tackles a data-engine problem directly: the new training set is **strictly uniform over scenarios** (44 x 25 = 1,100 routes), because the old Base set's uneven scenario mix skewed results. A separate 220-route validation set was added. Spin-offs test deployment issues (Bench2Drive-Robust: camera-stream failures, ego-state errors, compute latency) and vision-language QA in the loop [64].
+
+The lesson for flywheel builders is that **the evaluation gate needs the same care as the training set.** That means a balanced scenario mix, held-out validation that is separate from the gate set, and metrics that reward recovery and not imitation alone. The closed-loop-versus-open-loop debate in academia is the public form of the "virtual driver's test" question that Waymo raises in section 2.3.
+
+## 9. Comparison
 
 | System | Selection signal | Labeling | Evaluation / sim | Cadence / scale (public) |
 |---|---|---|---|---|
@@ -368,17 +401,19 @@ The flywheel framing has spread to automakers. Hyundai Motor Group, for example,
 | NVIDIA LLM flywheel [43] | All production logs per workload_id | Incumbent model output as label | LLM-as-judge; base/ICL/LoRA experiments | Up to 98.6% cost cut (one internal case) |
 | NVIDIA AV stack [47][50][52] | Curator filters over any log corpus | Auto + human-in-loop (CoC traces) | AlpaSim (NuRec), Cosmos Evaluator | 81,802 synthetic clips released; 20M h curation |
 | Mobileye REM [53] | All driving (map features) | On-edge semantic extraction | Map consistency across fleet | ~10 KB/km; millions of cars |
-| comma.ai [54] | User fleet driving video | World-model tokens / plans | On-policy in learned simulator | World model trained on 3M min video |
+| comma.ai [54][59] | User fleet driving video | World-model tokens / plans | On-policy in learned simulator | World model trained on 3M min video; 880M-param driving model (0.11.2, 2026) |
+| NVIDIA AlpaGym [60][61] | Closed-loop rollouts in AlpaSim | CoC auto-labels (reasoning traces) | GRPO on simulator rewards | Alpamayo 2 Super: 34B, 110k+ h data |
+| Physical Intelligence π\*0.6 [68] | Robot deployment rollouts + human corrections | Learned value function (advantage) | Real-world task success | Company-reported |
 
-## 9. Cross-cutting techniques
+## 10. Cross-cutting techniques
 
 **Edge versus cloud selection.** Tesla and Mobileye put selection on the vehicle (triggers, semantic compression), trading flexibility for bandwidth. Waymo, with full logging from a smaller fleet, selects in the cloud with embeddings [1][17][53]. A hybrid is common: coarse on-device triggers, then fine cloud-side retrieval and de-duplication.
 
-**Hindsight as supervision.** Tesla's offline auto-labeler and patent [9][14], Cruise's future-as-label CLM [32] and Waymo's Critic [18] all exploit the same asymmetry. An offline system that can see the future and use far more compute labels the past for an online system that cannot.
+**Hindsight as supervision.** Tesla's offline auto-labeler and patent [9][14], Waymo's offboard 3D detector [67], Cruise's future-as-label CLM [32] and Waymo's Critic [18] all exploit the same asymmetry. An offline system that can see the future and use far more compute labels the past for an online system that cannot.
 
 **Regression sets as contracts.** Tesla's never-regress unit tests [5], Cruise's "must beat prior model" gate [33] and NVIDIA's human-gated promotion [43] all put a monotone release gate after a noisy data stream.
 
-**Counterfactual generation.** Logged data cannot show what would have happened under a different policy. The field converged on learned simulators for this: Tesla's neural world simulator, the Waymo World Model, GAIA-2/PRISM-1, Cosmos/AlpaSim and comma's world model [15][19][26][29][52][54]. The new failure mode is **simulator exploitation and sim-to-real gap**. Waymo addresses it with a "virtual driver's test" for predictive validity [23]. Few public benchmarks exist [25][29].
+**Counterfactual generation.** Logged data cannot show what would have happened under a different policy. The field converged on learned simulators for this: Tesla's neural world simulator, the Waymo World Model, GAIA-2/PRISM-1, Cosmos/AlpaSim and comma's world model [15][19][26][29][52][54]. The new failure mode is **simulator exploitation and sim-to-real gap**. Waymo addresses it with a "virtual driver's test" for predictive validity [23]. Few public benchmarks exist for generative simulators themselves [25][29]. Planner-level open benchmarks such as NAVSIM pseudo-simulation and Bench2Drive are the nearest public proxies [63][64].
 
 **Teacher-student distillation.** Large offline models generate labels or behaviors that are distilled into deployable students. Waymo does this explicitly [18]. NVIDIA's LLM blueprint does the same for agent nodes [43]. Tesla's offline-to-online auto-labeling is an early perception-only version [9].
 
@@ -386,7 +421,7 @@ The flywheel framing has spread to automakers. Hyundai Motor Group, for example,
 
 1. **Design the selection function first.** Whether it is triggers on the device or embedding search in the cloud, what you choose to look at bounds what the model can learn. Version, audit and context-gate selectors the way you would models [2][3][17].
 2. **Exploit hindsight wherever ground truth arrives later.** Future observations (Cruise), multi-trip reconstruction (Tesla) or a larger offline judge (Waymo, NVIDIA) can replace most human labels. Reserve humans for QA, ontology and disputed cases [9][32][18][43].
-3. **Make every mined failure a permanent regression test.** Never-regress gates turn an open-ended data stream into a controllable release process [5][33].
+3. **Make every mined failure a permanent regression test, and balance the gate set.** Never-regress gates turn an open-ended data stream into a controllable release process. Scenario-uniform, held-out gate sets with recovery-aware metrics keep the gate from simply reflecting the data mix [5][33][63][64].
 4. **Separate inner and outer loops.** Iterate fast in simulation with an automated critic (inner loop). Ground truth in real deployment (outer loop) and measure how well each predicts the other [18][23].
 5. **Use reconstruction for fidelity and generation for coverage.** Re-simulating real logs (PRISM-1, NuRec) gives trustworthy regression tests. Generative world models (GAIA-2, the Waymo World Model, Cosmos) give long-tail breadth. You need both, plus a plausibility filter (Cosmos Evaluator) [29][19][50].
 6. **Treat automated judges as specifications.** LLM-as-judge and learned critics encode your definition of "good". Audit them with humans, version them, and remember that a flywheel labeled by the incumbent model can at best match it [43][18].
@@ -454,3 +489,15 @@ The flywheel framing has spread to automakers. Hyundai Motor Group, for example,
 56. "Active Learning, Data Selection, Data Auto-Labeling, and Simulation in Autonomous Driving, Part 5". I. Kargar (Medium), n.d. https://kargarisaac.medium.com/active-learning-data-selection-data-auto-labeling-and-simulation-in-autonomous-driving-part-5-82d7de92e82f
 57. "AI Orchestration for Data Flywheel". Iguazio (build.nvidia.com), 2025. https://build.nvidia.com/iguazio/ai-orchestration-for-data-flywheel
 58. "Technically Speaking: Learning Every Mile Driven". Motional, n.d. https://motional.com/news/technically-speaking-learning-every-mile-driven
+59. "openpilot release notes" (RELEASES.md, versions 0.9.9 to 0.11.2). comma.ai (GitHub), 2025-2026. https://github.com/commaai/openpilot/blob/master/RELEASES.md
+60. "Alpamayo Recipes" (hub for Alpamayo 1 / 1.5 Nano, Alpamayo 2 Super, SFT and RL recipes, CoC auto-labeling pipeline). NVIDIA NVlabs (GitHub), 2026. https://github.com/NVlabs/alpamayo-recipes
+61. "AlpaGym: reinforcement learning for end-to-end driving policies in AlpaSim". NVIDIA NVlabs (GitHub), 2026. https://github.com/NVlabs/alpagym
+62. "Alpamayo 1.5". NVIDIA NVlabs (GitHub), 2026. https://github.com/NVlabs/alpamayo1.5
+63. D. Dauner et al., "NAVSIM: Data-Driven Non-Reactive Autonomous Vehicle Simulation and Benchmarking" (NeurIPS 2024 D&B, arXiv:2406.15349); W. Cao et al., "Pseudo-Simulation for Autonomous Driving" (CoRL 2025, arXiv:2506.04218). https://github.com/autonomousvision/navsim
+64. X. Jia et al., "Bench2Drive: Towards Multi-Ability Benchmarking of Closed-Loop End-To-End Autonomous Driving" (NeurIPS 2024 D&B, arXiv:2406.03877), plus v0.0.4 update notes (August 2026). Thinklab-SJTU (GitHub). https://github.com/Thinklab-SJTU/Bench2Drive
+65. J.-J. Hwang et al., "EMMA: End-to-End Multimodal Model for Autonomous Driving". arXiv:2410.23262, Waymo, 2024. https://arxiv.org/abs/2410.23262
+66. "Waymo Open Dataset" (Perception, Motion and End-to-End Driving datasets). Waymo Research (GitHub), 2020-2026. https://github.com/waymo-research/waymo-open-dataset
+67. C. R. Qi, Y. Zhou, M. Najibi, P. Sun, K. Vo, B. Deng, C. Fowlkes, D. Anguelov, "Offboard 3D Object Detection from Point Cloud Sequences". CVPR 2021 (arXiv:2103.05073). https://arxiv.org/abs/2103.05073
+68. "π*0.6: a VLA That Learns From Experience" (Recap method). Physical Intelligence, November 2025. https://www.pi.website/blog/pistar06
+69. "GM to refocus autonomous driving development as Cruise robotaxi funding ends". General Motors press release, 10 December 2024 (widely reported; primary URL not retrieved here). https://news.gm.com/
+70. "openpi" (π0, π0-FAST, π0.5 open models). Physical Intelligence (GitHub), 2025. https://github.com/Physical-Intelligence/openpi

@@ -53,7 +53,7 @@ Adoption numbers reported by the project itself:
 
 | Revision | Headline changes |
 |---|---|
-| 2024-11-05 | Initial spec: JSON-RPC 2.0; stdio and HTTP+SSE transports; resources, prompts, tools, sampling, roots [1] |
+| 2024-11-05 | Initial spec: JSON-RPC 2.0; stdio and HTTP+SSE (separate SSE and POST endpoints); resources, prompts, tools, sampling, roots [1][49] |
 | 2025-03-26 | OAuth 2.1 authorization framework; **Streamable HTTP** replaces HTTP+SSE; JSON-RPC batching; tool annotations; audio content [48] |
 | 2025-06-18 | Batching removed; structured tool output; servers classified as OAuth Resource Servers (RFC 9728 metadata); RFC 8707 resource indicators required; elicitation; `MCP-Protocol-Version` header [47] |
 | 2025-11-25 | OIDC discovery; incremental scope consent; URL-mode elicitation; sampling with tools; **Client ID Metadata Documents** (SEP-991); experimental **tasks** (SEP-1686); SSE polling; JSON Schema 2020-12 default; formal governance [2] |
@@ -99,7 +99,7 @@ All messages are JSON-RPC 2.0. In the 2026-07-28 revision, every request carries
 
 **stdio** remains the local transport: the host launches the server as a subprocess and exchanges JSON-RPC over stdin/stdout. Servers may use stderr for logging [2]. stdio implementations should not follow the HTTP authorization spec and should take credentials from the environment instead [7].
 
-**HTTP+SSE (2024-11-05)** used separate endpoints for client POSTs and a server SSE stream. It was replaced in 2025-03-26 by **Streamable HTTP**, which exposes a single MCP endpoint [48]. The 2025-era Streamable HTTP added several stateful features:
+**HTTP+SSE (2024-11-05)** required two endpoints: an SSE endpoint for the server-to-client stream and an HTTP POST endpoint for client messages [49]. It was replaced in 2025-03-26 by **Streamable HTTP**, which exposes a single MCP endpoint [48]. The 2025-era Streamable HTTP added several stateful features:
 
 - A server-assigned `Mcp-Session-Id` header.
 - An optional GET stream for server-initiated messages.
@@ -207,7 +207,7 @@ The August 2026 roadmap names **agent identity** as the next frontier, because c
 
 SEP-2133 formalized **extensions**: optional, namespaced (`io.modelcontextprotocol/...`) features negotiated through an `extensions` field in client and server capabilities. Extensions can iterate outside the core release cadence; breaking changes require a new identifier [3][21].
 
-- **Tasks** (`io.modelcontextprotocol/tasks`, SEP-2663, contributed with AWS involvement). A server may answer `tools/call` with a durable *task handle* instead of a result, and the client polls with `tasks/get`, provides mid-flight input with `tasks/update`, or stops it with `tasks/cancel` [20][10]. SEP-2663 states three lessons from the 2025-11-25 experimental design:
+- **Tasks** (`io.modelcontextprotocol/tasks`, SEP-2663; AWS describes Tasks as contributed by AWS). A server may answer `tools/call` with a durable *task handle* instead of a result, and the client polls with `tasks/get`, provides mid-flight input with `tasks/update`, or stops it with `tasks/cancel` [20][10]. SEP-2663 states three lessons from the 2025-11-25 experimental design:
   - The per-method and per-tool opt-in handshake was "fragile," because clients had to call `tools/list` before any task-augmented request.
   - The blocking `tasks/result` was "a blocking trap" that forced long-lived connections.
   - `tasks/list` could not be scoped safely once sessions were gone, because a task ID was the only line of defense against cross-tenant contamination.
@@ -378,7 +378,7 @@ AGNTCY is an open-source collective, part of the Linux Foundation [39], that bui
 **Agent Directory Service (dir).** A federated registry for MCP servers, A2A agents, and Agent Skills [37]:
 
 - Records are OASF documents stored **content-addressed**, by CID, in an OCI registry such as Zot.
-- A Kademlia-style **DHT** maps skills, domains, modules, and locators to record IDs, so discovery is capability-based and needs no central index.
+- A **distributed hash table (DHT)** maps skills, domains, modules, and locators to record IDs, so discovery is capability-based and needs no central index.
 - Records carry cryptographic signatures and provenance ("verifiable claims").
 - A runtime-discovery component watches Docker and Kubernetes and resolves Agent Cards or OASF records from running workloads.
 - The directory is described as implementing the ARD (Agentic Resource Discovery) specification [37].
@@ -472,8 +472,8 @@ The v0.2 specification (released 28 April 2026) generalizes the design into an *
 
 x402 is "an open standard for internet native payments" for crypto and fiat. Its principles include being HTTP- and transport-native, network-agnostic, and **trust-minimizing**: a facilitator or server can never move funds except "in accordance with client intentions" [43]. The repository has moved to the x402 Foundation organization [43]. v2 of the spec, dated 9 December 2025, defines:
 
-- **Types, logic, and representation.** Transport- and scheme-independent types (`PaymentRequired`, `PaymentPayload`, `SettlementResponse`). Scheme logic: `exact`, `upto`, and `batch-settlement`. Networks are identified with CAIP-2 IDs [43].
-- **The HTTP flow.** The server answers `402 Payment Required` with a base64 `PAYMENT-REQUIRED` header. The client retries with a signed `PAYMENT-SIGNATURE` header, for example an EIP-3009-style authorization. The server verifies, settles, and returns `PAYMENT-RESPONSE` [43].
+- **Types, logic, and representation.** Transport- and scheme-independent types (`PaymentRequired`, `PaymentPayload`, `SettlementResponse`). Scheme logic: the core spec defines `exact`, and the repository adds `upto` and `batch-settlement` scheme specs. Networks are identified with CAIP-2 IDs [43].
+- **The HTTP flow.** The server answers `402 Payment Required` with a base64 `PAYMENT-REQUIRED` header. The client retries with a signed `PAYMENT-SIGNATURE` header, for example an EIP-3009 transfer authorization in the `exact` scheme. The server verifies, settles, and returns `PAYMENT-RESPONSE` [43].
 - **Facilitator API.** `POST /verify`, `POST /settle`, and a listing of supported schemes. The facilitator absorbs chain details such as gas and RPC so that the integration is "1 line for the server, 1 function for the client" [43].
 - **MCP binding.** A paid tool returns `isError: true` with `PaymentRequired` in both `structuredContent` and `content[0].text`. The client retries with `_meta["x402/payment"]`, and settlement comes back in `_meta["x402/payment-response"]` [43].
 - **A2A binding.** The a2a-x402 extension uses `payment-required`, `payment-submitted`, and `payment-completed` messages [44].
@@ -610,3 +610,4 @@ Discovery has split into three tiers: **package and server registries**, **stati
 46. ANP Community. "Agent Network Protocol (ANP)." 2026. https://github.com/agent-network-protocol/AgentNetworkProtocol
 47. MCP Maintainers. "Key Changes (2025-06-18)." 2025. https://modelcontextprotocol.io/specification/2025-06-18/changelog
 48. MCP Maintainers. "Key Changes (2025-03-26)." 2025. https://modelcontextprotocol.io/specification/2025-03-26/changelog
+49. MCP Maintainers. "Transports (2024-11-05)." Model Context Protocol Specification, 2024. https://modelcontextprotocol.io/specification/2024-11-05/basic/transports

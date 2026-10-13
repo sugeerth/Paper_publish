@@ -31,10 +31,10 @@ Every system in this chapter can be described with the same five parts:
 The chapter is organized from the shortest loop (within one task, seconds to minutes) to the longest (open-ended evolution of agents over days):
 
 - Section 1: verbal self-feedback within and across episodes (Reflexion, Self-Refine).
-- Section 2: skill libraries and memory-based learning (Voyager, Generative Agents, ExpeL, Agent Workflow Memory, Dynamic Cheatsheet, ACE, MemGPT/Letta, Mem0, Agent Skills).
+- Section 2: skill libraries and memory-based learning (Voyager, Generative Agents, ExpeL, Agent Workflow Memory, Dynamic Cheatsheet, ACE, MemGPT/Letta, Mem0, Agent Skills, ReasoningBank, Memento).
 - Section 3: LLM-guided evolutionary program search (FunSearch, AlphaEvolve, open reimplementations).
 - Section 4: self-referential and self-modifying agents (STOP, ADAS, Gödel Agent, SICA, Darwin Gödel Machine, Huxley-Gödel Machine).
-- Section 5: prompt and pipeline optimization (OPRO, Promptbreeder, DSPy/MIPRO, TextGrad, GEPA, and the production self-evolving agent loop).
+- Section 5: prompt and pipeline optimization (APE, ProTeGi and EvoPrompt as precursors; OPRO, Promptbreeder, DSPy/MIPRO, TextGrad, GEPA, AFlow, and the production self-evolving agent loop).
 - Section 6: a cross-cutting comparison, failure modes and design guidance.
 
 ## 1. Verbal Self-Feedback Loops
@@ -59,7 +59,7 @@ The chapter is organized from the shortest loop (within one task, seconds to min
  trial t+1: same task, Actor now conditioned on the new reflection
 ```
 
-**Results.** The paper reports 91% pass@1 on HumanEval, compared with 80% for GPT-4 at the time. On ALFWorld it reports 130 of 134 tasks completed and an absolute gain of about 22% over 12 iterative trials. On HotPotQA it reports roughly 20% improvement over baselines [1]. The official repository logs every run (HotPotQA with 100 sampled distractor questions, ALFWorld, programming, WebShop). It exposes the reflection strategy as a switch: none, last trajectory, self-reflection, or both. It also warns that reproduction is costly because the paper's runs used GPT-4 [2]. The authors' earlier draft repository describes Reflexion as "a simple retry technique" that wraps other decision procedures rather than replacing them [2].
+**Results.** The paper reports 91% pass@1 on HumanEval, compared with 80% for GPT-4 at the time. On ALFWorld it reports 130 of 134 tasks completed and an absolute gain of about 22% over 12 iterative trials. On HotPotQA it reports roughly 20% improvement over baselines [1]. The official repository logs every run (HotPotQA with 100 sampled distractor questions, ALFWorld, programming, WebShop). It exposes the reflection strategy as a switch: none, last trajectory, self-reflection, or both. It also warns that individual developers may find reproduction infeasible because the paper's runs used GPT-4, which had limited access and significant API charges [2]. Architecturally, Reflexion is a wrapper around an existing decision procedure (ReAct, CoT) rather than a replacement for it.
 
 **Failure modes and lessons.**
 - The loop only helps if the evaluator is reliable. For code, Reflexion relies on *self-generated* tests, so a wrong test can produce a confidently wrong "lesson".
@@ -108,7 +108,7 @@ Reflexion's memory is per-task. This section covers systems whose memory accumul
 - **Verification gates the library.** If unverified programs were committed, the library would fill with broken skills that get retrieved and copied. The self-verification critic is the integrity check on the loop.
 - **The curriculum is the exploration policy.** Without it, the agent stays near easy tasks. This anticipates the open-ended archives in Section 4.
 
-This design reappears in production as **Agent Skills**. A skill is a folder containing a `SKILL.md` file (YAML frontmatter with a `name` and a `description` that says when to use it, followed by Markdown instructions) plus optional scripts and resources, which an agent loads dynamically. A public specification is published alongside the reference repository [7]. The skill format is how the knowledge is *packaged*. Whether skills are authored by humans or induced by the agent, as Voyager and Agent Workflow Memory do, is a separate choice.
+This design reappears in production as **Agent Skills**. A skill is a folder containing a `SKILL.md` file (YAML frontmatter with a `name` and a `description` that says when to use it, followed by Markdown instructions) plus optional scripts and resources, which an agent loads dynamically. Only the two frontmatter fields are required. Anthropic's reference repository includes a specification, and the format is now published as an open "Agent Skills" standard at agentskills.io [7]. The skill format is how the knowledge is *packaged*. Whether skills are authored by humans or induced by the agent, as Voyager and Agent Workflow Memory do, is a separate choice.
 
 ### 2.2 Generative Agents: memory stream, retrieval, reflection (Park et al., 2023)
 
@@ -159,11 +159,32 @@ The Generator attempts tasks. The Reflector extracts lessons and is kept separat
 
 ### 2.7 OS-style and production memory layers: MemGPT/Letta and Mem0
 
-**MemGPT** framed long-term memory as *virtual context management*, by analogy to an operating system that pages data between fast and slow memory. The LLM moves information between its context window and external storage through function calls, editing its own memory [17]. Its successor platform, **Letta**, describes itself as a way to "build stateful agents with memory that can learn and improve over time". It has since expanded into an agent harness, server and SDK [18].
+**MemGPT** framed long-term memory as *virtual context management*, by analogy to an operating system that pages data between fast and slow memory. The LLM moves information between its context window and external storage through function calls, editing its own memory [17]. Its successor platform, **Letta**, describes itself as a way to "build stateful agents with memory that can learn and improve over time". Active development has since moved to a `letta-code` repository that contains an agent harness, a terminal UI, an App Server, and the runtime behind Letta's desktop and web apps [18].
 
 **Mem0** is a production memory layer that keeps user-, session- and agent-level state [19][20]. Its repository reports results for an April 2026 algorithm on its managed platform: LoCoMo 71.4 to 92.5 at about 7.0K tokens and 0.88 s p50 latency, LongMemEval 67.8 to 94.4, and BEAM 64.1 (1M) and 48.6 (10M). It cautions that open-source users should expect "directionally similar gains but not identical numbers" [20]. The accompanying paper describes extraction and update phases that decide whether new facts are added, update existing ones, delete contradicted ones, or are ignored [19].
 
 **Lesson.** In production, "agent learning" is mostly *memory hygiene*: extracting facts, resolving conflicts, scoping (user, session or agent), and controlling the token and latency budget. The benchmark gains reported above depend heavily on update policy, not on the storage backend.
+
+### 2.8 ReasoningBank: memory distilled from successes *and* failures (Ouyang et al., Google, ICLR 2026)
+
+ExpeL and AWM mostly learn from what worked. ReasoningBank stores *reasoning strategies* distilled from both successful and failed trajectories, and treats failures as a first-class source of preventive lessons [52]. The loop runs online at test time with no ground-truth labels:
+
+1. **Retrieve.** Before a task, relevant memory items are retrieved by similarity and injected into the agent's context.
+2. **Act.** The agent (a web-browsing or SWE agent) runs the task.
+3. **Judge.** An LLM-as-a-judge labels the trajectory as success or failure. The released WebArena code includes this `autoeval` component.
+4. **Distill and write back.** Successes yield validated strategies. Failures yield "what to avoid" lessons. Both are written as compact, structured items rather than raw trajectories.
+
+The paper's second contribution is **memory-aware test-time scaling (MaTTS)**. Spending extra test-time compute, through several parallel rollouts of one task or sequential self-refinement, produces *contrastive* experience: the agent can compare rollouts that succeeded with ones that failed. That contrast produces better memory, and better memory makes the next round of scaling more effective. The authors present experience-driven memory as a scaling dimension in its own right. Code is released for WebArena (BrowserGym) and SWE-Bench (built on mini-swe-agent), with Gemini 2.5 and Claude 3.7 Sonnet backends [52]. The paper reports gains in both effectiveness and efficiency (fewer interaction steps) over raw-trajectory and workflow-memory baselines such as AWM; see the paper for exact figures.
+
+**Lesson.** A memory that only records successes cannot tell the agent what to stop doing. Write back distilled lessons from failures, and remember that a self-judged success signal is a noisy label. ReasoningBank's gains depend on the judge as much as on the memory format.
+
+### 2.9 Memento: memory-based online RL without fine-tuning (Zhou et al., 2025)
+
+Memento recasts "fine-tuning an agent" as **online reinforcement learning over a memory-augmented MDP**, while the LLM weights stay frozen [53]. A **Case Bank** stores past episodes, both successful and failed. A **case-selection policy** decides which cases to retrieve for a new task. The policy comes in a non-parametric form (similarity retrieval) and a parametric form (a small neural policy trained on the reward signal), and the authors describe retrieval as being "by value", not only by similarity. The agent follows a planner-executor design. A CBR-driven meta-planner (GPT-4.1 in the reference setup) decomposes the task using retrieved cases. An executor (o3 or another model) runs each subtask as an MCP client with search, crawling, document, code and media tools, and writes outcomes back to the Case Bank [53].
+
+The repository reports 87.88% on the GAIA validation set (Pass@3, Top-1) and 79.40% on the GAIA test set, plus 95.0% on SimpleQA. It also notes that GAIA Level-3 remains hard because errors compound over long horizons [53]. These are the authors' own numbers on a heavily tool-augmented stack, so they reflect the whole system and not memory alone.
+
+**Lesson.** Memento makes the RL reading of agent memory explicit. The trainable component is the *retrieval policy*, a much smaller object than the LLM, and it can be trained with an ordinary reward signal. This is a practical midpoint between the prompt-only loops of this chapter and the weight-update loops of Chapter 07.
 
 ## 3. LLM-Guided Evolutionary Program Search
 
@@ -303,8 +324,9 @@ SICA removes the separation between meta-agent and target agent. The *same* codi
 - **Outer loop** (`DGM_outer.py`). The default is 80 generations, with 2 self-improvement attempts per generation run in parallel and a 1.5-hour timeout per attempt.
 - **Diagnose and modify.** For each selected parent, the system picks a task the parent failed, such as an unresolved issue or empty patches, and the parent agent is asked to analyze its own evaluation logs, propose a feature for *itself*, and implement it in its own codebase.
 - **Parent selection** (default `score_child_prop`). Each score `s` is passed through a sigmoid centered at 0.5, `s' = 1/(1+exp(-10(s-0.5)))`, then multiplied by `1/(1+children)` and normalized. This favors high performers that have not been explored much.
-- **Staged evaluation.** Every child must first compile and pass a small SWE-bench subset. A medium subset follows if the child clears a 0.4 threshold. A full evaluation follows only if it beats a threshold derived from the archive (the second-best score, floored at 0.4).
-- **Archive policy.** The default `keep_all` keeps every compiled child. The alternative `keep_better` keeps a child only if it scores within an evaluation-noise margin (0.1) of its parent.
+- **Staged evaluation.** Every child is first evaluated on a small SWE-bench subset and discarded if it does not compile or produces only empty patches. A medium subset follows if the child clears a 0.4 threshold. A full evaluation follows only if it beats a threshold derived from the archive (the second-best score, floored at 0.4).
+- **Archive policy.** The default `keep_all` keeps every compiled child. The alternative `keep_better` keeps a child only if it scores no worse than the *initial* agent's score minus an evaluation-noise margin (default 0.1).
+- **Failure targeting.** Besides picking a random unresolved issue, the code sometimes (each with probability 0.25) assigns a generic self-improvement target: fixing empty patches (when they are at least 10% of tasks), handling stochasticity, or handling context-length overflow.
 - **Polyglot mode.** The same loop runs against the Aider Polyglot benchmark.
 
 ```
@@ -332,7 +354,7 @@ SICA removes the separation between meta-agent and target agent. The *same* codi
 
 ### 4.6 Huxley-Gödel Machine (Wang, Piękos, Li, Laakom, Schmidhuber et al., 2025)
 
-The HGM paper argues that DGM-style selection by *benchmark score* is a weak proxy for self-improvement potential. The authors call this a **metaproductivity-performance mismatch**: an agent's own score does not predict how good its *descendants* will be [39][40]. HGM instead estimates the promise of an entire subtree (a "clade") of self-modifications and uses that clade-level estimate to choose which node to expand. It builds on the DGM codebase and evaluates on SWE-bench and Polyglot [40]. The authors report better results than prior self-improving coding-agent methods with less compute time, and the paper was presented as an ICLR 2026 oral; see the paper for exact figures [39][40].
+The HGM paper argues that DGM-style selection by *benchmark score* is a weak proxy for self-improvement potential. The authors call this a **metaproductivity-performance mismatch**: an agent's own score does not predict how good its *descendants* will be [39][40]. HGM instead estimates the promise of an entire subtree (a "clade") of self-modifications and uses that clade-level estimate to choose which node to expand. It builds on the DGM codebase and evaluates on SWE-bench and Polyglot [40]. The authors report better results than prior self-improving coding-agent methods with less compute time; see the paper for exact figures [39]. The repository reports that the paper was accepted as an oral presentation at ICLR 2026, and like the DGM repository it warns that it executes untrusted model-generated code inside Docker [40].
 
 **Lesson.** In tree-structured self-improvement, the *selection signal* is the key design decision. Lineage-aware credit assignment (how good are my descendants?) beats node-local fitness (how good am I?).
 
@@ -340,17 +362,27 @@ The HGM paper argues that DGM-style selection by *benchmark score* is a weak pro
 
 These systems treat prompts, instructions and few-shot demonstrations, and increasingly whole agent programs, as the parameters to optimize against a metric on a training set.
 
-### 5.1 OPRO: LLMs as optimizers (Yang et al., Google DeepMind, 2023)
+### 5.1 Precursors: APE, ProTeGi and EvoPrompt (2022-2024)
+
+Three early systems set up the patterns that the rest of this section refines.
+
+- **APE: Automatic Prompt Engineer** (Zhou et al., ICLR 2023). An LLM *induces* candidate instructions from input-output demonstrations. Each candidate is scored by the zero-shot performance of a target LLM, and the best candidates are optionally resampled as paraphrases (Monte-Carlo search). On 24 instruction-induction tasks, the generated instructions beat the prior LLM baseline by a large margin and matched or beat human-written instructions on 21 of 24 [54]. APE set up the basic propose-score-select loop.
+- **ProTeGi: Prompt Optimization with Textual Gradients** (Pryzant et al., EMNLP 2023). A minibatch of errors is shown to an LLM, which writes a natural-language "gradient": a critique of how the prompt caused the errors. A second call edits the prompt in the *opposite* semantic direction. Candidate prompts are kept in a **beam**, and **bandit algorithms** (UCB, successive rejects) decide which candidates get evaluated, which saves evaluation budget [55]. TextGrad credits ProTeGi with the term "textual gradients" [48]. ProTeGi is the direct ancestor of TextGrad's backward pass and GEPA's reflective mutation.
+- **EvoPrompt** (Guo et al., ICLR 2024). An LLM implements the operators of classical evolutionary algorithms, a genetic algorithm (crossover plus mutation) and differential evolution, directly on natural-language prompts. On 31 datasets, with GPT-3.5 and Alpaca, it reports gains over human-engineered prompts and earlier automatic methods of up to 25% on BIG-Bench Hard [56].
+
+**Lesson.** Score-only search (APE), error-driven critique (ProTeGi) and population search (EvoPrompt) were separate lines of work in 2023. GEPA (Section 5.6) is essentially their synthesis: reflective critique, a population with Pareto selection, and frugal evaluation.
+
+### 5.2 OPRO: LLMs as optimizers (Yang et al., Google DeepMind, 2023)
 
 OPRO describes the optimization problem in natural language. A **meta-prompt** contains the task description, a few exemplars, and a trajectory of past solutions *sorted by score*. The optimizer LLM proposes new candidates, which are scored and added back into the meta-prompt [41][42]. The repository includes prompt optimization, linear regression and TSP, and it warns about API cost [42]. The paper reports prompts that beat human-designed ones by up to 8% on GSM8K and up to 50% on Big-Bench Hard tasks. One example is "Take a deep breath and work on this problem step-by-step", which reached 80.2% on GSM8K with PaLM 2-L [41].
 
 **Limitation.** OPRO's only feedback is the score. The optimizer sees *that* a prompt scored 62% but not *why*. Later methods inject richer feedback.
 
-### 5.2 Promptbreeder (Fernando et al., Google DeepMind, 2023)
+### 5.3 Promptbreeder (Fernando et al., Google DeepMind, 2023)
 
 Promptbreeder evolves a population of task prompts using LLM-applied **mutation prompts**, and it evolves the mutation prompts too. This is self-referential prompt evolution, so the improvement operator is itself improved [43]. The idea recurs in AlphaEvolve's meta-prompt evolution, where the ablation shows it matters [23].
 
-### 5.3 DSPy and MIPROv2 (Khattab et al.; Opsahl-Ong et al., 2023-2024)
+### 5.4 DSPy and MIPROv2 (Khattab et al.; Opsahl-Ong et al., 2023-2024)
 
 DSPy recasts LM pipelines as **programs** made of declarative modules with signatures, and treats prompts and demonstrations as compiled parameters [44]. Its optimizers ("teleprompters") include [45]:
 
@@ -358,20 +390,20 @@ DSPy recasts LM pipelines as **programs** made of declarative modules with signa
 - **COPRO.** Instruction generation plus coordinate-ascent hill-climbing.
 - **MIPROv2.** Three stages. (1) **Bootstrapping** collects high-scoring traces per module. (2) **Grounded proposal** drafts candidate instructions conditioned on the program code, data summaries and traces. (3) **Discrete search** evaluates instruction and demonstration combinations on minibatches, with a **Bayesian-optimization surrogate** guiding later trials.
 - **SIMBA.** Finds high-variance examples in stochastic minibatches and writes self-reflective rules or adds demonstrations.
-- **GEPA** (see 5.5).
+- **GEPA** (see 5.6).
 - **BootstrapFinetune.** Distills a prompted program into fine-tuned weights, which closes the loop into weights as in Chapter 07.
 
 The MIPRO paper reports that it outperforms baseline optimizers on five of seven multi-stage programs, by up to 13% accuracy with Llama-3-8B [46]. The DSPy docs describe typical runs costing about US$2 and about 10 minutes, with a range from cents to tens of dollars. Informal examples include a ReAct agent on HotPotQA going from 24% to 51% (MIPROv2, light mode, 500 examples), RAG on a StackExchange subset going from 53% to 61%, and Banking77 classification going from 66% to 87% via BootstrapFinetune with GPT-4o-mini. The docs also give selection guidance: about 10 examples suits BootstrapFewShot, and 200+ examples with 40+ trials suits MIPROv2 [45].
 
 **Lesson.** Optimizing the **whole pipeline jointly** matters. Credit assignment across modules (which stage's instruction caused the failure?) is the hard part, and MIPRO handles it by bootstrapping per-module traces from end-to-end successes.
 
-### 5.4 TextGrad (Yuksekgonul et al., Nature 2025)
+### 5.5 TextGrad (Yuksekgonul et al., Nature 2025)
 
 TextGrad brings the PyTorch abstraction to text. **Variables** (prompts, solutions, code, even molecules) have role descriptions and a `requires_grad` flag. A **TextLoss** is a natural-language evaluation instruction. `loss.backward()` asks an LLM to produce **textual gradients** (critiques) that are back-propagated through the computation graph, and the **TGD** optimizer applies them as edits [47][48]. Published in Nature in March 2025, the paper reports GPT-4o zero-shot GPQA accuracy improving from 51% to 55% and a 20% relative gain on LeetCode-Hard solutions, alongside applications to molecule design and radiotherapy treatment planning [47][48].
 
 **Lessons.** The "gradient" is only as good as the critic. Long chains of textual backprop are noisy and can amplify hallucinated critiques. TextGrad works best when the loss is grounded, for example in test results or a verifier, rather than in pure LLM opinion.
 
-### 5.5 GEPA: Reflective Prompt Evolution (Agrawal et al., 2025)
+### 5.6 GEPA: Reflective Prompt Evolution (Agrawal et al., 2025)
 
 GEPA (Genetic-Pareto) combines three ideas: reflection from Reflexion, evolution from FunSearch, and Pareto selection from multi-objective optimization [49][50].
 
@@ -390,11 +422,19 @@ GEPA (Genetic-Pareto) combines three ideas: reflection from Reflexion, evolution
                 no : discard
 ```
 
-**Results.** The paper reports GEPA beating GRPO by about 10% on average, and by up to 20%, while using up to 35x fewer rollouts. It reports beating MIPROv2 by more than 10% across two LLMs [49]. The project reports 100-500 evaluations compared with roughly 5,000-25,000+ for GRPO. Other project-reported results include GPT-4.1 Mini on AIME 2025 going from 46.6% to 56.6%, an ARC-AGI agent going from 32% to 89% via architecture discovery, a cloud-scheduling policy with 40.2% cost savings, and a Databricks result where open-source models plus GEPA beat Claude Opus 4.1 at about 90x lower cost [50]. GEPA is integrated as `dspy.GEPA`, in MLflow's `optimize_prompts`, in Google ADK, and elsewhere. Adapters cover DSPy full programs (evolving signatures, modules and control flow), RAG pipelines, MCP tool descriptions and the Terminus terminal agent [50].
+**Results.** The paper reports GEPA beating GRPO by up to 20% on individual tasks while using up to 35x fewer rollouts, and beating MIPROv2 by more than 10% across two LLMs [49]. The *average* margin over GRPO is about 10% in the first arXiv version; it may differ in later revisions, so cite the specific version when quoting it. The project reports 100-500 evaluations compared with roughly 5,000-25,000+ for GRPO. Other project-reported results include GPT-4.1 Mini on AIME 2025 going from 46.6% to 56.6%, an ARC-AGI agent going from 32% to 89% via architecture discovery, a cloud-scheduling policy with 40.2% cost savings, and a Databricks result where open-source models plus GEPA beat Claude Opus 4.1 at about 90x lower cost [50]. GEPA is integrated as `dspy.GEPA`, in MLflow's `optimize_prompts`, in Google ADK, and elsewhere. Adapters cover DSPy full programs (evolving signatures, modules and control flow), RAG pipelines, MCP tool descriptions and the Terminus terminal agent [50].
 
 **Lesson.** GEPA's main finding is that **rich feedback beats rich sampling**. Reading one failure trace often reveals more than hundreds of scalar rollouts. RL-scale sample counts are mostly wasted on optimizing a few thousand tokens of instructions.
 
-### 5.6 A production pattern: the self-evolving agent loop (OpenAI and Bain cookbook, 2025)
+### 5.7 AFlow: tree search over agentic workflows (Zhang et al., ICLR 2025)
+
+DSPy and GEPA mostly tune the *text* inside a fixed program. AFlow searches over the program's *structure* [57]. It represents a workflow as code: LLM-invoking **nodes** connected by edges, plus reusable **operators** that encapsulate common patterns such as Generate, Format, Review, Revise, Ensemble, Test and Programmer. A variant of **Monte Carlo tree search** then repeatedly does four things. It *selects* a workflow from the tree of past versions, balancing score against exploration. It *expands* the workflow by asking an LLM to modify the code, using the parent's logged failures and the modification history. It *evaluates* the result on a validation set, repeated over several rounds to average out noise. It *backpropagates* the score and experience into the tree [57].
+
+Experiments cover six benchmarks: HumanEval, MBPP, GSM8K, MATH, HotpotQA and DROP. The paper reports an average improvement over the strongest manual and automated baselines of about 5.7%, and workflows that let smaller models beat GPT-4o on some tasks at a small fraction of its dollar inference cost (approximate figures, from the abstract) [57]. AFlow was an oral presentation at ICLR 2025 [57].
+
+**Lesson.** AFlow sits between ADAS (Section 4.2, unrestricted code search with an archive) and DSPy (fixed structure, optimized text). Restricting the search to a vocabulary of operators makes structural search tractable and the results readable, at the cost of not discovering primitives outside that vocabulary.
+
+### 5.8 A production pattern: the self-evolving agent loop (OpenAI and Bain cookbook, 2025)
 
 The OpenAI Cookbook's "self-evolving agents" guide packages these ideas into a deployable retraining loop for a regulated domain: summarizing sections of a pharmaceutical CMC regulatory document, with about 70 sections [51]. The components are:
 
@@ -426,15 +466,18 @@ The guide compares three tiers: manual optimization in the Evals UI, the automat
 | Voyager [5] | Skill library (code) | GPT-4 | Env + execution + critic LLM | Embedding-indexed skills; curriculum | Lifelong; GPT-4 API | Library pollution if verification is weak |
 | ExpeL / AWM [9][11] | Insights / workflows | LLM | Task success (labels or judge) | Insight list + trajectory retrieval | Grows with experience | Contradictory or stale rules |
 | Dynamic Cheatsheet / ACE [13][15] | Context playbook | LLM roles | Execution feedback | Curated memory; delta merges | ACE: ~87% lower adaptation latency vs baselines | Context collapse, brevity bias |
+| ReasoningBank / Memento [52][53] | Strategy memory / case bank | LLM (distiller); learned case-selection policy (Memento) | LLM judge (ReasoningBank); task reward | Similarity retrieval; value-based retrieval policy | Online, no weight updates | Noisy self-judged labels poison memory |
 | FunSearch [21] | One function | Small code LLM | Deterministic scorer | Islands; best-shot prompts | Millions of samples | Evaluator bugs exploited |
 | AlphaEvolve [23] | Whole files, multi-language | Gemini Flash + Pro | Cascaded, parallel, multi-metric | MAP-Elites x islands; meta-prompts | Thousands of samples; up to ~100 compute-h per eval | Limited to auto-evaluable tasks |
 | OpenEvolve / Shinka [26][27] | Programs | Model ensemble (bandit) | User evaluator | MAP-Elites / islands / novelty filter | ~$0.01-0.60 per iteration (OpenEvolve est.) | Wasted evals on near-duplicates |
 | DGM [36] | Agent's own codebase | The agent itself | SWE-bench / Polyglot, staged | Open-ended archive, score/children weighting | ~2 weeks, ~US$22k per run (approx.) | Objective hacking of detectors |
 | HGM [39] | Agent's own codebase | The agent itself | Coding benchmarks | Clade-level metaproductivity | Reported less compute than DGM | Proxy mismatch (addressed) |
+| APE / ProTeGi / EvoPrompt [54][55][56] | Instruction prompt | LLM (induce / critique-and-edit / GA-DE operators) | Score on dev set | Resampling; beam + bandit; population | Dev-set evaluations per candidate | Overfit to small dev set |
 | OPRO [41] | Prompt | LLM | Score on train set | Sorted score trajectory | Many evals | Score-only signal |
 | MIPROv2 [46] | Instructions + demos, per module | LLM | Program metric | Bayesian surrogate | ~$2, ~10 min typical (docs) | Overfit small train sets |
 | TextGrad [47] | Any text variable | LLM | Natural-language loss | Optimizer state | Per-variable LLM calls | Noisy textual gradients |
 | GEPA [49] | Prompts / programs / code | Reflection LLM | Metric + traces (ASI) | Per-instance Pareto front, merge | 100-500 evals vs 5k-25k+ for GRPO | Judge-feedback overfitting |
+| AFlow [57] | Workflow structure (code over operators) | LLM | Validation-set score, repeated runs | MCTS tree with experience backprop | 20 rounds default; several validation runs | Limited to operator vocabulary |
 
 ### 6.1 Three axes that organize the design space
 

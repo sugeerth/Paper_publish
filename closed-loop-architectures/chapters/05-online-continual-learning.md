@@ -7,14 +7,14 @@ Every closed-loop system has to decide how quickly the consequences of its own a
 Five families of design appear in the public record:
 
 1. **Streaming (online) training for recommendation and ads.** Labels are joined from event streams, models are trained continuously, and parameter deltas are pushed to serving within minutes. This is the oldest family in production: Google's FTRL-Proximal ads model [1], Facebook's online joiner and online logistic regression [2], ByteDance's Monolith [3][4], Twitter's continuous training with delayed feedback [5], and the update-dissemination and checkpointing systems that make it work at terabyte scale (Ekko [6], Check-N-Run [7], PERSIA [8]).
-2. **Bandit loops.** Instead of passively learning from logs, the system explores on purpose, logs propensities and learns a policy online. Examples are Yahoo's LinUCB news module [9][10], Microsoft's Decision Service and MSN deployment [11][12][13] and Netflix artwork personalization [14].
-3. **Catastrophic forgetting and its mitigations.** These run from EWC and GEM [15][16] to the LLM-era findings that LoRA forgets less [17], on-policy RL forgets less than SFT [18], and sparse memory-layer updates forget far less than either [19][20].
+2. **Bandit loops.** Instead of passively learning from logs, the system explores on purpose, logs propensities and learns a policy online. Examples are Yahoo's LinUCB news module [9][10], Microsoft's Decision Service and MSN deployment [11][12][13], Netflix artwork personalization [14] and ZOZO's public Open Bandit Dataset for validating the offline gate [45].
+3. **Catastrophic forgetting and its mitigations.** These run from EWC and GEM [15][16] to the LLM-era findings that LoRA forgets less [17] yet loses little plasticity under RL [46], on-policy RL forgets less than SFT [18], on-policy self-distillation can bring that benefit to demonstrations [47], and sparse memory-layer updates forget far less than full fine-tuning or LoRA [19][20].
 4. **Continual pretraining of LLMs.** This covers learning-rate re-warming, replay and the "stability gap" [21][22][23], with time-continual benchmarks such as TiC-LM [24] and the survey literature [25].
-5. **Test-time training (TTT).** This runs from self-supervised TTT and TENT for distribution shift [26][27], through TTT layers and Titans, which turn "learning at test time" into a sequence-model architecture [28][29], to per-task LoRA training at inference for abstract reasoning [30], minute-long video generation [31], and self-editing models that write their own fine-tuning data [32][33].
+5. **Test-time training (TTT).** This runs from self-supervised TTT and TENT for distribution shift [26][27], through TTT layers, Titans and Nested Learning, which turn "learning at test time" into a sequence-model architecture [28][29][52], to per-task LoRA training at inference for abstract reasoning [30], minute-long video generation [31], self-editing models that write their own fine-tuning data [32][33], and RL on unlabeled test questions with majority-vote rewards [49].
 
-The chapter closes with online RL on LLM product signals (Cursor Tab [34]) and a cautionary rollback (GPT-4o sycophancy [35]), followed by comparison and failure-mode tables and takeaways.
+The chapter closes with online RL on LLM product signals (Cursor Tab [34]), a cautionary rollback (GPT-4o sycophancy [35]) and the asynchronous RL infrastructure that has rebuilt the recommender parameter server for LLMs [50][53]. Comparison and failure-mode tables and takeaways follow.
 
-Source note: the systems facts below come from the cited papers, official repositories and engineering posts. Where a number could not be re-checked against the primary text while this chapter was written, it is marked "approximately" or "reported".
+Source note: the systems facts below come from the cited papers, official repositories and engineering posts. Where a number could not be re-checked against the primary text while this chapter was written, it is marked "approximately" or "reported". Repository-level details (Monolith, TENT, PERSIA, MARC, TiC-LM, SEAL, TTT-Video, TFRA, Open Bandit Pipeline, TTRL, SDFT) were re-checked against the repositories' source and READMEs for the October 2026 revision.
 
 ```
   LOOP LATENCY SPECTRUM (time from outcome to parameter change)
@@ -86,7 +86,7 @@ Short-video and ads recommendation at ByteDance faces two problems that batch fr
          |  workers <-> training PS                |
          |  - collisionless cuckoo-hash embeddings |
          |  - occurrence filter, expiry            |
-         |  - touched-key set per sparse table     |
+         |  - touched-key set (ids since last sync)|
          +-----------------------------------------+
                | sparse: only touched keys,     | dense: full, on a
                | minute-level cadence           | slower cadence
@@ -104,7 +104,7 @@ The data flow above follows the paper [3]. The serving split is visible in the r
 
 - **Collisionless embedding table.** Monolith uses a cuckoo hash map, with two tables and two hash functions. An insert that finds its slot taken evicts the occupant to its alternate table, so distinct IDs never share an embedding [3]. The repository implements this in `runtime/hash_table/cuckoohash/` [4].
 - **Bounding memory without collisions.** Two mechanisms keep the table bounded. *Frequency filtering* means an ID is admitted only after it has been seen a configurable number of times (`occurrence_threshold` per feature slot). It is implemented with probabilistic and sliding-window hash filters. *Expirable embeddings* means each entry carries a last-update timestamp, and an ID untouched for longer than its slot's `expire_time` is evicted [3][4]. Expiry is deliberate forgetting: it trades memory, and some long-tail knowledge, for capacity to learn new IDs.
-- **Incremental parameter sync.** Most bytes are in sparse embeddings, but only a small fraction of IDs are updated in any short window. The training PS therefore records a *touched-key set* per table, and at sync time pushes only those keys' embeddings to the serving PS. Dense parameters move slowly and are synced less often [3]. In the open-source code, the touched-key buffer is a hopscotch hash set with a capacity constant of 64 MiB / 32 B, about 2.1 million keys per push, wired to a `ParameterSyncClient` [4].
+- **Incremental parameter sync.** Most bytes are in sparse embeddings, but only a small fraction of IDs are updated in any short window. The training PS therefore tracks the set of IDs trained since the last sync (the *touched keys*), and at sync time pushes only those keys' embeddings to the serving PS. Dense parameters move slowly and are synced less often [3]. In the open-source code, each `ParameterSyncClient` owns a single concurrent hopscotch hash set of (key, table) pairs that every attached hash table writes into. Its capacity is the constant `MAX_TOUCHED_KEYS = 64 * 1024 * 1024 / (8 * 4)`, about 2.1 million entries, and the sync step drains it with `GetAndClear()` [4].
 - **Negative sampling with correction.** Negatives are subsampled in the joiner. The paper applies log-odds correction at serving so predicted probabilities stay calibrated, the same issue Facebook solved with re-calibration [2][3].
 - **Streaming input.** Training reads directly from Kafka. The tutorial's `create_plain_kafka_dataset` treats the poll batch size as the effective training batch size [4].
 
@@ -166,12 +166,12 @@ Recommendation training jobs run for long periods on massive embedding tables, s
 
 ### 4.3 PERSIA and dynamic-embedding stacks
 
-PERSIA, from Kuaishou and ETH Zurich, uses hybrid synchronization. Dense layers train synchronously on GPUs, while embeddings update asynchronously on a CPU parameter server [8]. Its README cites training up to 100 trillion parameters and production validation "with 100 million level DAU at Kuaishou" [8]. The project is marked unmaintained after a company reorganization [8], a reminder that open-source online-training stacks often outlive their sponsors. TensorFlow Recommenders-Addons (TFRA) covers similar ground for the TensorFlow ecosystem. Its stated scope includes dynamic embeddings for very large sparse features, online learning, and continuous-training pipelines integrated with TFX [40].
+PERSIA, from Kuaishou and ETH Zurich, uses hybrid synchronization. Dense layers train synchronously on GPUs, while embeddings update asynchronously on a CPU parameter server [8]. Its README cites training up to 100 trillion parameters and production validation "with 100 million level DAU at Kuaishou" [8]. The project is marked unmaintained after a company reorganization [8], a reminder that open-source online-training stacks often outlive their sponsors. TensorFlow Recommenders-Addons (TFRA) covers similar ground for the TensorFlow ecosystem. Its README centers on trainable, resizable *dynamic embeddings* backed by pluggable key-value stores (a CPU cuckoo hash map, NVIDIA's GPU HierarchicalKV, or Redis), and on "half synchronous" Horovod training that is synchronous for dense weights and asynchronous for sparse ones [40]. The design RFC behind it names online learning as the motivation: tracking user interests in real time "requires eliminating and adding weights on running-time without frequently restart training" [40].
 
 ### 4.4 Lessons
 
-- The sparse/dense asymmetry recurs everywhere. Sparse rows change fast and locally, while dense weights change slowly and globally. Monolith's sync [3], Check-N-Run's checkpoints [7] and PERSIA's hybrid synchronization [8] all exploit it.
-- **Update validation has to be continuous.** Ekko's rollback [6] and Facebook's joiner circuit breaker [2] are the two published guardrails at the update level rather than the release level.
+- The sparse/dense asymmetry recurs everywhere. Sparse rows change fast and locally, while dense weights change slowly and globally. Monolith's sync [3], Check-N-Run's checkpoints [7], PERSIA's hybrid synchronization [8] and TFRA's half-synchronous mode [40] all exploit it.
+- **Update validation has to be continuous.** Ekko's rollback [6] and Facebook's joiner circuit breaker [2] are two of the few published guardrails that act at the update level rather than the release level.
 
 ## 5. Bandit loops: learning the policy, not just the predictor
 
@@ -183,7 +183,7 @@ Li et al. framed news-article recommendation on the Yahoo! Today module as a con
 
 ### 5.2 Microsoft Decision Service and MSN (2016-2017)
 
-Agarwal et al. present the Decision Service as "the first general system for contextual learning". It is built from four abstractions connected in a loop, **explore, log, learn and deploy**. The explore and log abstractions guarantee "correct, unbiased data", which the learner uses "for online learning and to enable real-time safeguards, all in a fully reproducible manner" [11]. The reported production deployments are two content-recommendation services with 25-30% click-through improvements and a landing page with an 18% revenue lift [11]. Agarwal and Langford's Microsoft Research blog reports that clicks on MSN.com rose 26% after a contextual-bandit system went live in January 2016. The same technology shipped as the Custom Decision Service in Azure Cognitive Services, as open source on GitHub, and as algorithms in Vowpal Wabbit [12]. The project page describes Multiworld Testing as evaluating K policies with data and computation that scale *logarithmically* in K, unlike A/B testing [13].
+Agarwal et al. present the Decision Service (the paper's later arXiv versions are titled "Making Contextual Decisions with Low Technical Debt") as a general-purpose system for contextual-bandit learning. It is built from four abstractions connected in a loop, **explore, log, learn and deploy**. Exploration and logging are designed so that the logged data is correct and unbiased, which lets the learner train online, supports real-time safeguards and keeps every decision reproducible [11]. The reported production deployments include content-recommendation services with click-through improvements in the 25-30% range and a landing page with an 18% revenue lift (as reported) [11]. Agarwal and Langford's Microsoft Research blog reports that clicks on MSN.com rose 26% after a contextual-bandit system went live in January 2016. The same technology shipped as the Custom Decision Service in Azure Cognitive Services, as open source on GitHub, and as algorithms in Vowpal Wabbit [12]. The project page describes Multiworld Testing as evaluating K policies with data and computation that scale *logarithmically* in K, unlike A/B testing [13].
 
 ```
             +-----------+    context x     +--------------------+
@@ -210,7 +210,11 @@ Netflix chooses which artwork to show each member for each title using contextua
 
 Chen et al. treat YouTube recommendation as a REINFORCE policy learned from logs produced by many earlier policies. They correct with importance weights, a top-K correction for slates, and variance-control techniques [42]. This is the batch, large-action-space counterpart to online bandits. The loop closes on the training cadence rather than per event, but the propensity discipline is the same.
 
-### 5.5 Lessons
+### 5.5 Open Bandit Dataset and Pipeline: a public testbed for the offline gate (ZOZO, 2021)
+
+Most bandit logs stay private, so the off-policy evaluation (OPE) step that gates every new policy is rarely tested against ground truth. The Open Bandit Dataset fixes that for one real system. ZOZO logged its ZOZOTOWN fashion e-commerce recommender over a 7-day experiment on three campaigns (all, men's and women's items), with three recommendation positions per page. Each campaign randomly served either a uniform-random policy or Bernoulli Thompson sampling [45]. Because two different policies ran on the same platform and traffic, one policy's logs can be used to estimate the other's value, and the estimate can be checked against that policy's actual on-policy outcome. This is the replay idea of [10] turned into a benchmark for OPE estimators. The companion Open Bandit Pipeline is a Python package that standardizes preprocessing, off-policy learning and OPE estimators (DM, IPW, self-normalized IPW, DR and more robust DR variants) behind one interface [45]. For system builders the lesson is practical. Before trusting an IPS or DR gate in a production bandit loop, validate it on data where the answer is known, ideally by keeping a small slice of traffic on a logged randomized policy, as ZOZO did.
+
+### 5.6 Lessons
 
 - **Exploration is infrastructure.** The Decision Service shows that exploration, propensity logging and offline evaluation work best as shared platform features, not as per-team code [11].
 - **Online learning amplifies whatever the reward measures.** Fast bandit updates on click rewards converge quickly to click-optimal and possibly engagement-bait policies. The guardrails must be as fast as the learner.
@@ -234,8 +238,15 @@ Recommendation streams are non-stationary by design. Monolith's expiry and the f
 ### 6.3 LLM-era findings
 
 - **LoRA learns less and forgets less** (Biderman et al., 2024). For continued pretraining and instruction fine-tuning on code and math, LoRA underperforms full fine-tuning on the target domain but better preserves source-domain abilities. The weight perturbations that full fine-tuning learns have far higher rank than typical LoRA configurations (reported 10-100x) [17]. Parameter-efficient updates act as an implicit regularizer against forgetting, at the cost of plasticity.
+- **...but for RL, LoRA's plasticity cost largely disappears** ("LoRA Without Regret", Schulman et al., Thinking Machines Lab, 2025). The post reports that LoRA matches full fine-tuning for policy-gradient RL even at rank 1. The argument is information-theoretic: an episode's scalar advantage carries only about O(1) bits, so a tiny adapter has enough capacity to absorb it [46]. Read together with [17] and [18], this suggests a cheap default for closed-loop LLM updates, namely low-rank adapters trained on-policy. It also has a systems payoff, covered in Section 9.3: a rank-1 adapter is megabytes, not gigabytes, so it can be shipped to serving as a delta [53].
 - **On-policy RL forgets less than SFT** ("RL's Razor", Shenfeld, Pari and Agrawal, 2025). At matched performance on a new task, RL fine-tuning preserves prior capabilities better than supervised fine-tuning. The amount of forgetting is predicted by the KL divergence between the fine-tuned and base policies, measured on the new task's distribution. On-policy RL is implicitly biased toward KL-minimal solutions among those that solve the task [18]. For closed-loop LLM products, this argues for on-policy updates, such as Cursor's online RL [34], over repeated SFT on logged data when retaining general capability matters.
 - **Sparse memory fine-tuning** (Lin et al., Meta FAIR, 2025). This builds on memory layers, which add a large key-value memory sparsely accessed per token [20]. New facts are learned by updating only the memory slots that the new data activates far more than pretraining data did, ranked with a TF-IDF-style score [19]. In the reported fact-learning experiment, held-out NaturalQuestions performance dropped about 89% with full fine-tuning and about 71% with LoRA, against about 11% with sparse memory fine-tuning, at comparable new-knowledge acquisition (approximate, as reported) [19]. The architectural lesson is that **sparse, addressable parameters make continual updates local**. The same property makes Monolith's per-ID embeddings safe to update every minute.
+
+### 6.4 On-policy learning from demonstrations: self-distillation fine-tuning (2026)
+
+RL's Razor [18] leaves a gap. On-policy RL forgets less, but it needs a reward function, and many production updates arrive as demonstrations, such as corrected outputs, new documents or tool traces, which normally feed off-policy SFT. *Self-Distillation Fine-Tuning* (SDFT; Shenfeld et al., ICML 2026) closes that gap with in-context learning [47]. The same model, conditioned on a demonstration, acts as the teacher. The unconditioned model samples its own outputs, and the training signal is the divergence between the student's and the demonstration-conditioned teacher's token distributions on those on-policy samples. The authors report that SDFT beats SFT on skill-learning and knowledge-acquisition tasks, with higher new-task accuracy and substantially less forgetting, and that one model can accumulate several skills sequentially without regression [47].
+
+Two caveats belong next to the claim. First, the authors later found that all of the paper's results came from a per-token *forward*-KL loss, not the reverse KL analyzed in the paper's theory. The repository default was changed and the arXiv version clarified [47][48]. Second, an independent reproduction during Hugging Face's ICML 2026 agent-reproduction challenge did not reproduce the headline gain of about 4 points with the authors' own code and data [48]. The design idea, turning demonstrations into an on-policy signal so that updates stay close to the current policy, is sound and consistent with [18]. The magnitude of the benefit should be treated as unsettled.
 
 ## 7. Continual pretraining of LLMs
 
@@ -280,7 +291,7 @@ TiC-LM builds a web-scale *time-continual* pretraining benchmark from successive
   C_{k+1}  --> alignment/RL refresh --> eval gates --> deploy
 ```
 
-The open problem is that the post-training stack, including SFT, RLHF and safety tuning, sits on top of the pretrained checkpoint. CPT can erode aligned behavior, and work in the survey literature examines forgetting in CPT of already-aligned models [25]. In practice, many teams re-run post-training after every CPT step.
+The open problem is that the post-training stack, including SFT, RLHF and safety tuning, sits on top of the pretrained checkpoint. CPT can erode aligned behavior. Li and Lee examine forgetting when an already-aligned chat model is continually pretrained, measuring losses in output format, knowledge and reliability [51], and the survey literature catalogs the wider problem [25]. In practice, many teams re-run post-training after every CPT step.
 
 ## 8. Test-time training: closing the loop inside a request
 
@@ -291,10 +302,11 @@ TTT methods update some parameters *on the test input itself*, using a self-supe
 - **TTT with self-supervision** (Sun et al., ICML 2020). A shared feature extractor feeds both the main classifier and an auxiliary self-supervised head that predicts image rotation. At test time, the shared encoder takes gradient steps on the rotation loss for the single test image, or keeps updating across an online stream. This improves robustness on corrupted and shifted benchmarks such as CIFAR-10-C and CIFAR-10.1 [26].
 - **TENT** (Wang, Shelhamer et al., ICLR 2021). This is *fully* test-time adaptation. It needs no auxiliary training: it minimizes prediction entropy on test batches and updates only normalization statistics and affine parameters, with "just one update per batch to not interrupt inference" [27]. In the repository's illustrative CIFAR-10-C example (WRN-28-10, severity 5), mean error falls from 43.5% (source model) to 20.4% (test-time normalization only) to 18.6% (TENT) [27]. Most of the gain comes from re-estimating normalization statistics. This is a cheap, robust production trick, while entropy minimization adds a smaller increment and a risk of collapse on long non-stationary streams.
 
-### 8.2 TTT as architecture: TTT layers and Titans
+### 8.2 TTT as architecture: TTT layers, Titans and Nested Learning
 
 - **TTT layers** (Sun et al., 2024). The recurrent hidden state *is a model*, either a linear model (TTT-Linear) or a two-layer MLP (TTT-MLP). The state update rule is a step of self-supervised learning on the incoming tokens, so the layer literally trains on the test sequence [28]. The authors pitch this as linear-complexity sequence modeling with a more expressive state than classic RNNs. They provide JAX training code, PyTorch inference code and dedicated kernels [28].
 - **Titans** (Behrouz, Zhong and Mirrokni, Google, 2025). Titans adds a *neural long-term memory*, an MLP whose weights are updated at test time. The update is driven by a "surprise" signal, the gradient of an associative-memory loss, with momentum and a learned forgetting (weight-decay) gate. The memory is combined with attention as short-term memory in three variants: memory as context, as gate, or as layer [29]. The paper reports scaling to context windows beyond 2M tokens, with strong needle-in-haystack results (reported) [29]. An unofficial PyTorch implementation exposes the memory module as a drop-in `NeuralMemory` with configurable chunk size [44].
+- **Nested Learning and Hope** (Google, NeurIPS 2025). The same group generalizes the idea by treating a model as a set of nested optimization problems, each updated at its own frequency. Optimizers and attention are viewed as associative memories within this framing. Their proof-of-concept architecture, Hope, is a self-modifying variant of Titans paired with a "continuum memory system", a spectrum of MLP blocks updated at different rates. Google presents it explicitly as a continual-learning architecture and reports lower perplexity and better long-context recall than Titans and other recurrent baselines (as reported) [52]. For this chapter, the significance is conceptual. The fast and slow state split that recommender engineers implement in infrastructure (Section 4.4) becomes a multi-timescale update schedule *inside* the network.
 - **TTT for long video** (CVPR 2025). TTT-MLP layers are added to a pretrained CogVideoX 5B diffusion transformer. The original attention handles each 3-second segment locally, and TTT layers process the global sequence and its reverse, gated residually. Context is extended in stages to 9, 18, 30 and 63 seconds, and the authors' custom TTT-MLP kernel targets H100s [31].
 
 The engineering consequence of these designs is that "online learning" moves from the MLOps layer into the kernel. Update rules, learning rates and forgetting gates become architecture hyperparameters, and per-request state is weights rather than a KV cache.
@@ -320,7 +332,14 @@ Sakana AI's Text-to-LoRA is the amortized alternative. A hypernetwork generates 
   ARC TTT              per-task LoRA             leave-one-out demos      full LoRA run
   SEAL                 LoRA/full via self-edit   model-written data (RL)  inner finetune
   Text-to-LoRA         generated LoRA            none (hypernetwork)      1 forward pass
+  TTRL                 policy weights (RL)       majority-vote reward     RL run on test set
 ```
+
+### 8.5 Test-time reinforcement learning: TTRL (2025)
+
+TTRL (Zuo et al., Tsinghua and Shanghai AI Lab, NeurIPS 2025) asks whether a reasoning model can run RL on *unlabeled* test questions [49]. The missing reward is estimated with a standard test-time-scaling trick. The model samples many answers per question, the majority answer is treated as a pseudo-label, and each sample is rewarded for agreeing with it. The repository reports that this boosts Qwen2.5-Math-7B's pass@1 on AIME 2024 by about 211% using only unlabeled test data. It also reports that the trained model surpasses the initial model's own maj@n, the nominal ceiling of its supervision, and approaches models trained on the test data with ground-truth labels [49]. TTRL has since been folded into the verl RL framework behind a single flag [49].
+
+For closed-loop design, TTRL is the batch-RL counterpart of per-task TTT (Section 8.3). It closes the loop over a *distribution* of incoming unlabeled queries rather than one request. Its risk is the same self-reinforcement that makes entropy-based TTA collapse (Section 8.1): if the majority is confidently wrong, the reward pushes the model further toward that answer. Deployments therefore need a held-out labeled slice to detect drift. The approach suits domains with verifiable or consensus-friendly answers, such as math and code, much better than open-ended generation.
 
 ## 9. Online learning from product signals in LLM systems
 
@@ -331,6 +350,17 @@ Cursor reports that its Tab completion model serves over 400 million requests pe
 ### 9.2 Cautionary case: GPT-4o sycophancy (2025)
 
 OpenAI's postmortem describes an April 2025 update that added a reward signal based on ChatGPT thumbs-up and thumbs-down data. In aggregate, this weakened the primary reward signal that had been holding sycophancy in check. Offline evaluations did not catch the regression, and a full rollback took about 24 hours [35]. User-feedback loops optimize the proxy the users emit. The faster the update loop, the more the evaluation gate must test for the behaviors the proxy rewards by accident.
+
+### 9.3 The LLM parameter server: weight sync and staleness in asynchronous RL (2025-2026)
+
+Online RL on LLMs, whether from product signals like Cursor's or from verifiable rewards, has rebuilt the recommender stack of Sections 2 and 4 under new names. A March 2026 Hugging Face survey of 16 open-source RL libraries finds that all of them converged on the same architecture. Inference GPUs and training GPUs are physically separated, a buffer decouples them, and weights are pushed asynchronously from trainer to generators so that "generation never stops and training never waits" [50]. This is Monolith's training-PS/serving-PS split, with rollouts in place of joined click examples.
+
+The survey identifies the same two design axes that recommender engineers face [50]:
+
+- **Weight synchronization.** Transports range from NCCL broadcast (roughly 100-500 ms) and bucketed NCCL (about 20 ms in verl) to CUDA IPC, filesystem plus HTTP, and filesystem plus restart. The interrupt model matters as much as the transport. PipelineRL swaps weights between individual decode steps, so in-flight sequences continue under the new policy. Other libraries abort in-flight requests, drain them, or block a whole batch.
+- **Staleness management.** Rollouts are generated under a policy several steps behind the trainer, so the data is off-policy, just as a CTR model trains on impressions chosen by its predecessor. Three orthogonal remedies appear. *Version rejection* tags each sample with its policy version and drops samples that are too old. *Depth bounding* caps the buffer so lag cannot exceed a limit. *Importance-sampling correction* reweights stale samples with clipped ratios. The production trend is hybrid: bounded queues plus optional truncated IS [50].
+
+Low-rank adapters change the economics of the sync. Because rank-1 LoRA suffices for policy-gradient RL [46], a follow-up Hugging Face write-up ships only the adapter, a few megabytes for a 1.5B model against about 3 GB for full weights. It moves the adapter through shared storage instead of NCCL, and vLLM keeps several adapter versions loaded so that old rollouts finish under the policy they started with [53]. This is the LLM analogue of Monolith's touched-key sync and Ekko's delta dissemination (Sections 2.3 and 4.1): ship deltas, not models, and keep version identity attached to every sample.
 
 ## 10. Comparison of designs
 
@@ -349,6 +379,10 @@ OpenAI's postmortem describes an April 2025 update that added a reward signal ba
 | TTT layers / Titans (2024-25) [28][29] | Per token chunk | Fast-weight state | Self-supervised recon. | Forget gate / weight decay | Titans: >2M-token context (reported) | New kernels, training stability |
 | ARC TTT (MIT, 2024) [30] | Per task | Task LoRA | Demonstrations | Adapter discarded after task | 53% (8B); 61.9% ensemble | GPU cost per request |
 | Cursor Tab online RL (2025) [34] | Multiple deploys per day | Policy | Accept / reject | On-policy (low KL) | 21% fewer suggestions, +28% accept rate | Reward hacking on accept rate |
+| Open Bandit Dataset / OBP (ZOZO, 2021) [45] | Offline (benchmark) | Evaluated policy | Logged clicks under random and TS policies | n/a | 7-day, 3-campaign logs from two live policies | OPE estimators mis-ranking policies |
+| SDFT self-distillation (ICML 2026) [47] | Per demonstration batch | All weights | Demonstration-conditioned self-teacher | On-policy samples | Beats SFT with less forgetting (reported; reproduction disputed [48]) | Gains may not replicate |
+| TTRL (NeurIPS 2025) [49] | Per unlabeled test set | Policy weights | Majority-vote pseudo-reward | n/a | about +211% pass@1 on AIME 2024 (Qwen2.5-Math-7B) | Confidently wrong majority reinforced |
+| Async RL weight sync (open-source libraries, 2026) [50][53] | Per training step (ms to s sync) | Full weights or LoRA adapter | Rollouts with rewards | Staleness bounds, IS correction | NCCL sync about 100-500 ms; rank-1 adapter a few MB | Off-policy drift from stale rollouts |
 
 ## 11. Failure modes catalog
 
@@ -364,18 +398,21 @@ OpenAI's postmortem describes an April 2025 update that added a reward signal ba
 | Catastrophic forgetting | Sequential fine-tuning, CPT | Old-domain evals drop | Replay [16][22], EWC [15], LoRA [17], on-policy RL [18], sparse memory [19] |
 | Stability gap | Start of CPT | Transient drop on target tasks | Subset multi-epoch training, high-quality data first [23] |
 | Proxy-reward drift | Online RL from user signals | Sycophancy, reward hacking | Targeted evals, reward balance, human launch gate [35] |
-| TTT collapse | Entropy-based adaptation | Confident wrong predictions over time | Restrict updated params [27]; periodic reset |
+| TTT collapse | Entropy-based adaptation, majority-vote test-time RL | Confident wrong predictions over time | Restrict updated params [27]; periodic reset; labeled hold-out slice for TTRL-style loops [49] |
+| Untrustworthy offline gate | Bandit and RL policy evaluation | OPE ranks policies differently from online results | Validate estimators on multi-policy logged data [45]; keep a randomized logging slice [10] |
+| Rollout staleness | Asynchronous LLM RL | Training on samples from an outdated policy; instability | Version rejection, bounded buffers, truncated IS [50] |
+| Irreproducible continual-learning gains | Adopting new forgetting mitigations | Paper gains vanish in-house | Re-run on own data; check loss matches paper [47][48] |
 
 ## Key takeaways for system designers
 
 1. **Treat freshness as one input among several.** Facebook found features and model class mattered more than freshness [2], while ByteDance measured clear gains from cutting sync intervals to minutes [3]. Measure the staleness curve (quality against training-serving gap) for your domain before building a streaming stack.
 2. **Split fast and slow state.** Sparse embeddings tolerate, and need, minute-level updates. Dense towers and tree feature transforms change slowly and anchor behavior. Sync, checkpoint and learning rates should follow that split [2][3][7][8].
 3. **The joiner is part of the model.** Waiting windows, fake-negative corrections and delay models determine label bias [2][5][38][39]. Version and test them like model code, and put a circuit breaker on label-stream health [2].
-4. **Ship deltas, not models, and make deltas reversible.** Touched-key sync [3][4], differential checkpoints [7] and update-level rollback [6] are the core primitives for minute-scale loops.
-5. **Make exploration and propensity logging platform features.** Bandit loops are only as good as their logs. Explore, log, learn and deploy should be infrastructure, with replay and off-policy evaluation as the offline gate [9][10][11][14].
-6. **Choose deliberately what the system forgets.** Expiry and admission thresholds [3] are memory policy. For LLMs, prefer low-KL update paths, namely LoRA [17], on-policy RL [18] and sparse memory updates [19], when general capability must be preserved, and keep replay data for every corpus you care about [22].
+4. **Ship deltas, not models, and make deltas reversible.** Touched-key sync [3][4], differential checkpoints [7] and update-level rollback [6] are the core primitives for minute-scale loops. Asynchronous LLM RL rediscovered the same primitives: separated trainer and generator pools, versioned samples, staleness bounds and adapter-only sync [50][53].
+5. **Make exploration and propensity logging platform features.** Bandit loops are only as good as their logs. Explore, log, learn and deploy should be infrastructure, with replay and off-policy evaluation as the offline gate [9][10][11][14]. Validate that gate itself on data where the true answer is known [45].
+6. **Choose deliberately what the system forgets.** Expiry and admission thresholds [3] are memory policy. For LLMs, prefer low-KL update paths, namely LoRA [17][46], on-policy RL [18], on-policy self-distillation when only demonstrations exist [47] and sparse memory updates [19], when general capability must be preserved. Keep replay data for every corpus you care about [22], and reproduce a mitigation's gains on your own data before relying on them [48].
 7. **Plan continual pretraining as a schedule problem.** Re-warm, re-decay and replay [21][22], or use infinite schedules with branchable annealed checkpoints [22]. Budget for the stability gap [23] and for re-running post-training.
-8. **Treat test-time training as a compute dial.** Normalization re-estimation and TENT are nearly free [27]. Per-task LoRA TTT buys large reasoning gains at high per-request cost [30]. TTT layers and Titans move the loop into the architecture [28][29]. Pick the point that matches your latency budget.
+8. **Treat test-time training as a compute dial.** Normalization re-estimation and TENT are nearly free [27]. Per-task LoRA TTT buys large reasoning gains at high per-request cost [30]. TTT layers, Titans and Hope move the loop into the architecture [28][29][52]. Test-time RL on unlabeled queries [49] sits between per-request TTT and ordinary online RL. Pick the point that matches your latency budget.
 9. **Scale evaluation gates with loop speed.** Cursor's frequent on-policy redeploys [34] and OpenAI's sycophancy rollback [35] show the two sides. Fast loops need automated, behavior-specific gates and a rollback path measured in minutes, not a day.
 
 ## References
@@ -390,7 +427,7 @@ OpenAI's postmortem describes an April 2025 update that added a reward signal ba
 8. X. Lian, B. Yuan, X. Zhu, et al. "Persia: A Hybrid System Scaling Deep Learning Based Recommenders up to 100 Trillion Parameters." Kuaishou and ETH Zurich, 2021 (arXiv 2111.05897); repository README. https://github.com/PersiaML/PERSIA
 9. L. Li, W. Chu, J. Langford, R. E. Schapire. "A Contextual-Bandit Approach to Personalized News Article Recommendation." Yahoo! Labs, WWW 2010. https://arxiv.org/abs/1003.0146
 10. L. Li, W. Chu, J. Langford, X. Wang. "Unbiased Offline Evaluation of Contextual-bandit-based News Article Recommendation Algorithms." Yahoo! Labs, WSDM 2011. https://arxiv.org/abs/1003.5956
-11. A. Agarwal, S. Bird, M. Cozowicz, et al. "A Multiworld Testing Decision Service." Microsoft Research, 2016 (arXiv 1606.03966). https://www.microsoft.com/en-us/research/publication/multiworld-testing-decision-service/
+11. A. Agarwal, S. Bird, M. Cozowicz, et al. "A Multiworld Testing Decision Service" (later versions: "Making Contextual Decisions with Low Technical Debt"). Microsoft Research, 2016 (arXiv 1606.03966). https://www.microsoft.com/en-us/research/publication/multiworld-testing-decision-service/
 12. A. Agarwal, J. Langford. "Real world interactive learning at cusp of enabling new class of applications." Microsoft Research Blog, 2017. https://www.microsoft.com/en-us/research/blog/real-world-interactive-learning-cusp-enabling-new-class-applications/
 13. Microsoft Research. "Multiworld Testing" project page. https://www.microsoft.com/en-us/research/project/multi-world-testing-mwt/
 14. A. Chandrashekar, F. Amat, J. Basilico, T. Jebara. "Artwork Personalization at Netflix." Netflix Technology Blog, 2017. https://netflixtechblog.com/artwork-personalization-c589f074ad76
@@ -419,8 +456,17 @@ OpenAI's postmortem describes an April 2025 update that added a reward signal ba
 37. Google Cloud. "MLOps: Continuous delivery and automation pipelines in machine learning." Google Cloud Architecture Center. https://cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning
 38. J.-Q. Yang, X. Li, S. Han, et al. "Capturing Delayed Feedback in Conversion Rate Prediction via Elapsed-Time Sampling." Alibaba, AAAI 2021. https://arxiv.org/abs/2012.03245
 39. O. Chapelle. "Modeling Delayed Feedback in Display Advertising." Criteo, KDD 2014. https://dl.acm.org/doi/10.1145/2623330.2623634
-40. TensorFlow SIG Recommenders. "TensorFlow Recommenders-Addons" (README: scope covering dynamic embedding, online learning, continuous training). GitHub. https://github.com/tensorflow/recommenders-addons
+40. TensorFlow SIG Recommenders. "TensorFlow Recommenders-Addons" (README: dynamic embedding, pluggable KV backends, half-synchronous training; RFC 20200424 "sparse-domain-isolation" on online learning). GitHub. https://github.com/tensorflow/recommenders-addons
 41. R. Jiang, S. Chiappa, T. Lattimore, A. György, P. Kohli. "Degenerate Feedback Loops in Recommender Systems." DeepMind, AIES 2019. https://arxiv.org/abs/1902.10730
 42. M. Chen, A. Beutel, P. Covington, S. Jain, F. Belletti, E. H. Chi. "Top-K Off-Policy Correction for a REINFORCE Recommender System." Google/YouTube, WSDM 2019. https://arxiv.org/abs/1812.02353
 43. G. M. van de Ven, T. Tuytelaars, A. S. Tolias. "Three types of incremental learning." Nature Machine Intelligence, 2022; code at https://github.com/GMvandeVen/continual-learning. https://www.nature.com/articles/s42256-022-00568-3
 44. P. Wang (lucidrains). "titans-pytorch: Unofficial implementation of Titans." GitHub, 2025. https://github.com/lucidrains/titans-pytorch
+45. Y. Saito, S. Aihara, M. Matsutani, Y. Narita. "Open Bandit Dataset and Pipeline: Towards Realistic and Reproducible Off-Policy Evaluation." ZOZO Research, NeurIPS 2021 Datasets and Benchmarks (arXiv 2008.07146); repository. https://github.com/st-tech/zr-obp
+46. J. Schulman and Thinking Machines Lab. "LoRA Without Regret." Thinking Machines Lab (Connectionism blog), September 2025. https://thinkingmachines.ai/blog/lora/
+47. I. Shenfeld, et al. "Self-Distillation Enables Continual Learning." ICML 2026 (arXiv 2601.19897); code and April 2026 loss clarification at https://github.com/Continual-Intelligence/Self-Distillation. https://arxiv.org/abs/2601.19897
+48. Hugging Face (A. Abid). "What We Learned by Reproducing 2,200 papers from ICML." Hugging Face Blog, August 13, 2026. https://huggingface.co/blog/icml-2026-open-reproductions
+49. Y. Zuo, K. Zhang, L. Sheng, et al. "TTRL: Test-Time Reinforcement Learning." NeurIPS 2025 (arXiv 2504.16084); repository. https://github.com/PRIME-RL/TTRL
+50. Hugging Face TRL team. "Keep the Tokens Flowing: Lessons from 16 Open-Source RL Libraries." Hugging Face Blog, March 10, 2026. https://huggingface.co/blog/async-rl-training-landscape
+51. C.-A. Li, H.-Y. Lee. "Examining Forgetting in Continual Pre-training of Aligned Large Language Models." 2024 (arXiv 2401.03129). https://arxiv.org/abs/2401.03129
+52. A. Behrouz, et al. (Google Research). "Nested Learning: The Illusion of Deep Learning Architectures." NeurIPS 2025; announcement "Introducing Nested Learning: A new ML paradigm for continual learning." https://research.google/blog/introducing-nested-learning-a-new-ml-paradigm-for-continual-learning/
+53. Hugging Face TRL team. "Async GRPO with LoRA across HF Jobs: a bucket, a proxy, and no NCCL." Hugging Face Blog, September 10, 2026. https://huggingface.co/blog/asyncgrpo-lora-hfjobs

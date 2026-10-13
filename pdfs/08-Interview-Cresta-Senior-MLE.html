@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang xml:lang>
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Cresta Senior ML Engineer</title>
+  <style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+</style>
+  <style type="text/css">@page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+body { font-family: "DejaVu Serif", Georgia, serif; font-size: 10.5pt; line-height: 1.45; color: #111; }
+h1 { font-family: "DejaVu Sans", sans-serif; font-size: 22pt; page-break-before: always; border-bottom: 3px solid #1f4e79; padding-bottom: 6px; color: #1f4e79; }
+h2 { font-family: "DejaVu Sans", sans-serif; font-size: 15pt; color: #1f4e79; margin-top: 1.4em; }
+h3 { font-family: "DejaVu Sans", sans-serif; font-size: 12pt; color: #2e5f8a; }
+h4 { font-family: "DejaVu Sans", sans-serif; font-size: 11pt; }
+pre { background: #f4f6f9; border: 1px solid #d5dbe3; padding: 8px; font-size: 7.6pt; line-height: 1.25; white-space: pre-wrap; word-break: break-word; page-break-inside: avoid; }
+code { font-family: "DejaVu Sans Mono", monospace; font-size: 0.88em; }
+table { border-collapse: collapse; width: 100%; font-size: 8.4pt; margin: 0.8em 0; page-break-inside: auto; }
+th, td { border: 1px solid #b8c2cc; padding: 3px 5px; vertical-align: top; word-break: break-word; }
+th { background: #1f4e79; color: #fff; }
+tr:nth-child(even) td { background: #f3f6fa; }
+a { color: #1a5fa8; word-break: break-all; }
+blockquote { border-left: 4px solid #1f4e79; margin-left: 0; padding-left: 10px; color: #333; }
+#title-block-header { text-align: center; padding-top: 60mm; page-break-after: always; }
+#title-block-header .title { font-size: 34pt; color: #1f4e79; border: none; page-break-before: avoid; }
+#title-block-header .subtitle { font-size: 15pt; color: #444; }
+nav#TOC { page-break-after: always; }
+nav#TOC ul { list-style: none; padding-left: 1em; } nav#TOC > ul { padding-left: 0; }
+nav#TOC > ul > li { margin-top: 4px; font-weight: bold; } nav#TOC > ul > li li { font-weight: normal; font-size: 9pt; }
+</style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Cresta Senior ML Engineer</h1>
+<p class="subtitle">Onsite interview question bank (partial)</p>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#01-cresta-senior-mle-interview-loop-format-rounds-culture-and-the-senior-bar" id="toc-01-cresta-senior-mle-interview-loop-format-rounds-culture-and-the-senior-bar">01.
+Cresta Senior MLE Interview Loop: Format, Rounds, Culture and the Senior
+Bar</a>
+<ul>
+<li><a href="#format-notes-expected-unverified" id="toc-format-notes-expected-unverified">Format notes (expected,
+unverified)</a></li>
+<li><a href="#questions" id="toc-questions">Questions</a></li>
+<li><a href="#references" id="toc-references">References</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="01-cresta-senior-mle-interview-loop-format-rounds-culture-and-the-senior-bar">01.
+Cresta Senior MLE Interview Loop: Format, Rounds, Culture and the Senior
+Bar</h1>
+<blockquote>
+<p><strong>Research status (read first).</strong> This chapter was
+written in a run where live research was blocked. The shared web-search
+budget was used up, and the egress proxy refused connections to
+cresta.com, glassdoor.com, teamblind.com and jobs.ashbyhq.com.
+<strong>No candidate reports were retrieved, so no question below is
+tagged [Reported].</strong> Every question is tagged [Likely]: an
+inference from Cresta&#39;s public product line (real-time contact-center
+AI) and the usual shape of senior MLE loops at Series C/D AI startups.
+Before the onsite, check the format against your recruiter&#39;s prep email
+and against Glassdoor and Blind. Ask the recruiter directly for the
+round list, the duration of each round, and whether coding is done in an
+IDE or a shared doc.</p>
+</blockquote>
+<h2 id="format-notes-expected-unverified">Format notes (expected,
+unverified)</h2>
+<p>Background context from general knowledge, not fetched in this run:
+Cresta builds generative AI for contact centers. Its products cover
+real-time agent guidance (Agent Assist), post-call analytics
+(Conversation Intelligence and automated QA), knowledge assist,
+coaching, and AI/virtual agents. That means streaming ASR, real-time LLM
+inference, per-customer customization and enterprise data constraints
+all apply at the same time. Expect the loop to test whether you can ship
+ML that works under latency, cost and customer-specific accuracy
+requirements, not only whether you know the models.</p>
+<p>Typical structure for this kind of role (confirm with the
+recruiter):</p>
+<table>
+<thead>
+<tr class="header">
+<th>Stage</th>
+<th>Likely duration</th>
+<th>Interviewer</th>
+<th>What the senior bar looks like</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Recruiter screen</td>
+<td>30 min</td>
+<td>Recruiter</td>
+<td>Motivation for Cresta and contact-center AI, level calibration,
+compensation, timeline</td>
+</tr>
+<tr class="even">
+<td>Technical screen</td>
+<td>45-60 min</td>
+<td>Engineer / MLE</td>
+<td>Practical coding (data processing, Python, possibly an ML-flavored
+implementation); clean, tested, talks through tradeoffs</td>
+</tr>
+<tr class="odd">
+<td>Hiring-manager call</td>
+<td>30-45 min</td>
+<td>ML/eng manager</td>
+<td>Scope of past work, ownership, fit for a specific team (e.g., agent
+assist, AI agent, analytics, ML platform)</td>
+</tr>
+<tr class="even">
+<td>Onsite: coding</td>
+<td>45-60 min</td>
+<td>Engineer</td>
+<td>Production-quality code, edge cases, complexity; at senior level,
+extensible design without prompting</td>
+</tr>
+<tr class="odd">
+<td>Onsite: ML system design</td>
+<td>60 min</td>
+<td>Senior MLE / staff</td>
+<td>End-to-end design of an LLM/ASR-powered contact-center feature:
+data, labeling, modeling, evaluation, serving latency, monitoring,
+rollout</td>
+</tr>
+<tr class="even">
+<td>Onsite: ML depth / project deep dive</td>
+<td>45-60 min</td>
+<td>Senior MLE / research</td>
+<td>Deep ownership of one past project; justifies choices with metrics;
+knows the failure modes</td>
+</tr>
+<tr class="odd">
+<td>Onsite: behavioral / values</td>
+<td>45 min</td>
+<td>Manager or cross-functional</td>
+<td>Ownership, customer focus, ambiguity, mentorship, cross-team
+influence</td>
+</tr>
+<tr class="even">
+<td>Possible: take-home or practical ML exercise</td>
+<td>variable</td>
+<td>n/a</td>
+<td>Some startups use a take-home or a live practical round (e.g., an
+evaluation or fine-tuning exercise); ask whether one applies</td>
+</tr>
+</tbody>
+</table>
+<p>What usually separates senior from mid-level in this kind of
+loop:</p>
+<ul>
+<li>Drives the design conversation: sets the requirements and metrics
+before choosing a model.</li>
+<li>Reasons about the whole system, including latency budgets for
+real-time features, cost per conversation, multi-tenant customization,
+data privacy and PII, and online/offline evaluation gaps.</li>
+<li>Has stories with measurable business impact, and has influenced
+people beyond their own team (product, customers, other teams).</li>
+<li>Raises risks first: hallucination, drift, label noise,
+customer-specific regressions.</li>
+</ul>
+<h2 id="questions">Questions</h2>
+<h3 id="a-recruiter-screen-and-motivation">A. Recruiter screen and
+motivation</h3>
+<ol type="1">
+<li>Why Cresta, and why contact-center AI specifically? [Likely]
+<ul>
+<li>What do you think is hardest about applying LLMs in a contact center
+compared with a consumer chatbot?</li>
+<li>Which Cresta product would you most want to work on, and why?</li>
+</ul></li>
+<li>Walk me through your background in two minutes, focusing on ML
+you&#39;ve shipped to production. [Likely]
+<ul>
+<li>Which of these projects was most similar to real-time conversational
+AI?</li>
+</ul></li>
+<li>What level are you targeting, and what scope did you own in your
+current role? [Likely]
+<ul>
+<li>How many engineers or models did your work touch?</li>
+</ul></li>
+<li>What are you looking for in your next team: research-heavy,
+product-heavy, or platform? [Likely]</li>
+<li>Are you comfortable working in a hybrid or in-office setup, and what
+is your timeline with other processes? [Likely]</li>
+<li>What do you know about how Cresta&#39;s customers (enterprise contact
+centers) measure success? [Likely]
+<ul>
+<li>Which KPIs (AHT, CSAT, conversion, first-contact resolution) would
+you expect an ML feature to move?</li>
+</ul></li>
+</ol>
+<h3 id="b-technical-phone-screen-coding">B. Technical phone screen
+(coding)</h3>
+<ol start="7" type="1">
+<li>Given a stream of transcript utterances with speaker labels and
+timestamps, merge consecutive utterances from the same speaker and
+output conversation turns. [Likely]
+<ul>
+<li>How do you handle overlapping timestamps or out-of-order
+events?</li>
+<li>How would this change if events arrive in real time and you must
+emit partial results?</li>
+</ul></li>
+<li>Implement a sliding-window function that returns the top-k most
+frequent phrases over the last N minutes of conversations. [Likely]
+<ul>
+<li>What is the memory complexity, and how would you bound it?</li>
+</ul></li>
+<li>Implement a simple tokenizer plus n-gram counter, then use it to
+find the phrases that best distinguish converted from non-converted
+sales calls. [Likely]
+<ul>
+<li>How would you control for phrases that are just frequent?</li>
+</ul></li>
+<li>Write a function that redacts PII (phone numbers, emails, card
+numbers) from transcripts. [Likely]
+<ul>
+<li>How would you test it? What are its precision/recall tradeoffs?</li>
+<li>When would you replace regex with a learned NER model?</li>
+</ul></li>
+<li>Implement beam search (or top-k / top-p sampling) over a given
+next-token probability function. [Likely]
+<ul>
+<li>How do you handle length normalization?</li>
+</ul></li>
+<li>Implement precision, recall, F1 and a confusion matrix from scratch
+for multi-label intent classification. [Likely]
+<ul>
+<li>Micro vs macro averaging: which would you report to a customer?</li>
+</ul></li>
+<li>Implement an LRU or TTL cache for embedding lookups. [Likely]
+<ul>
+<li>How does this change under concurrent access?</li>
+</ul></li>
+<li>Given a list of call events with start/end times, compute the
+maximum number of concurrent calls (interval problem). [Likely]</li>
+<li>Parse a nested JSON conversation log and compute per-agent metrics
+(average handle time, talk ratio, interruptions). [Likely]
+<ul>
+<li>How would you make this run over a billion records?</li>
+</ul></li>
+<li>Implement cosine-similarity nearest-neighbor retrieval over a matrix
+of embeddings with NumPy, without loops. [Likely]
+<ul>
+<li>How would you scale this past memory? Which ANN index would you
+choose?</li>
+</ul></li>
+</ol>
+<h3 id="c-onsite-coding-production-quality">C. Onsite coding
+(production-quality)</h3>
+<ol start="17" type="1">
+<li>Design and implement a rate limiter for calls to an LLM API shared
+across tenants. [Likely]
+<ul>
+<li>How do you enforce per-tenant fairness?</li>
+<li>How do you handle retries and backoff?</li>
+</ul></li>
+<li>Implement a streaming text-chunker that splits a live transcript
+into segments for downstream LLM calls under a token budget. [Likely]
+<ul>
+<li>How do you avoid splitting mid-sentence?</li>
+</ul></li>
+<li>Implement a simple trie-based autocomplete for suggested agent
+responses ranked by frequency. [Likely]
+<ul>
+<li>How would you blend this with a model score?</li>
+</ul></li>
+<li>Write a class that tracks a conversation state machine (greeting,
+verification, resolution, close) from a stream of classified utterances.
+[Likely]
+<ul>
+<li>How do you handle classifier noise that causes state flapping?</li>
+</ul></li>
+<li>Implement a batching queue that groups incoming inference requests
+to maximize GPU throughput under a max-latency constraint. [Likely]
+<ul>
+<li>What is the tradeoff between batch size and p99 latency?</li>
+</ul></li>
+<li>Implement edit distance and word error rate (WER) between a
+reference and a hypothesis transcript. [Likely]
+<ul>
+<li>How does WER fail to reflect downstream task quality?</li>
+</ul></li>
+<li>Implement a deduplication routine for near-duplicate chat
+transcripts (e.g., MinHash or shingling). [Likely]</li>
+<li>Refactor a given messy training-data pipeline function for
+testability. [Likely]
+<ul>
+<li>What unit tests would you write first?</li>
+</ul></li>
+</ol>
+<h3 id="d-ml-system-design-core-onsite-round">D. ML system design (core
+onsite round)</h3>
+<ol start="25" type="1">
+<li>Design a real-time agent-assist system that listens to a live call
+and suggests the next best response to the agent. [Likely]
+<ul>
+<li>What is your end-to-end latency budget from audio to
+suggestion?</li>
+<li>Where do ASR, retrieval and LLM generation sit, and which of them
+streams?</li>
+<li>How do you evaluate suggestion quality offline and online?</li>
+<li>How do you decide when to show a suggestion versus stay silent?</li>
+</ul></li>
+<li>Design a system that automatically scores 100% of calls against a QA
+rubric (automated QA). [Likely]
+<ul>
+<li>How do you turn a free-text rubric item into a reliable model
+judgment?</li>
+<li>How do you calibrate against human QA scores, and handle
+disagreement between human graders?</li>
+<li>How do you keep cost per call bounded?</li>
+</ul></li>
+<li>Design an LLM-powered virtual agent that fully handles customer
+chats or voice calls for a specific enterprise. [Likely]
+<ul>
+<li>How do you ground it in the customer&#39;s knowledge base and
+policies?</li>
+<li>How do you design escalation to a human?</li>
+<li>What guardrails stop it from making unauthorized promises (refunds,
+pricing)?</li>
+<li>How do you evaluate it before launch?</li>
+</ul></li>
+<li>Design a system that discovers the behaviors of top-performing
+agents and turns them into coaching guidance. [Likely]
+<ul>
+<li>How do you separate causation from correlation in &quot;what top
+performers do&quot;?</li>
+</ul></li>
+<li>Design a knowledge-assist (RAG) system that retrieves answers from a
+customer&#39;s documents during a live conversation. [Likely]
+<ul>
+<li>How do you chunk and index heterogeneous documents (PDFs, wikis,
+macros)?</li>
+<li>How do you handle stale or conflicting documents?</li>
+<li>What retrieval metrics and answer-faithfulness metrics would you
+track?</li>
+</ul></li>
+<li>Design a topic/intent discovery pipeline over millions of unlabeled
+conversations for a new customer. [Likely]
+<ul>
+<li>How do you let non-technical customer admins name and refine the
+clusters?</li>
+</ul></li>
+<li>Design a call-summarization feature that writes post-call notes into
+a CRM. [Likely]
+<ul>
+<li>How do you measure and reduce hallucinated facts?</li>
+<li>How do you enforce a customer-specific summary template?</li>
+</ul></li>
+<li>Design a multi-tenant model customization strategy: one base model
+with per-customer adaptation. [Likely]
+<ul>
+<li>When do you use prompting, retrieval, LoRA adapters or full
+fine-tuning?</li>
+<li>How do you serve hundreds of adapters efficiently?</li>
+<li>How do you prevent data leakage across tenants?</li>
+</ul></li>
+<li>Design monitoring for production LLM features across many enterprise
+customers. [Likely]
+<ul>
+<li>What signals detect quality regressions when there are no
+labels?</li>
+<li>How do you catch a regression that affects only one customer?</li>
+</ul></li>
+<li>Design the data flywheel: how agent interactions with suggestions
+(accept, edit, ignore) feed back into model improvement. [Likely]
+<ul>
+<li>What biases does this implicit feedback introduce?</li>
+</ul></li>
+<li>Design a real-time sentiment / escalation-risk detector for live
+calls. [Likely]
+<ul>
+<li>How do you combine acoustic and textual signals?</li>
+<li>How do you set thresholds per customer?</li>
+</ul></li>
+<li>Design the migration of a feature from an expensive frontier LLM API
+to a smaller self-hosted model. [Likely]
+<ul>
+<li>How do you decide the quality bar is met?</li>
+<li>Distillation or fine-tuning: which, and on what data?</li>
+</ul></li>
+<li>Design an evaluation platform the whole ML org uses to compare model
+versions before release. [Likely]
+<ul>
+<li>How do you build and maintain golden sets per customer and use
+case?</li>
+<li>When can you trust LLM-as-judge, and how do you validate the
+judge?</li>
+</ul></li>
+</ol>
+<h3 id="e-ml-depth-llms-nlp-and-speech">E. ML depth: LLMs, NLP and
+speech</h3>
+<ol start="38" type="1">
+<li>Walk through how you would fine-tune an LLM for a domain-specific
+classification or generation task with limited labeled data. [Likely]
+<ul>
+<li>SFT vs preference optimization (DPO/RLHF): when is each worth
+it?</li>
+</ul></li>
+<li>How do you reduce hallucinations in a RAG system? [Likely]
+<ul>
+<li>How would you measure groundedness automatically?</li>
+</ul></li>
+<li>Explain the main contributors to LLM inference latency and how to
+reduce them. [Likely]
+<ul>
+<li>KV cache, batching, quantization, speculative decoding: what does
+each trade off?</li>
+</ul></li>
+<li>How do you handle very long conversations that exceed the context
+window? [Likely]
+<ul>
+<li>Summarization memory vs retrieval: what are the failure modes of
+each?</li>
+</ul></li>
+<li>How does streaming ASR differ from offline ASR, and how do ASR
+errors propagate into downstream NLP? [Likely]
+<ul>
+<li>How would you make a downstream classifier robust to ASR
+errors?</li>
+</ul></li>
+<li>How would you do speaker diarization or agent/customer channel
+separation, and how does it fail? [Likely]</li>
+<li>How do you build an intent classifier when labels are noisy and
+categories change per customer? [Likely]
+<ul>
+<li>What are the tradeoffs among weak supervision, active learning and
+LLM-generated labels?</li>
+</ul></li>
+<li>Compare embedding models for semantic search over conversational
+text. How would you fine-tune one? [Likely]
+<ul>
+<li>Which hard-negative mining strategy would you use?</li>
+</ul></li>
+<li>How do you design prompts that are robust across customers and model
+versions? [Likely]
+<ul>
+<li>How do you version and regression-test prompts?</li>
+</ul></li>
+<li>Explain calibration. Why does it matter when you show a
+confidence-gated suggestion to an agent? [Likely]</li>
+<li>How do you detect and handle distribution shift when onboarding a
+new enterprise customer in a new vertical? [Likely]</li>
+<li>How would you use LLMs to generate synthetic training data, and how
+do you keep it from degrading the model? [Likely]</li>
+<li>How do you evaluate a generative model when there is no single
+correct answer? [Likely]
+<ul>
+<li>How do you design a rubric for human raters? How do you measure
+inter-annotator agreement?</li>
+</ul></li>
+<li>Explain how you would structure tool use / function calling for an
+AI agent that needs to look up orders or reset passwords. [Likely]
+<ul>
+<li>How do you test multi-turn agent trajectories?</li>
+</ul></li>
+<li>What are the risks of prompt injection in a customer-facing voice or
+chat agent, and how do you mitigate them? [Likely]</li>
+<li>Explain transformer attention and its complexity. What changes make
+it work in long-context or streaming settings? [Likely]</li>
+<li>How would you A/B test a new agent-assist model when the unit of
+randomization could be agent, call or customer? [Likely]
+<ul>
+<li>How do you handle network effects or learning effects among
+agents?</li>
+<li>What sample size and duration would you need?</li>
+</ul></li>
+</ol>
+<h3 id="f-project-deep-dive-senior-bar">F. Project deep dive (senior
+bar)</h3>
+<ol start="55" type="1">
+<li>Pick the most impactful ML system you&#39;ve built. Walk me through the
+problem, your role, the architecture and the result. [Likely]
+<ul>
+<li>What was the baseline, and how did you prove the improvement?</li>
+<li>What would you do differently now?</li>
+<li>What part did you personally own, as opposed to the team?</li>
+</ul></li>
+<li>Tell me about a model that worked offline but failed online.
+[Likely]
+<ul>
+<li>How did you diagnose the gap?</li>
+</ul></li>
+<li>Describe a time you chose a simpler model over a more sophisticated
+one. [Likely]</li>
+<li>How did you set up evaluation for your project, and what did your
+metrics miss? [Likely]</li>
+<li>What were the biggest data-quality problems in your project, and how
+did you find them? [Likely]</li>
+<li>How did you handle latency, cost or scaling constraints in
+production? [Likely]
+<ul>
+<li>What did serving cost per request look like, and how did you reduce
+it?</li>
+</ul></li>
+<li>Describe how you deployed and monitored your model. What alerts
+existed, and did any fire? [Likely]</li>
+<li>Have you shipped an LLM-based feature to production? What broke
+first? [Likely]</li>
+<li>If we gave you this same problem in the contact-center domain, what
+would change? [Likely]</li>
+<li>Describe a technical decision you made that you later reversed.
+[Likely]</li>
+</ol>
+<h3 id="g-behavioral-values-and-collaboration">G. Behavioral, values and
+collaboration</h3>
+<ol start="65" type="1">
+<li>Tell me about a time you worked directly with a customer, or
+customer-facing teams, to define what an ML feature should do. [Likely]
+<ul>
+<li>How did you translate vague customer asks into measurable
+requirements?</li>
+</ul></li>
+<li>Tell me about a time you owned a problem end to end without being
+asked. [Likely]</li>
+<li>Describe a disagreement with a product manager or another engineer
+about model quality versus shipping speed. [Likely]
+<ul>
+<li>How was it resolved, and what did you concede?</li>
+</ul></li>
+<li>Tell me about a time you had to deliver under heavy ambiguity at a
+fast-moving company. [Likely]</li>
+<li>Tell me about a project that failed. What did you learn?
+[Likely]</li>
+<li>Describe how you mentored a more junior engineer or raised the
+technical bar of your team. [Likely]</li>
+<li>Tell me about a time you pushed back on a customer request or an
+executive priority because of data or technical risk. [Likely]</li>
+<li>How do you prioritize between customer escalations, roadmap work and
+tech debt? [Likely]</li>
+<li>Tell me about a time you influenced a decision across teams without
+direct authority. [Likely]</li>
+<li>Describe a time you handled sensitive data responsibly (PII,
+compliance, enterprise security reviews). [Likely]</li>
+<li>How do you stay current with fast-moving LLM research, and how do
+you decide what is worth adopting? [Likely]</li>
+<li>Tell me about the hardest production incident you were involved in.
+[Likely]
+<ul>
+<li>What did the postmortem change?</li>
+</ul></li>
+<li>What kind of feedback have you received that changed how you work?
+[Likely]</li>
+<li>Where do you want to be in 3 years, and how does this role get you
+there? [Likely]</li>
+</ol>
+<h3 id="h-hiring-manager-and-senior-scope-probes">H. Hiring-manager and
+senior-scope probes</h3>
+<ol start="79" type="1">
+<li>If you joined and found that our evaluation process for a key model
+was weak, what would you do in your first 90 days? [Likely]</li>
+<li>How would you decide whether to build a capability in-house or use a
+third-party model provider? [Likely]</li>
+<li>How do you scope an ML project so that it delivers value in weeks
+rather than quarters? [Likely]</li>
+<li>How would you explain a model regression to an enterprise customer?
+[Likely]</li>
+<li>What does good ML engineering hygiene look like (reproducibility,
+experiment tracking, data versioning)? [Likely]
+<ul>
+<li>Which of these have you introduced on a team yourself?</li>
+</ul></li>
+<li>How do you balance research exploration with product delivery?
+[Likely]</li>
+<li>How do you write a design doc for an ML system, and who reviews it?
+[Likely]</li>
+<li>What would make you successful here, and what would make you fail?
+[Likely]</li>
+</ol>
+<h3 id="i-domain-sense-contact-center-ai">I. Domain sense:
+contact-center AI</h3>
+<ol start="87" type="1">
+<li>What are the main sources of data in a contact center, and what
+quality problems does each have? [Likely]</li>
+<li>How would you measure whether real-time guidance actually improves
+agent outcomes, rather than just correlating with good agents?
+[Likely]</li>
+<li>How would you handle multilingual and code-switched calls?
+[Likely]</li>
+<li>Which parts of a voice AI agent are most latency-sensitive
+(barge-in, turn-taking, TTS), and how would you design for them?
+[Likely]
+<ul>
+<li>How do you detect end of turn?</li>
+</ul></li>
+<li>What compliance constraints (call recording consent, PCI, HIPAA,
+data residency) affect how you train and serve models? [Likely]</li>
+<li>How do you design an ML product so that non-technical customer
+admins can configure behaviors (custom rules, topics, scorecards)
+safely? [Likely]</li>
+<li>How would you prevent an automated QA score from being gamed by
+agents once they know the criteria? [Likely]</li>
+</ol>
+<h3 id="j-questions-you-should-ask-them-prep">J. Questions you should
+ask them (prep)</h3>
+<ol start="94" type="1">
+<li>Which team is this role on, and what are its next two quarters of
+goals? [Likely]</li>
+<li>How does the team evaluate LLM features before they reach customers?
+[Likely]</li>
+<li>What is the split between self-hosted models and third-party APIs,
+and where is it heading? [Likely]</li>
+<li>What does the senior-to-staff promotion path look like for MLEs?
+[Likely]</li>
+<li>How much direct customer contact do MLEs have? [Likely]</li>
+</ol>
+<h2 id="references">References</h2>
+<p>No sources could be retrieved in this run: web search was exhausted
+and the proxy blocked the target domains, so none are listed. No URLs or
+candidate reports have been invented. Recommended sources to check
+manually before the onsite (fill in URLs once verified):</p>
+<ol type="1">
+<li>Cresta official careers page and job postings for Senior / Staff
+Machine Learning Engineer (cresta.com). Not accessed.</li>
+<li>Glassdoor: Cresta interview reviews, filtered by Machine Learning
+Engineer / Software Engineer. Not accessed.</li>
+<li>Blind (teamblind.com): Cresta company page and interview threads.
+Not accessed.</li>
+<li>Cresta engineering / AI blog posts on agent assist, AI agents and
+LLM evaluation. Not accessed.</li>
+<li>LeetCode Discuss / 1point3acres: posts mentioning Cresta onsites.
+Not accessed.</li>
+</ol>
+</body>
+</html>

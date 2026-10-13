@@ -8,12 +8,12 @@ This chapter covers the publicly documented designs, in roughly historical order
 
 - **The original RLHF lineage**: deep RL from human preferences [1], fine-tuning LMs from preferences [2], and summarization from human feedback [3], which set out the three-stage SFT, RM, PPO recipe that InstructGPT [4] scaled up.
 - **Anthropic's HH-RLHF and iterated online RLHF** [5][6], the first detailed public account of a weekly retrain-and-redeploy preference loop.
-- **Principle-driven feedback**: DeepMind's Sparrow rule RMs [8], Constitutional AI and RLAIF [7][9], Collective Constitutional AI [44], OpenAI's Rule-Based Rewards [39], deliberative alignment [40] and the Model Spec [59].
+- **Principle-driven feedback**: DeepMind's Sparrow rule RMs [8], Constitutional AI and RLAIF [7][9], Collective Constitutional AI [44], Anthropic's 2026 rewritten constitution [62], OpenAI's Rule-Based Rewards [39], deliberative alignment [40] and the Model Spec [59].
 - **Direct alignment algorithms**: DPO and its variants (IPO, KTO, ORPO, SimPO) [10][11][12][13][14], with the open recipes built on them (Zephyr [15], Tulu 3 [19]).
 - **Online and iterative preference learning**: Llama 2's five RLHF rounds [17], Llama 3's six SFT+DPO rounds [18], Self-Rewarding LMs [20], iterative/online DPO [21][22][23], Nemotron-4's synthetic weak-to-strong loop [34], and the evidence that on-policy data matters [24][25][55].
-- **The reasoning-era turn**: RL from verifiable rewards with GRPO-family optimizers [36][37][57] and generative reward models [56].
-- **Preference collection in products**: ChatGPT-style feedback widgets, Chatbot Arena [33], and the GPT-4o sycophancy rollback of April 2025 [41][42], the clearest public case of a product feedback signal destabilizing a deployed loop.
-- **Reward-model refresh and overoptimization**: scaling laws for reward hacking [26], ensembles and weight averaging [27][28], benchmarks [29], length and sycophancy biases [31][32], and the "RM continually improved while RL pushes it" practice described for Gemini [45].
+- **The reasoning-era turn**: RL from verifiable rewards with GRPO-family optimizers [36][37][57], generative reward models [56], and rubric-based rewards that carry RL into non-verifiable domains [66][67][68].
+- **Preference collection in products**: ChatGPT-style feedback widgets, Chatbot Arena [33], the 2025 "Leaderboard Illusion" audit of arena-driven optimization [65], pluralistic collection in the PRISM dataset [64], and the GPT-4o sycophancy rollback of April 2025 [41][42], the clearest public case of a product feedback signal destabilizing a deployed loop.
+- **Reward-model refresh and overoptimization**: scaling laws for reward hacking [26], ensembles and weight averaging [27][28], benchmarks [29][63], length and sycophancy biases [31][32], the "RM continually improved while RL pushes it" practice described for Gemini [45], and 2025 evidence that reward hacking can generalize into broader misalignment and that optimizing against chain-of-thought monitors teaches obfuscation [69][70].
 
 A note on sourcing. The numbers in this chapter come from the cited papers and official posts. Values that are rounded, inferred, or reported inconsistently across versions of a paper are marked approximate. Frontier labs rarely publish post-training cadences or costs for current production models, so the most detailed numbers come from 2022 to 2024 papers and open-model reports. The practitioner syntheses by Lambert [52], Huyen [53] and Hugging Face [54] are useful entry points.
 
@@ -45,7 +45,7 @@ The generic loop:
 
 ### 1.1 Deep RL from human preferences
 
-Christiano et al. [1] posed the core problem: for many tasks a reward function is hard to write, but a human can compare two short trajectory clips. The architecture runs three asynchronous processes. A policy interacts with the environment. Pairs of clips are sent to humans for comparison. A reward predictor is fit to the comparisons with a Bradley-Terry (logistic) model and supplies rewards to the RL learner. Queries were chosen where an ensemble of reward predictors disagreed, an early form of active preference elicitation. The lesson that carries forward is that the reward model must be trained online, alongside the policy. A reward model fit once on a fixed dataset was exploited as the policy drifted into regions the model had never seen.
+Christiano et al. [1] posed the core problem: for many tasks a reward function is hard to write, but a human can compare two short trajectory clips. The architecture runs three asynchronous processes. A policy interacts with the environment. Pairs of clips are sent to humans for comparison. A reward predictor is fit to the comparisons with a Bradley-Terry (logistic) model and supplies rewards to the RL learner. Queries were chosen where an ensemble of reward predictors disagreed, an early form of active preference elicitation. The lesson that carries forward is that the reward model must be trained online, alongside the policy. A reward model fit once on a fixed dataset was exploited as the policy drifted into regions the model had never seen. The feedback budget was small: roughly 700 human queries for the MuJoCo tasks and 5,500 for Atari, and a simulated-robot backflip learned from about 900 queries, under an hour of rater time [1].
 
 ### 1.2 Fine-tuning LMs from human preferences
 
@@ -77,7 +77,7 @@ GPT-3 completes text; it does not reliably follow instructions. OpenAI wanted a 
 
 - **Data.** Prompts came mostly from the OpenAI API Playground, plus prompts written by labelers to bootstrap categories. Dataset sizes were about 13k prompts for SFT, 33k for RM training and 31k for PPO (approximate, as reported) [4]. About 40 contractors did the labeling, selected with a screening test for sensitivity to the preferences of different demographic groups.
 - **Ranking interface.** Labelers ranked between 4 and 9 responses per prompt. All C(K,2) pairwise comparisons from one prompt were put into a single batch element. Treating them as independent samples caused the RM to overfit within one epoch, because each completion appeared in K-1 updates.
-- **RM.** A 6B model trained with the pairwise Bradley-Terry loss. The authors found 175B RMs unstable as PPO value functions.
+- **RM.** A 6B model trained with the pairwise Bradley-Terry loss. The authors chose 6B because it saved compute and because 175B RM training could be unstable, which made a 175B RM less suitable for initializing the PPO value function [4].
 - **PPO-ptx.** The RL objective mixes pretraining log-likelihood gradients into PPO to reduce the "alignment tax", meaning performance regressions on public NLP benchmarks such as SQuAD and DROP.
 
 ### 2.3 Results and numbers
@@ -97,7 +97,7 @@ Anthropic studied how to train a dialogue assistant to be both helpful and harml
 ### 3.2 Architecture
 
 - **Preference model pretraining (PMP).** Askell et al. [5] introduced an intermediate stage. The preference model is first trained on large public comparison corpora (for example Stack Exchange votes and Reddit scores) and then fine-tuned on Anthropic's own comparisons. This improved sample efficiency.
-- **Collection interface.** Crowdworkers held open-ended conversations with the model and, at every turn, picked the better of two responses. Helpfulness and harmlessness (red-teaming) data were collected separately: in harmlessness sessions workers chose the more harmful response for adversarial prompts. The public release on Hugging Face holds roughly 160k training comparisons [6][61].
+- **Collection interface.** Crowdworkers held open-ended conversations with the model and, at every turn, picked the better of two responses. Helpfulness and harmlessness (red-teaming) data were collected separately: in harmlessness sessions workers chose the more harmful response for adversarial prompts. The public release holds roughly 160k training comparisons [6][61]. It is split into tranches that mirror the loop: helpfulness data from the base context-distilled 52B models, from best-of-16 rejection sampling against an early PM, and from the iterated online process. Harmlessness data was collected only for the base models [61].
 - **Iterated online RLHF.** After the base dataset was collected, the team ran a loop with a roughly weekly cadence. Train new PMs and RLHF policies, deploy them to the crowdworker interface, collect comparisons on the new policies' outputs, and repeat [6]. Comparisons drawn from the best current models shift the PM's training distribution toward the high-quality region the policy now occupies, which is where the PM's accuracy matters most.
 
 ```
@@ -147,7 +147,7 @@ Key techniques [7]:
 - **AI preference labels.** The feedback model's normalized log-probabilities over the options serve as soft preference targets. When chain-of-thought was used, the probabilities were clamped to the 40 to 60% range, because CoT made the labels overconfident and the resulting policies over-trained.
 - **Hybrid loop.** Helpfulness comparisons stayed human. Only harmlessness was AI-labeled. The result was Pareto-better on harmlessness and helpfulness than the HH-RLHF baselines and far less evasive.
 
-Anthropic later published the constitution used for Claude, with principles drawn partly from the UN Declaration of Human Rights and from trust-and-safety practice [43]. In Collective Constitutional AI [44] it sourced a constitution from about 1,000 members of the US public through the Polis platform and trained a model on it. This closes the loop one level higher: the public helps write the judge's specification.
+In May 2023 Anthropic published the constitution then used for Claude, a list of standalone principles drawn from the UN Universal Declaration of Human Rights, Apple's terms of service (for privacy and impersonation), DeepMind's Sparrow rules, trust-and-safety practice, and an explicit effort to include non-Western perspectives [43]. In Collective Constitutional AI [44] it sourced a constitution from about 1,000 members of the US public through the Polis deliberation platform and trained a Claude Instant-sized model on it. Compared with a model trained on Anthropic's own constitution, the public-constitution model was similar on helpfulness and harmlessness and showed lower bias on the BBQ benchmark. This closes the loop one level higher: the public helps write the judge's specification.
 
 ### 4.3 RLAIF vs RLHF at Google
 
@@ -160,7 +160,17 @@ OpenAI's Model Spec [59] is a public behavior specification, so it doubles as th
 - **Rule-Based Rewards (RBR)** [39]. Desired safety behavior (for example, refuse with a brief apology and no judgment) is broken into binary propositions ("contains an apology", "is judgmental", "complies"). An LLM grader scores the propositions, and a small fitted linear model combines those scores with a helpful-only RM to give the RL reward. The goal is to avoid both over-refusal and unsafe compliance without large volumes of human safety data. Because the rules are explicit, updating behavior means editing propositions and refitting a few weights, not relabeling data.
 - **Deliberative alignment** [40]. Used for the o-series reasoning models. The model is taught the text of the safety specification and trained to reason about it explicitly in its chain of thought. Stage 1 is SFT on (prompt, spec-citing CoT, answer) data, generated by a model with the spec in context and then filtered by a judge. Stage 2 is RL in which a judge model with access to the spec supplies the reward. No human-written CoTs or completions are needed.
 
-### 4.5 Lessons from principle-driven loops
+### 4.5 From rule lists to an explained constitution (Anthropic, 2026)
+
+In January 2026 Anthropic replaced the 2023 list of standalone principles with a long-form constitution that explains the reasoning behind each value, released under a CC0 public-domain dedication [62]. Three design choices matter for the loop:
+
+- **Explained values over rules.** The stated aim is for the model to understand why a behavior is wanted, so that it generalizes to situations the text does not anticipate. A small set of hard constraints is kept for high-stakes cases.
+- **An explicit priority order.** When properties conflict, Claude should generally be broadly safe first, then broadly ethical, then compliant with Anthropic's more specific guidelines, then genuinely helpful. The ordering is described as holistic rather than strict: higher priorities usually dominate, but lower ones are still weighed.
+- **The document as the judge's source of truth.** Anthropic calls the constitution the final authority on intended behavior and says Claude uses it to generate many kinds of synthetic training data, including response rankings. In loop terms, it is the versioned specification from which AI-feedback labels are produced, a direct descendant of the RLAIF stage in Section 4.2. Anthropic also states that model behavior will not always match the text and that system cards will report the gaps.
+
+The OpenAI Model Spec [59] and the Anthropic constitution now play the same role: a public, versioned judge specification. They differ in form, with the Model Spec closer to an annotated rulebook with worked examples and the constitution closer to an argued essay.
+
+### 4.6 Lessons from principle-driven loops
 
 - A written specification makes the judge versionable. Policy changes become text diffs.
 - AI judges inherit the biases of their prompts and base models, so calibration (soft labels, clamping) and periodic human audits are still needed.
@@ -254,7 +264,7 @@ NVIDIA's Nemotron-4 340B [34] reports that over 98% of its alignment data was sy
 - An RM is worth keeping even without PPO, as a rejection-sampling filter, pair constructor and eval signal [17][18][34].
 - Each round needs fresh prompts that cover the policy's current weaknesses. Llama 3's per-capability data streams are an example of active prompt sourcing [18].
 - Simulate before paying for humans. AlpacaFarm [48] showed that LLM-simulated annotators, with deliberately injected label noise, reproduce the method rankings that real human feedback gives at a fraction of the cost and time, so a loop design can be prototyped cheaply. LLM-as-a-judge agreement with humans on MT-Bench-style tasks was reported to be roughly at the level of human-human agreement (about 80%, approximate) [49]. That makes the judge usable for gating, though not as a substitute for audits.
-- Off-the-shelf infrastructure now covers the whole loop. Hugging Face TRL [51] implements SFT, RM training, PPO, RLOO, GRPO, DPO, KTO and ORPO trainers. OpenRLHF [50] splits actor, critic, reward and reference models across GPUs with Ray and uses vLLM for the generation phase, which dominates wall-clock time in online RLHF.
+- Off-the-shelf infrastructure now covers the whole loop. Hugging Face TRL [51] ships SFT, reward-model, DPO, KTO, RLOO and GRPO trainers in its main package, with online DPO, ORPO and newer methods in an experimental namespace (the set has shifted between releases; earlier versions also shipped a PPO trainer). OpenRLHF [50] splits actor, critic, reward and reference models across GPUs with Ray, uses vLLM for the generation phase (which dominates wall-clock time in online RLHF), and supports PPO alongside critic-free estimators such as REINFORCE++, RLOO and GRPO.
 
 ## 7. The reasoning-era turn: verifiable rewards and generative judges (2024 to 2026)
 
@@ -264,9 +274,11 @@ From 2024 the frontier of "RL post-training" shifted from learned preference RMs
 - **DeepSeek-R1** [37]. R1-Zero applied GRPO to the base model with only rule-based rewards (answer accuracy and a format reward), and long chain-of-thought reasoning emerged. The authors said they avoided neural reward models for reasoning because these were prone to reward hacking during large-scale RL and needed retraining that complicated the pipeline. The full R1 pipeline was a loop of loops: cold-start SFT, reasoning RL (plus a language-consistency reward), then rejection sampling of about 600k reasoning and about 200k non-reasoning samples for a new SFT round, then a final RL stage that combined rule rewards for reasoning with preference RMs for helpfulness and harmlessness.
 - **DAPO** [57] published fixes for instabilities in long-CoT RL at scale: decoupled clip ranges ("clip-higher") against entropy collapse, dynamic sampling that drops prompt groups with all-correct or all-wrong outputs (they give zero advantage), token-level loss, and overlong-response reward shaping.
 - **Generative reward models.** DeepSeek-GRM [56] trains the RM to write principles and critiques before scoring (Self-Principled Critique Tuning). Quality can then improve at inference time by sampling multiple critiques and voting, with a meta-RM filtering them. This merges the CAI-style "judge reasons over principles" idea with scalable reward modeling.
+- **Rubrics as rewards for non-verifiable tasks.** In 2025, rubric-based rewards became the main way to extend RLVR-style training beyond math and code. OpenAI's HealthBench [68] scores responses against conversation-specific criteria written by physicians (about 5,000 conversations and about 48,000 criteria from 262 physicians), showing that open-ended quality can be broken into many checkable propositions, much as RBR did for safety [39]. Rubrics as Rewards [66] used such checklists, scored by an LLM judge, as the reward for GRPO in medical and science domains. It reported gains over Likert-style holistic judge scores and better robustness across judge sizes.
+- **Closed-loop critic refinement (Kimi K2).** Moonshot's Kimi K2 report [67] describes a "Self-Critique Rubric Reward" loop. The K2 actor generates responses to general prompts. The K2 critic ranks them pairwise against core rubrics (the assistant's values), prescriptive rubrics designed to block reward hacking, and human-written task-specific rubrics. During RL, the critic itself is continually updated on on-policy rollouts from verifiable-reward prompts, so objective signals recalibrate the subjective judge "in lockstep with the policy's evolution". It is a compact public example of a judge refreshed by a verifier rather than by new human labels.
 - **Process supervision.** OpenAI's "Let's Verify Step by Step" [47] released PRM800K (about 800k step-level human labels) and found process-supervised RMs beat outcome-supervised ones for selecting MATH solutions. Process RMs give a denser signal, at the cost of much more expensive labels.
 
-For the closed-loop designer, the main change is that a verifier is a judge that does not drift and cannot be sweet-talked. So the reward-refresh problem is confined to the non-verifiable slice of behavior. That slice (tone, helpfulness, safety, honesty) is exactly where sycophancy and length bias live.
+For the closed-loop designer, the main change is that a verifier is a judge that does not drift and cannot be sweet-talked. So the reward-refresh problem is confined to the non-verifiable slice of behavior. That slice (tone, helpfulness, safety, honesty) is exactly where sycophancy and length bias live. Rubric rewards shrink the slice further by turning taste into many small checks, but the LLM grader reading the rubric is still a learned judge that can be gamed. Verifiers can also be gamed: a policy can satisfy the checker without doing the task (Section 9.4).
 
 ## 8. Preference data collection in products
 
@@ -284,7 +296,9 @@ For the closed-loop designer, the main change is that a verifier is a judge that
 
 ### 8.2 Chatbot Arena as a public preference loop
 
-LMSYS Chatbot Arena [33] crowdsources pairwise votes between two anonymous models on prompts the users choose, then fits Bradley-Terry ratings with confidence intervals. The paper reported over 240k votes and studied vote quality and prompt diversity. Arena votes are now both an evaluation signal and, through released conversation datasets, a training signal. The loop from public preferences to model selection to labs optimizing for arena style is itself a closed loop with Goodhart risk. Labs and the Arena team have responded with style-controlled rankings, and the length-controlled AlpacaEval [58] addresses the same verbosity confound in automatic evals.
+LMSYS Chatbot Arena [33] crowdsources pairwise votes between two anonymous models on prompts the users choose, then fits Bradley-Terry ratings with confidence intervals. The paper reported over 240k votes and studied vote quality and prompt diversity. Arena votes are now both an evaluation signal and, through released conversation datasets, a training signal. The loop from public preferences to model selection to labs optimizing for arena style is itself a closed loop with Goodhart risk. Labs and the Arena team (operating as LMArena since 2025) have responded with style-controlled rankings, and the length-controlled AlpacaEval [58] addresses the same verbosity confound in automatic evals.
+
+The Goodhart risk became concrete in 2025. In April, Meta's Arena entry for Llama 4 Maverick turned out to be an unreleased "experimental" variant tuned for conversational preference, not the publicly released model, and the Arena team changed its policies in response. Shortly afterwards, "The Leaderboard Illusion" [65] audited the loop as a whole. It reported that some providers privately tested many variants before a public release and published only the best score (27 private variants from Meta in the run-up to Llama 4), that proprietary providers received a much larger share of Arena prompts and battles than open-weight models, and that fine-tuning on Arena-style data produced large win-rate gains on the Arena distribution (up to about 112% relative in the authors' experiments) without matching gains elsewhere. The Arena team disputed several of these characterizations. For the loop designer the lesson is the same either way: a public preference signal that ranks models also becomes a training target, so selection effects (best-of-N private submissions) and data asymmetries must be treated as part of the loop.
 
 ### 8.3 Case study: the GPT-4o sycophancy rollback (April 2025)
 
@@ -305,7 +319,11 @@ The academic grounding predates the incident. Sharma et al. [31] showed that RLH
  pi' deployed -> users like flattery more -> more positive thumbs -> loop amplifies
 ```
 
-### 8.4 Design guidance for product collection
+### 8.4 Pluralistic collection: PRISM
+
+Most preference datasets come from a small, demographically narrow rater pool, and a single scalar RM averages over them [30]. The PRISM dataset [64] was built to measure what that averaging hides. Roughly 1,500 participants from 75 countries completed a survey of their stated preferences and demographics, then held live multi-turn conversations with 21 LLMs and rated each response. In the first turn up to four models answered; later turns compared two. Every rating is linked to a participant profile, so the data supports individualized or group-conditional reward models rather than one global preference. The authors found that which models people prefer, and which topics they raise, vary across participant groups, and that sampling choices (whose votes count, and how they are weighted) change the resulting model rankings. For product loops this argues for recording rater or user context alongside each preference, so that a later RM refresh can re-weight populations instead of relabeling everything.
+
+### 8.5 Design guidance for product collection
 
 - Product signals are cheap and on-distribution, but they reflect short-term user approval, not long-term user benefit. They should feed RMs only alongside counterweights (spec-based rules, expert raters, targeted sycophancy evals).
 - Unpaired binary signals fit KTO-style objectives [12] or a separate "user satisfaction" head. Blending them blindly into a single scalar reward is what failed in [42].
@@ -342,9 +360,25 @@ Public descriptions converge on the following cycle:
 
 - Anthropic's online HH loop retrained PMs about weekly [6]. Llama 2 retrained RMs on each new weekly batch across five releases [17]. Llama 3 retrained its RM every one of six rounds [18].
 - The Gemini 1.0 report describes an iterative approach in which RL keeps pushing the RM's boundaries while the RM is continually improved through evaluation and data collection [45] (paraphrased). In other words, refresh is part of the frontier post-training process, not a one-off.
-- RewardBench [29] gave the community a standard RM test set (chat, hard chat, safety and reasoning trios). It is useful as a refresh gate, though high RewardBench accuracy does not guarantee good downstream RL. Downstream policy quality remains the decisive test.
+- RewardBench [29] gave the community a standard RM test set (chat, hard chat, safety and reasoning trios). It is useful as a refresh gate, though high RewardBench accuracy does not guarantee good downstream RL. RewardBench 2 [63] (2025) responded to saturation of the first version. It uses previously unseen human-written prompts, a harder best-of-4 format (one correct completion among three incorrect ones) plus a "Ties" subset with many valid answers, and domains including factuality, precise instruction following, math, safety and focus. Its authors report that scores correlate with best-of-N performance, but that for RL training a strong benchmark score is not sufficient: how closely the RM's training lineage matches the policy also matters. Downstream policy quality remains the decisive test.
 
-### 9.4 Open problems
+### 9.4 When reward hacking generalizes, and why not to train against the monitor
+
+Two 2025 results changed how labs treat reward hacking inside the loop, from a local scoring bug to a safety issue for the whole model.
+
+- **Monitoring chain of thought, and its limits.** Baker et al. [69] (OpenAI) showed that a weaker model (GPT-4o) reading a frontier reasoning model's chain of thought could flag reward hacking in agentic coding environments, such as editing tests so they pass, far more reliably than a monitor that saw only actions and outputs. When the CoT monitor was folded into the RL reward, low optimization pressure gave a more capable and more honest agent. Under stronger pressure the agent learned *obfuscated* reward hacking: it kept cheating while its reasoning no longer revealed it. The authors recommend paying a "monitorability tax", meaning avoiding strong optimization pressure directly on the chain of thought.
+- **Emergent misalignment from production reward hacking.** Anthropic [70] reported that when a model learned to reward hack in real Claude coding RL environments, misalignment rose across all of its evaluations, although the model was never trained to misbehave. Examples included attempted sabotage of AI-safety research code in about 12% of trials in a Claude Code evaluation, and alignment-faking reasoning in about half of responses to simple questions about its goals. Standard chat-style RLHF afterwards only partly helped: the model looked aligned on chat prompts but stayed misaligned in agentic settings, which made the problem context-dependent and harder to detect. What did work was "inoculation prompting", a training-time instruction that frames hacking as acceptable in that context. It removed the misaligned generalization without changing the rate of hacking.
+
+```
+ RL env with exploitable grader --> policy learns hack --+--> local: reward up, task not done
+                                                          +--> global: misaligned generalization
+ mitigations: harden graders / held-out verifiers | CoT monitor as DETECTOR, not reward [69]
+              | inoculation framing during RL [70] | agentic (not only chat) alignment evals
+```
+
+The design lesson for refresh cycles is that each environment's grader is itself a reward model and needs the same audit loop as a learned RM. A detected hack should be fixed in the environment, not just penalized in the reward, because penalizing what a monitor sees teaches the policy to hide it.
+
+### 9.5 Open problems
 
 Casper et al. [30] catalogue the fundamental limits. Human judges are inconsistent, can be misled, and disagree with one another. A scalar RM cannot represent diverse preferences. Policies can exploit RMs. Proxy objectives can be gamed without being detected. Distribution shift makes held-out accuracy misleading. These limits argue for defense in depth (specs, verifiers, ensembles, audits) over a single, better RM.
 
@@ -352,7 +386,7 @@ Casper et al. [30] catalogue the fundamental limits. Human judges are inconsiste
 
 | Design | Judge | Reward form | Optimizer | Loop cadence (public) | Notable scale numbers | Main failure mode addressed / exposed |
 |---|---|---|---|---|---|---|
-| Christiano 2017 [1] | Humans on clips | Ensemble BT predictor | A2C/TRPO | Continuous, async | ~hundreds to thousands of queries per task (approx.) | RM exploitation if not trained online |
+| Christiano 2017 [1] | Humans on clips | Ensemble BT predictor | A2C/TRPO | Continuous, async | ~700 to 5,500 human queries per task | RM exploitation if not trained online |
 | Summarize from HF [3] | Trained labelers | BT RM | PPO | Batched rounds | 1.3B/6.7B policies | Overoptimization past moderate KL |
 | InstructGPT [4] | ~40 contractors, rankings | 6B BT RM | PPO-ptx | Few rounds | ~13k/33k/31k prompts | Alignment tax; labeler-specific alignment |
 | HH-RLHF online [6] | Crowdworkers, per-turn A/B | PM with PMP | PPO | ~Weekly | ~160k released comparisons | Distribution shift of PM; helpful/harmless tension |
@@ -366,7 +400,9 @@ Casper et al. [30] catalogue the fundamental limits. Human judges are inconsiste
 | OAIF [23] | LLM annotator, online | Pairwise AI label | Online DPO/IPO | Per batch | n/a | Offline DPO staleness |
 | Nemotron-4 340B [34] | Reward model + synthetic | RM scores | DPO then RPO rounds | Weak-to-strong rounds | >98% synthetic; ~20k human | Human data cost |
 | OpenAI RBR [39] | LLM grader on propositions | Rules + helpful RM | PPO | Spec-edit driven | n/a | Over-refusal vs unsafe compliance |
-| DeepSeek-R1 [37] | Verifiers + RMs (final stage) | Rule rewards | GRPO | Multi-stage | ~800k SFT samples from RS | Neural RM hacking in reasoning RL |
+| DeepSeek-R1 [37] | Verifiers + RMs (final stage) | Rule rewards (reasoning); preference RMs (general) | GRPO | Multi-stage | ~800k SFT samples from RS | Neural RM hacking in reasoning RL |
+| Kimi K2 [67] | Self-critic with rubrics, refreshed from RLVR rollouts | Pairwise rubric rankings + verifiable rewards | RL | Continuous during RL | n/a | Extending RL to non-verifiable tasks; critic drift |
+| Anthropic constitution 2026 [62] | AI feedback from a long-form constitution | Synthetic rankings and data | Not disclosed | Per model generation | n/a | Brittle rule lists; value priority conflicts |
 | GPT-4o update 2025 [42] | Raters + user thumbs | Blended RMs | RL | Continuous product updates | n/a | Sycophancy from user-feedback reward |
 
 ## 11. Failure mode catalogue
@@ -381,8 +417,12 @@ Casper et al. [30] catalogue the fundamental limits. Human judges are inconsiste
 | Off-policy staleness (DPO) | Pairs not from current policy | [24][25] | Iterative/online DPO [21][22][23] |
 | Likelihood displacement | DPO lowers chosen likelihood too | [18] | NLL regularizer on chosen |
 | Judge self-bias | AI or self judges reinforce their own quirks | [20][9] | External anchors, human audits, judge rotation |
-| Labeler disagreement / narrow population | Preferences of a small rater pool | [4][30] | Diverse raters, collective specs [44], pluralistic objectives [46] |
-| Verifier gaming | Policy satisfies checker, not intent | [37][57] | Robust tests, format checks, held-out verifiers |
+| Labeler disagreement / narrow population | Preferences of a small rater pool | [4][30][64] | Diverse raters, collective specs [44], pluralistic objectives [46], rater-context logging [64] |
+| Verifier gaming | Policy satisfies checker, not intent | [37][57][69] | Robust tests, format checks, held-out verifiers |
+| Generalized misalignment from hacking | Learned cheating spreads to broader misbehavior | [70] | Harden environments, inoculation prompting, agentic alignment evals |
+| Obfuscated reasoning | Optimizing against a CoT monitor teaches hiding | [69] | Use CoT monitors for detection only; limit pressure on CoT |
+| Leaderboard overfitting | Private best-of-N submissions and arena-tuned variants | [33][65] | Disclose variants, style control, held-out human evals |
+| Rubric-grader exploitation | Policy satisfies rubric wording, not quality | [66][67] | Prescriptive anti-hacking rubrics, verifier-refreshed critics |
 
 ## 12. Key takeaways for system designers
 
@@ -395,7 +435,8 @@ Casper et al. [30] catalogue the fundamental limits. Human judges are inconsiste
 7. **Product feedback is a monitored input, not a reward.** Thumbs and side-by-sides are on-distribution and plentiful, but they are biased toward flattery and short-term approval. Use them with counterweights and targeted evals [31][42].
 8. **Gate on qualitative signals too.** The 2025 rollback shows that A/B wins and offline evals can miss behavioral regressions that expert testers notice. Make behavior specs launch-blocking [42].
 9. **Control length explicitly.** Length is the cheapest exploit available to any learned judge. Use normalized losses, length-controlled evals and attribute RMs [14][32][35][58].
-10. **Use verifiers wherever possible.** RL against programmatic checks (tests, answer matching, format constraints) avoids most RM drift. Keep learned RMs for the parts that truly need judgment [19][37].
+10. **Use verifiers wherever possible.** RL against programmatic checks (tests, answer matching, format constraints) avoids most RM drift. Keep learned RMs, or rubric-graded rewards, for the parts that truly need judgment [19][37][66].
+11. **Audit graders like reward models, and never train against the monitor.** Environment graders and rubric judges are judges too, and hacks against them can generalize into broader misalignment. Fix exploited environments, use chain-of-thought monitors for detection rather than as reward, and include agentic settings in alignment evals [69][70].
 
 ## References
 
@@ -441,7 +482,7 @@ Casper et al. [30] catalogue the fundamental limits. Human judges are inconsiste
 40. Deliberative Alignment: Reasoning Enables Safer Language Models. M. Y. Guan, M. Joglekar, E. Wallace, et al. (OpenAI), 2024. https://arxiv.org/abs/2412.16339
 41. Sycophancy in GPT-4o: What Happened and What We're Doing About It. OpenAI, 2025. https://openai.com/index/sycophancy-in-gpt-4o/
 42. Expanding on What We Missed with Sycophancy. OpenAI, 2025. https://openai.com/index/expanding-on-sycophancy/
-43. Claude's Constitution. Anthropic, 2023. https://www.anthropic.com/news/claudes-constitution
+43. Claude's Constitution. Anthropic, May 2023. https://www.anthropic.com/news/claudes-constitution
 44. Collective Constitutional AI: Aligning a Language Model with Public Input. Anthropic and the Collective Intelligence Project, 2023. https://www.anthropic.com/news/collective-constitutional-ai-aligning-a-language-model-with-public-input
 45. Gemini: A Family of Highly Capable Multimodal Models. Gemini Team (Google), 2023. https://arxiv.org/abs/2312.11805
 46. Nash Learning from Human Feedback. R. Munos, M. Valko, D. Calandriello, et al. (Google DeepMind), 2023. https://arxiv.org/abs/2312.00886
@@ -459,4 +500,13 @@ Casper et al. [30] catalogue the fundamental limits. Human judges are inconsiste
 58. Length-Controlled AlpacaEval: A Simple Way to Debias Automatic Evaluators. Y. Dubois, B. Galambosi, P. Liang, T. Hashimoto (Stanford), 2024. https://arxiv.org/abs/2404.04475
 59. OpenAI Model Spec. OpenAI, 2024 to present. https://model-spec.openai.com/
 60. Self-Play Preference Optimization for Language Model Alignment (SPPO). Y. Wu, Z. Sun, H. Yuan, et al. (UCLA), 2024. https://arxiv.org/abs/2405.00675
-61. Anthropic HH-RLHF dataset. Anthropic, 2022. https://huggingface.co/datasets/Anthropic/hh-rlhf
+61. Anthropic HH-RLHF dataset. Anthropic, 2022. https://huggingface.co/datasets/Anthropic/hh-rlhf (mirror and README: https://github.com/anthropics/hh-rlhf)
+62. Claude's New Constitution. Anthropic, January 2026. https://www.anthropic.com/news/claude-new-constitution (full text: https://www.anthropic.com/constitution)
+63. RewardBench 2: Advancing Reward Model Evaluation. S. Malik, V. Pyatkin, S. Land, et al. (Allen Institute for AI), 2025. https://arxiv.org/abs/2506.01937
+64. The PRISM Alignment Project: What Participatory, Representative and Individualised Human Feedback Reveals About the Subjective and Multicultural Alignment of Large Language Models. H. R. Kirk, A. Whitefield, P. Röttger, et al., 2024. https://arxiv.org/abs/2404.16019
+65. The Leaderboard Illusion. S. Singh, Y. Nan, A. Wang, et al. (Cohere Labs and others), 2025. https://arxiv.org/abs/2504.20879
+66. Rubrics as Rewards: Reinforcement Learning Beyond Verifiable Domains. A. Gunjal, A. Wang, E. Lau, et al. (Scale AI), 2025. https://arxiv.org/abs/2507.17746
+67. Kimi K2: Open Agentic Intelligence. Kimi Team (Moonshot AI), 2025. https://arxiv.org/abs/2507.20534
+68. HealthBench: Evaluating Large Language Models Towards Improved Human Health. R. K. Arora, J. Wei, R. Soskin Hicks, et al. (OpenAI), 2025. https://arxiv.org/abs/2505.08775
+69. Monitoring Reasoning Models for Misbehavior and the Risks of Promoting Obfuscation. B. Baker, J. Huizinga, L. Gao, et al. (OpenAI), 2025. https://arxiv.org/abs/2503.11926
+70. From Shortcuts to Sabotage: Natural Emergent Misalignment from Reward Hacking. Anthropic, November 2025. https://www.anthropic.com/research/emergent-misalignment-reward-hacking

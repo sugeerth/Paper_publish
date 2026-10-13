@@ -23,8 +23,12 @@ systems" [25]. Commercial platforms package the same loop differently:
   open-source agent RL with ART and RULER [7][10][11].
 - Predibase supplies the methodology (a distillation playbook) and the serving layer (LoRAX)
   [15][17].
-- Fireworks and Together expose training APIs and cookbooks covering SFT, DPO, GRPO and
-  on-policy distillation [18][19][23].
+- Fireworks, Together and Thinking Machines (Tinker) expose training APIs and cookbooks
+  covering SFT, DPO, GRPO and on-policy distillation [18][19][23][48].
+- Hyperscalers offer the same capture-to-distill path: Amazon Bedrock can distill directly from
+  tagged invocation logs [47].
+- Open standards are emerging for both ends of the loop: OpenTelemetry GenAI conventions for
+  traces and evaluation results [44][45], and OpenEnv for agent environments [49].
 - Research and open-source projects supply the parts these platforms are built from:
   - routers trained on preference or outcome data [31][32][34];
   - on-policy distillation objectives [40][41];
@@ -106,10 +110,12 @@ causes:
 
 1. Non-unique tokenizations (for example `H`+`AVING` versus `HAV`+`ING`).
 2. Tool-call parsing and re-serialization. These change whitespace and can silently
-   auto-correct malformed JSON, "masking the model's true generation errors."
+   auto-correct malformed JSON, which "masks the model's true generation errors."
 3. Chat-template differences between frameworks.
 
-The result is effectively off-policy updates and unstable learning curves. The fix was
+The result is effectively off-policy updates and unstable learning curves. The authors add that
+because the drift is not token-level, it "cannot be corrected through token-level importance
+sampling." The fix was
 upstreamed into vLLM (v0.10.2): the OpenAI-compatible API accepts `return_token_ids` and
 returns `prompt_token_ids` and `token_ids` [30]. Agent Lightning v1.0's gateway now records
 "prompt token IDs, response token IDs, and chosen-token log probabilities" for every proxied
@@ -152,6 +158,34 @@ blueprint "doesn't automatically promote or deploy any model" [26]. Predibase re
 canary rollout (1%, then 10%), dark launch (shadowing the teacher) or a hybrid launch where the
 student takes the easy queries and the teacher the hard ones [15]. That hybrid launch is a
 router, which links distillation loops to the routing loops in section 10.
+
+### 1.5 Trace standards and observability platforms
+
+Vendor-specific capture (stored completions, OpenPipe tags, NVIDIA's Elasticsearch schema)
+locks the training data to one platform. Since 2024 the OpenTelemetry project has been
+standardizing GenAI telemetry, now maintained in a dedicated `semantic-conventions-genai`
+repository and still at **Development** stability [44]:
+
+- **Spans** carry `gen_ai.request.model`, `gen_ai.response.id`, token usage
+  counts (for example `gen_ai.usage.input_tokens`) and, for multi-turn sessions,
+  `gen_ai.conversation.id`. Operation names such as `invoke_agent` and `execute_tool` cover agent
+  invocations and tool calls, and further spans cover retrieval and memory operations.
+- **Content is opt-in.** `gen_ai.input.messages`, `gen_ai.output.messages`, system
+  instructions and tool definitions are all `Opt-In` attributes flagged as likely to contain
+  sensitive or PII data. A default-configured instrumentation therefore yields cost and latency
+  telemetry but *not* a trainable dataset. A flywheel has to turn content capture on
+  deliberately and route it to a store with appropriate retention and redaction.
+- **Evaluations are first-class events.** A `gen_ai.evaluation.result` event records an
+  evaluator name, a score value and a label (for example `pass` or `fail`), parented to the span
+  being evaluated or linked by `gen_ai.response.id` [45]. Judge scores, user feedback and
+  production outcomes can thus be joined to the exact call they grade, which is the join every
+  curation step in section 1.2 needs.
+
+Open-source LLM observability platforms sit on top of this layer. Langfuse, for example,
+combines production tracing with LLM-as-judge, code evaluators, user
+feedback, manual labelling and **datasets** built from production traces for regression testing
+and experiments [46]. These tools usually stop at the eval set. Exporting their curated
+datasets into a fine-tuning API is the step that closes the loop described in this chapter.
 
 ## 2. OpenAI: stored completions, Evals, distillation and RFT
 
@@ -271,6 +305,30 @@ the prompt version is important," and grader fidelity determines optimization qu
 same notebook notes that the Evals platform "does not yet provide an API to retrieve user
 feedback programmatically", so human thumbs-up and thumbs-down data cannot yet flow back into
 the loop automatically.
+
+### 2.6 The same pattern on a hyperscaler: Bedrock distillation from invocation logs
+
+Amazon Bedrock Model Distillation packages the stored-completions pattern for AWS. Its
+workflow automates teacher response generation, data synthesis and student fine-tuning, and
+one of its two input modes is **historical invocation logs** [47]. AWS's sample notebook shows
+the loop end to end:
+
+- **Capture.** Model invocation logging is enabled to an S3 bucket. Each teacher call
+  (`Llama 3.1 70B` in the example) is made through the Converse API with `requestMetadata`
+  tags such as `{"job_type": ..., "invoke_model": "llama31-70b"}`, the direct analogue of
+  OpenAI's `metadata`.
+- **Curation by tag.** The distillation job's `invocationLogsConfig` points at the log bucket
+  and applies `requestMetadataFilters` (for example `equals: {"invoke_model":
+  "llama31-70b"}`) so only the intended workload is used.
+- **Reuse or regenerate.** The flag `usePromptResponse` (default `False`) decides whether the
+  logged teacher responses are used as targets or only the prompts are kept and the teacher is
+  re-queried during the job.
+- **Train.** The student (`Llama 3.1 8B` in the example) is fine-tuned on the result, with
+  the teacher named in `teacherModelConfig`.
+
+The `usePromptResponse` switch makes explicit a choice every log-driven loop faces: train on
+what production actually returned (cheap, but it inherits any prompt version or model that was
+live at the time) or re-label the logged prompts with today's best teacher.
 
 ## 3. OpenPipe: from request logs to agent RL
 
@@ -396,11 +454,12 @@ points on average". The accompanying demo served 25 LoRA fine-tuned Mistral-7B m
 single 80 GB A100 [16]. The serving layer is LoRAX, which serves many adapters over one shared
 base model [17]:
 
-- **Just-in-time adapter loading** happens per request without blocking.
-- **Heterogeneous continuous batching** packs requests for different adapters into one batch
-  using SGMV kernels, "keeping latency and throughput nearly constant with the number of
-  concurrent adapters."
-- **Adapter exchange scheduling** prefetches and offloads adapters between GPU and CPU memory.
+- **Just-in-time adapter loading** happens per request without blocking concurrent requests.
+- **Heterogeneous continuous batching** packs requests for different adapters into one batch,
+  "keeping latency and throughput nearly constant with the number of concurrent adapters."
+  Multi-adapter kernels (Punica's SGMV) keep the mixed batch efficient under load.
+- **Adapter exchange scheduling** asynchronously prefetches and offloads adapters between GPU
+  and CPU memory.
 
 This matters for loop design because a flywheel that spawns a new adapter per workload, per
 tenant or per retraining cycle stays affordable only if adapters share base-model GPUs. Without
@@ -432,8 +491,9 @@ Two workflows differ in cost model [20]:
 - **Serverless.** The user drives `forward_backward` and `optim_step` against a shared pooled
   trainer and samples in-session from a snapshot, billed per token with no idle cost.
 
-On an earlier model, the dedicated path took about 12–25 minutes against about 2 minutes
-serverless for the same 51 optimizer steps [20].
+In earlier runs of the router case study on `qwen3p5-9b`, the dedicated path took about 12–25
+minutes against about 2 minutes serverless for the same 51 optimizer steps. The case study
+notes these timings were not remeasured on the current base model [20].
 
 ### 5.2 Eval Protocol: RL on agents already in production
 
@@ -448,14 +508,14 @@ Fireworks RFT, TRL, Unsloth or a custom loop [22]. The cookbook's case studies a
 
 The `sft_prompt_router` case study links the distillation and routing threads [20]:
 
-- **Task.** It fine-tunes a LoRA on Qwen 3.8 27B to emit a five-field JSON routing decision:
+- **Task.** It fine-tunes a LoRA on Qwen 3.8 27B (thinking disabled) to emit a five-field JSON routing decision:
   small or big model, complexity 1–5, and math, code and reasoning flags. The goal is to "keep
   easy chat on a small model and escalate hard logic/code/math to a big model — without paying
   a frontier model just to make that decision."
 - **Comparison.** On a 60-row holdout, the tuned model with a lean prompt beat a
   prompt-engineered base model that had the routing rule written into its prompt.
 - **Results.** Route accuracy rose from 93.3% to 98.3% (dedicated) and from 91.7% to 95.0%
-  (serverless). Exact match on all five fields rose from about 41% to 67–73%. The largest gain
+  (serverless). Exact match on all five fields rose from about 40–42% to 67–73%. The largest gain
   was on the `reasoning` flag (62% to 93%, and 60% to 100%).
 
 The sample is small: 992 rows in total and a 60-row holdout.
@@ -472,7 +532,9 @@ A "privileged" variant gives the teacher extra context, such as a worked solutio
 student never sees. This is a way to distill from information that is present in logs but
 absent at inference time. Section 9 places this among the other distillation objectives.
 
-## 6. Together AI: fine-tuning API, continual fine-tuning and evaluations
+## 6. Together AI and Tinker: training APIs as loop primitives
+
+### 6.1 Together AI: fine-tuning API, continual fine-tuning and evaluations
 
 Together's public cookbook covers the same loop with an API-first shape [23]:
 
@@ -491,6 +553,27 @@ appeal for a flywheel is that each cycle trains only on the newly harvested data
 
 The risk is cumulative drift, which a fixed regression eval set must catch. This is the same
 discipline the playbook asks for ("Avoid changing your test sets frequently") [15].
+
+### 6.2 Tinker: a low-level training API
+
+Thinking Machines Lab's Tinker takes the "training as an API" idea furthest. Instead of
+submitting a job, the user's own Python loop calls a remote service that handles distributed
+training [48]:
+
+- `create_lora_training_client(base_model, rank)` opens a LoRA training session;
+- `forward_backward(...)` and `optim_step(...)` are the training primitives;
+- `save_weights_and_get_sampling_client()` returns a client whose `sample(...)` generates from
+  the current weights, so the same script can alternate between sampling and updating;
+- `save_state` / `load_state` and checkpoint download make each cycle resumable and the
+  weights portable.
+
+The companion Tinker Cookbook implements SFT, RL with verifiable rewards, sandboxed code RL,
+DPO and a three-stage RLHF pipeline, tool use, multi-agent self-play, rubric-based grading, and
+on- and off-policy distillation on top of these primitives [48]. Its distillation results appear
+in section 9 [40]. Fireworks' serverless path (section 5.1) exposes the same
+`forward_backward` / `optim_step` shape. For flywheel builders the significance is that the
+loop's control logic (when to sample, what to grade, when to stop) stays in the team's own
+code, while GPU management is outsourced.
 
 ## 7. NVIDIA Data Flywheel Blueprint: automated experiment search
 
@@ -550,14 +633,16 @@ cutting cost and time to first token by more than 50% [25].
 Its roadmap items included PII redaction and the use of thumbs-up/down signals for DPO or KTO.
 At the time of deprecation, user feedback "will have no effect" on selection [26].
 
-## 8. Agent RL directly from production harnesses: Agent Lightning
+## 8. Agent RL directly from production harnesses: Agent Lightning and OpenEnv
 
 ### 8.1 Problem
 
 Agent RL frameworks often require rewriting the agent into the trainer's rollout abstraction.
 Microsoft's Agent Lightning instead inserts a **proxy** between an unmodified agent and the
-model. Every model call made during a rollout then becomes a training sample, an approach its
-authors describe as training "ANY AI agent" with "(almost) zero code changes" [28].
+model. Every model call made during a rollout then becomes a training sample. The project
+originally pitched this as training "ANY AI agent" with "(almost) zero code changes"; the v1.0
+README describes agents reaching the trainer through the proxy with "ZERO changes" to the agent
+[28].
 
 ### 8.2 Architecture (v1.0, August 2026)
 
@@ -592,7 +677,10 @@ The project reports results on SWE-bench Verified [28]:
 
 - Qwen3.5-9B improved from 41.8% to 56.4% (+14.6 points) using 6K training samples. The release
   includes the data cleaning and "reward-hacking prevention" pipeline.
-- Qwen3.5-35B-A3B improved from 47.8% to 61.6% using 1.8K examples.
+- Qwen3.5-35B-A3B improved from 47.8% to 61.6% (+13.8 points) with pure RL on 1.8K examples.
+
+These are project-reported figures; the README does not describe how the reward-hacking
+prevention works.
 
 Two lessons generalize to any trace-to-RL loop:
 
@@ -600,6 +688,23 @@ Two lessons generalize to any trace-to-RL loop:
 2. **Treat the production harness as the environment.** That means keeping the agent's tools,
    context management and control flow in the loop instead of re-implementing them in a
    simulator.
+
+### 8.4 Standardizing the environment side: OpenEnv
+
+Agent Lightning standardizes the *model* side of the harness (an OpenAI-compatible proxy).
+OpenEnv standardizes the *environment* side [49]. Each environment is a Docker image exposing a
+Gymnasium-style `reset()`, `step()` and `state()` interface (sync or async) to a client over a
+network connection, and can run locally, in a cloud sandbox or as a Hugging Face Space. A hub
+lists 40+ environments, from coding sandboxes and browsers to games and finance simulators. The
+README lists integrations with ART, SkyRL, torchforge, TRL (whose `GRPOTrainer` accepts an
+`environment_factory`), Unsloth and others, and a technical committee drawn from Meta-PyTorch,
+Hugging Face, NVIDIA, Microsoft, Unsloth and other organizations governs it. The project
+describes itself as early-stage, with APIs that may change.
+
+For trace-to-model loops, a shared environment interface addresses failure mode 8 in section
+12: an agent whose production tools have side effects can be retrained against a containerized
+replica that exposes the same tool surface. The same image can serve RL rollouts, offline
+regression evals and, through its MCP endpoint, production tool calls.
 
 ## 9. Distillation techniques used in these loops
 
@@ -672,6 +777,8 @@ judge [31]:
 - **`bert`**: a BERT classifier;
 - **`causal_llm`**: an LLM-based classifier.
 
+A `random` router is also provided as a baseline.
+
 Each router exposes one method, `calculate_strong_win_rate(prompt)`. A request goes to the
 strong model when the win rate exceeds a cost threshold, encoded in the model name (for example
 `router-mf-0.11593`). Reported results: cost reduced by "up to 85%" while keeping "95% GPT-4
@@ -732,11 +839,13 @@ a published component above.
 | System | Capture primitive | Curation | Training methods | Evaluator | Serving / promotion | Public numbers |
 |---|---|---|---|---|---|---|
 | OpenAI platform [1][2][3][6] | `store=True` + `metadata` | Dashboard filters by model and metadata | SFT distillation, DPO, RFT (o4-mini) | Evals API graders: label, score, python, similarity | Hosted `ft:` model; manual switch | Distilled 4o-mini 79.3% vs teacher 79.7% vs base 64.7%; RFT about +5 pts |
+| Amazon Bedrock distillation [47] | Invocation logs to S3 + `requestMetadata` | `requestMetadataFilters`; reuse logged responses or re-query teacher (`usePromptResponse`) | Managed teacher-to-student SFT with data synthesis | User-side | Bedrock-hosted custom model | Not published in sample |
 | OpenPipe (classic) [7][8][9] | Drop-in SDK or proxy, async report, tags | Log filters, pruning rules, 20% holdout | SFT on Mistral, Llama, GPT-3.5 | GPT-4 judge, head-to-head | Hosted OpenAI-compatible endpoint or weights | Not published in docs |
 | OpenPipe ART + RULER [10][11][12] | Trajectory objects from client | Group per scenario | GRPO on LoRA (vLLM + Unsloth), SFT | RULER relative LLM judge or custom reward | LoRA hot-swap; W&B serverless backend | $15–200 per run (FAQ); ART·E beats o3 (vendor) |
 | Predibase [15][16][17] | Stream logs to S3 or Snowflake | Playbook practices | LoRA SFT (Ludwig) | Task metrics; in-distribution and balanced test sets | LoRAX multi-LoRA; canary, dark or hybrid launch | LoRA Land: +34 vs base, +10 vs GPT-4; 25 adapters per A100 |
 | Fireworks [19][20][21][22] | Eval Protocol rollouts and trace store | Per case study | SFT, DPO, ORPO, GRPO (sync and async), OPD, SDFT | EP evaluators | Dedicated vs serverless; multi-LoRA | Router SFT route accuracy 93.3% to 98.3% |
 | Together [23][24] | (bring your own logs) | User-side | SFT, DPO, continual FT (`from_checkpoint`) | Evaluations API, judge tuning, GEPA | Dedicated endpoints | Not published in cookbook |
+| Tinker [40][48] | (bring your own logs) | User code | LoRA SFT, RL, DPO/RLHF, on- and off-policy distillation via `forward_backward` / `optim_step` | User code; rubric grading recipes | Sampling client; downloadable checkpoints | OPD: AIME'24 about 65% to 76.7% |
 | NVIDIA Data Flywheel [25][26][27] | Elasticsearch docs with `workload_id` | Dedup, stratified split | LoRA via NeMo Customizer; ICL | LLM judge; tool-call accuracy | Human promotion only | Up to 98.6% cost reduction (1B vs 70B on tool routing) |
 | Agent Lightning [28][29][30] | Gateway proxy recording token IDs and logprobs | Merge only on continuous token histories | RL (verl), APO, RS-SFT | Agent-emitted reward events | Trainer endpoints | SWE-bench Verified +13.8 to +14.6 pts |
 | RouteLLM / RoRF [31][32] | Preference or battle data | GPT-4-judge augmentation | MF, BERT, LLM classifier, random forest | MT Bench, MMLU, GSM8K | Threshold `router-mf-t` | Up to 85% cost cut at 95% GPT-4 quality |
@@ -763,11 +872,12 @@ a published component above.
 7. **Retokenization and serialization drift** in RL from logged text [30].
 8. **Non-repeatable environments.** GRPO-style RL needs many rollouts per scenario, so it does
    not suit agents with irreversible side effects. Sandboxes or replayable environments are
-   needed [12][28].
+   needed, ideally behind a standard interface such as OpenEnv [12][28][49].
 9. **Router calibration drift.** Thresholds calibrated on public data do not hold on product
    traffic, and must be recalibrated on recent queries [31][32].
 10. **Privacy and terms of service.** NVIDIA's reference flow fine-tunes on traffic without PII
-    removal, and lists redaction as roadmap work [25][26]. The playbook advises checking
+    removal, and lists redaction as roadmap work [25][26]. OpenTelemetry marks prompt and
+    completion content as opt-in and likely to contain PII [44]. The playbook advises checking
     provider terms before training on their outputs [15].
 
 ## Key takeaways for system designers
@@ -775,7 +885,12 @@ a published component above.
 - **Design the log schema for training on day one.** Store the exact request, the exact
   response and a stable task id per call site, plus model, prompt version and user-feedback
   fields. For anything that may become RL, also store the token IDs and logprobs from the
-  inference engine [25][29][30].
+  inference engine [25][29][30]. Prefer an open schema (OpenTelemetry GenAI spans and
+  evaluation events), and remember that message content is opt-in there: turn it on
+  deliberately, with redaction and retention rules [44][45].
+- **Decide whether to reuse or regenerate targets.** Logged responses are free but frozen at
+  whatever model and prompt were live; re-querying a current teacher on logged prompts costs
+  more but removes stale labels [1][47].
 - **Keep logging off the critical path.** Use async reporting, stream passthrough and client
   fallback when the logging service is down [9].
 - **Build the evaluator before the trainer.** Freeze an in-distribution and a stress or
@@ -822,7 +937,7 @@ a published component above.
    https://github.com/OpenPipe/OpenPipe/blob/main/docs/features/pruning-rules.mdx ;
    (c) "Evaluations"
    https://github.com/OpenPipe/OpenPipe/blob/main/docs/features/evaluations.mdx ;
-   (e) "How reporting works"
+   (d) "How reporting works"
    https://github.com/OpenPipe/OpenPipe/blob/main/docs/faq/how-reporting-works.mdx
 10. "ART: Agent Reinforcement Trainer" (README). B. Hilton, K. Corbitt, D. Corbitt et al.,
     OpenPipe, 2025. https://github.com/OpenPipe/ART
@@ -899,3 +1014,18 @@ a published component above.
     Smaller Model Sizes" (code). Google Research, 2023.
     https://github.com/google-research/distilling-step-by-step (paper:
     https://arxiv.org/abs/2305.02301)
+44. "Semantic conventions for generative client AI spans" (gen-ai-spans.md). OpenTelemetry
+    GenAI Semantic Conventions, Development status, 2024-2026.
+    https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-spans.md
+45. "Semantic conventions for Generative AI events" (gen-ai-events.md, including
+    `gen_ai.evaluation.result`). OpenTelemetry, 2025-2026.
+    https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-events.md
+46. "Langfuse: open source LLM engineering platform" (README). Langfuse, n.d.
+    https://github.com/langfuse/langfuse
+47. "Amazon Bedrock Model Distillation" samples (README and
+    `Historical_invocation_distillation.ipynb`). AWS Samples, 2025.
+    https://github.com/aws-samples/amazon-bedrock-samples/tree/main/custom-models/model_distillation
+48. "Tinker Cookbook" (README: Tinker API primitives and recipe list). Thinking Machines Lab,
+    2025-2026. https://github.com/thinking-machines-lab/tinker-cookbook
+49. "OpenEnv: an interface library for RL post-training with environments" (README). OpenEnv
+    project (Meta-PyTorch, Hugging Face et al.), 2025-2026. https://github.com/meta-pytorch/OpenEnv
