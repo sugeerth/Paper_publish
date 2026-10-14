@@ -1,6 +1,6 @@
 # 10. Tagging System and Source Index: What Each Tag Means, Every Reported ML System Design Prompt by Portal, and Where Each Likely Prompt Comes From
 
-> **Why this chapter exists.** You asked for details on the tagging system. Chapters 01-08 each repeat the [Reported]/[Likely] definitions in their header, keep their own reference lists, and scatter research caveats. This chapter puts all of it in one place.
+> **Why this chapter exists.** You asked for details on the tagging system. Chapters 01-09 (there is no chapter 06) each repeat the [Reported]/[Likely] definitions in their header, keep their own reference lists, and scatter research caveats. This chapter puts all of it in one place.
 > - Part 1 defines each tag and the evidence needed to earn it.
 > - Part 2 lists every [Reported] system design prompt with its portal, date, role, round and evidence strength.
 > - Part 3 maps each [Likely] design prompt to the job posting, blog post or product it is inferred from.
@@ -10,8 +10,8 @@
 
 ## Research limits (stated once, applies to the whole bank)
 
-- **No source page was ever opened.** During research and every review pass, the egress proxy refused, or DNS failed for, every cited domain: Glassdoor, Blind (teamblind.com), 1point3acres, PracHub, Greenhouse, Lever, Built In, CoderPad, cresta.com, fireworks.ai and CX Today. While this chapter was being written, a fetch of the PracHub ML system design page failed again (DNS lookup `ENOTFOUND prachub.com`).
-- **Live web search was exhausted.** The shared web-search budget for this run was already used up. A test search while writing this chapter was refused, so no new candidate reports could be found. Everything here comes from re-reading chapters 01-08 and the search-result excerpts they recorded, not from new searches.
+- **No source page was ever opened.** During research and every review pass, the egress proxy refused, or DNS failed for, every cited domain: Glassdoor, Blind (teamblind.com), 1point3acres, PracHub, Greenhouse, Lever, Built In, CoderPad, cresta.com, fireworks.ai and CX Today. While this chapter was being written, a fetch of the PracHub ML system design page failed again (DNS lookup `ENOTFOUND prachub.com`). In the adversarial review of this chapter, 12 more cited URLs were tried, and every one failed DNS lookup (`ENOTFOUND`): PracHub [10], 1point3acres [14], Glassdoor [1], Blind [6], Greenhouse [19], Lever [24], Built In [23], CoderPad [17], a16z Jobs [18], cresta.com [27], fireworks.ai [35] and CX Today [39]. A failed lookup means the page could not be checked. It does not show that the URL is dead or invented, so no reference was removed for that reason.
+- **Live web search was exhausted.** The shared web-search budget for this run was already used up. A test search while writing this chapter was refused, and so was a search for Cresta MLE system design reports during the review. No new candidate reports could be found, and no new [Reported] prompts were added. Everything here comes from re-reading chapters 01-09 and the search-result excerpts they recorded, not from new searches.
 - **What a [Reported] tag therefore rests on.** It rests on a search-result excerpt (title plus snippet) gathered while the bank was first researched, never on a full read of the page. Dates, roles and wording come from those excerpts and may be incomplete.
 - **What you should do.** Treat the loop description as provisional. Before the onsite, ask your recruiter to confirm the round list, which round is ML system design, how long it lasts, who conducts it, and whether the AI-assisted coding round is in your loop (see Part 4).
 
@@ -35,7 +35,8 @@
 | **[Reported] [n]** | A candidate report or a question bank attributes this question, or a close variant, to Cresta. | A search-result excerpt from an interview portal (Glassdoor, Blind, 1point3acres, PracHub) that names Cresta and states the question or its title. The citation [n] must point to that excerpt's page. | It does not mean the question was asked in the Senior MLE system design round. Where the report is for another role (SWE, FDE) or round (phone screen, coding), the tag says so. |
 | **[Reported format]** | A source reports that a round of this type exists at Cresta, not the exact wording. | An excerpt that describes the round (for example "project presentation"), with no question text. | It does not mean the wording in this bank was reported. |
 | **[Likely]** | A well-grounded inference from Cresta's products, engineering blog, partner write-ups and ML job postings. No candidate has reported it. | A specific Cresta posting, blog post or product that makes the topic central to the role. A citation on a [Likely] item points to that source, not to a candidate report. | It never means someone was asked it. |
-| **[Likely] scale-up of a reported coding question** | A design version of a question reported for a Cresta coding round (rate limiter, worker pool, job dispatcher). | The coding question must itself be [Reported]. | The design version was not reported. |
+| **[Likely scale-up]** | A design version of a question reported for a Cresta coding round (rate limiter, worker pool, job dispatcher, decoder, API call). The citation points to the coding report. | The coding question must itself be [Reported] (table 2.2 or R4). | The design version was not reported. |
+| **[Self-check]** | A study prompt about the evidence behind a reported item, used only in section 3.9. | None. The citation names the reported item it examines. | It is not an interview question and was not reported. |
 
 ### 1.2 Evidence-strength scale used in Part 2
 
@@ -49,8 +50,9 @@
 - **Glassdoor regional mirrors are one source.** The .co.in, .ca, .com and .sg pages (employer ID E3180909) show the same review pool. Two mirrors citing one review do not count as two reports.
 - **PracHub is an aggregator.** Its pages are user-submitted question banks. A PracHub title counts as [Reported], but it is weaker than a first-person account.
 - **Removed sources.** The Scoutify guide (a generic template, not candidate reports), the Blind "Cresta AI SWE AMA" thread (no excerpt supported any question) and the second 1point3acres thread 1173094 (no excerpt supported it) were removed.
+- **Process claims from non-portal sources are [Likely].** A vendor case study (CoderPad [17]) or a job posting that describes the hiring process (a16z Jobs [18]) is not a candidate report, so a claim resting only on them is [Likely], not [Reported].
 - **Restricted source.** The Blind "Cresta senior backend SWE interview" thread [9] supports only an online assessment, so it must not be cited for the system design round.
-- **Open clean-up items.** Chapter 02's reference 12 still lists Scoutify. Chapter 01 has two questions numbered 34 and none numbered 39. Chapters 01, 02 and 05 still cite [9] for loop shape.
+- **Open clean-up items.** Chapter 02's reference 12 still lists Scoutify. Chapter 01 has two questions numbered 34 and none numbered 39. Chapters 01, 02 and 05 still cite [9] for loop shape. Chapters 01 and 05 cite a JobsByCulture culture summary, and chapter 02 cites a ZeroG Talent repost of the Senior MLE posting [19]. Neither is an interview portal or supports a design prompt, so neither is indexed here.
 
 ## Part 2. Every [Reported] prompt, by portal
 
