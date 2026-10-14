@@ -1887,10 +1887,13 @@ annotators of his CVPR 2021 keynote, is [5][6][7]:</p>
 <li>Add similar examples to the dataset.</li>
 <li>Retrain, and repeat.</li>
 </ol>
-<p>A 2025 arXiv paper on extending the V-model for AI systems uses Tesla
-as a worked example. It describes the same cycle: collection drives
-auto-labeling and unit-test updates, and then the network is retrained
-and redeployed in shadow mode [2].</p>
+<p>Ullrich et al.&#39;s paper on extending the V-model for AI systems (IEEE
+Transactions on Intelligent Vehicles, 2024; arXiv 2025) is cited in
+secondary write-ups as using Tesla as a worked example of the same
+cycle: collection drives auto-labeling and unit-test updates, and then
+the network is retrained and redeployed in shadow mode [2]. This chapter
+could not retrieve the full text to confirm the Tesla passage, so treat
+the attribution as secondary.</p>
 <pre><code>  FLEET (on-vehicle)                                CLOUD (offline)
   +---------------------------------------+         +-------------------------------+
   | Production net drives / or human      |         | Upload queue -&gt; data lake     |
@@ -1918,18 +1921,20 @@ account, shadow mode is one part of Tesla&#39;s data closed loop, not a
 self-contained learning system [4].</p>
 <p><strong>Trigger classifiers.</strong> The fleet-side selector is a
 library of triggers: small detectors or rules run alongside the driving
-stack that decide when a clip is worth uploading. The V-model paper
-reports that Tesla has crafted more than 200 triggers to detect
-discrepancies in predicted object parameters such as position, velocity
-and acceleration [2]. A practitioner analysis adds that triggers are
-chosen by context. Map data showing a tunnel ahead, for example, can
-activate tunnel-specific triggers [3]. Karpathy described the fleet as a
-large, distributed, mobile data center. In a 2020 talk quoted by
-Spectrum he said engineers can &quot;beam it down to the fleet, and we can
-ask the fleet to please apply this detector on top of everything else
-you&#39;re doing&quot; [1]. In his canonical example, a request for stop signs
-occluded by foliage came back with thousands of examples to iterate on
-[5][1].</p>
+stack that decide when a clip is worth uploading. Secondary accounts
+report that Tesla hand-crafted roughly 200 triggers (recaps of
+Karpathy&#39;s CVPR 2021 talk often give 221) to detect discrepancies in
+predicted object parameters such as position, velocity and acceleration,
+for example during the move to vision-only depth and velocity [2][6][7].
+The exact count comes from talk slides and recaps, not from a Tesla
+publication. A practitioner analysis adds that triggers are chosen by
+context. Map data showing a tunnel ahead, for example, can activate
+tunnel-specific triggers [3]. Karpathy described the fleet as a large,
+distributed, mobile data center. In a 2020 talk quoted by Spectrum he
+said engineers can &quot;beam it down to the fleet, and we can ask the fleet
+to please apply this detector on top of everything else you&#39;re doing&quot;
+[1]. In his canonical example, a request for stop signs occluded by
+foliage came back with thousands of examples to iterate on [5][1].</p>
 <p><strong>Unit tests as regression gates.</strong> Mispredictions
 become curated evaluation sets. One analysis describes the policy as
 follows: performance on these &quot;unit tests&quot; must never regress, and a new
@@ -2537,10 +2542,11 @@ architecture that uses parts of comma&#39;s MLSIM simulator [59].</li>
 architecture in &quot;Learning to Drive from a World Model&quot;, which the
 release notes call comma&#39;s CVPR paper. The longitudinal MPC in
 Experimental mode was replaced by end-to-end planning from the world
-model. The lateral-MPC action used as the training objective was
-replaced the same way. Point releases 0.10.1 and 0.10.3 doubled
-world-model parameters, used four times as many training segments, and
-added an on-policy training physics-noise model [59].</li>
+model. Release 0.10.1 (September 2025) removed global-localization
+inputs from the world model, doubled its parameters and trained it on
+four times as many segments. Release 0.10.3 (December 2025) added a new
+temporal policy architecture and an on-policy training physics-noise
+model [59].</li>
 <li><strong>openpilot 0.11 (March 2026).</strong> The release notes say
 the driving model was &quot;fully trained using a learned simulator&quot; [59].
 comma&#39;s blog calls it the first real-world robotics agent shipped to

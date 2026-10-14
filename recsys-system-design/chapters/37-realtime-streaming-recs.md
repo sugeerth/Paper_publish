@@ -11,7 +11,7 @@ This chapter surveys the public designs along four axes:
 
 The recurring tension is **freshness versus stability**. Fresher means more infrastructure, more ways to diverge between training and serving, more exposure to feedback loops and noise, and less diversity. The best designs pair a cheap, stable long-term component (a batch embedding, a daily model, a lifelong history) with a small, fast real-time component, and they measure the decay curve before buying freshness.
 
-*Sourcing note.* The live web-search budget for this run was used up and the sandbox egress proxy blocked direct fetches of arXiv, Medium and company blogs. This chapter therefore draws on primary sources (papers, engineering posts and open-source READMEs) that sibling chapters of this Atlas had already fetched and summarized (Chapters 5, 8, 9, 11, 18, 19, 20, 21, 22, 26 and 28). Figures marked "approx." come from secondary summaries or could not be re-verified here.
+*Sourcing note.* The sandbox egress proxy blocked direct fetches of arXiv, Medium and company blogs. The chapter therefore draws on two kinds of material. The first is primary sources (papers, engineering posts and open-source READMEs) that sibling chapters of this Atlas had already fetched and summarized (Chapters 5, 8, 9, 11, 18, 19, 20, 21, 22, 26 and 28). The second is a later research pass of about 25 web searches, whose result abstracts and snippets added references [53]-[63]. Figures marked "approx." come from secondary summaries or could not be re-verified here.
 
 ---
 
@@ -45,6 +45,13 @@ Key rules from the post [27]:
 
 Amatriain's 2023 "10th anniversary" revisit says the split still holds, but "nearline" has grown into streaming feature platforms and near-real-time training [28]. Almost every system in this chapter can be placed in one of the three tiers.
 
+Netflix's later stack shows how far the nearline tier has grown. Third-party summaries of Netflix talks describe Keystone, a managed Kafka routing service with Flink on top, running on the order of 20,000 Flink jobs. One stated use case is replacing day-old batch jobs for personalization signals such as "take fraction" (plays divided by impressions), which previously had a delay of hours to days (approx.) [62].
+
+Eugene Yan's survey of real-time recommendations frames the trade-off from the operator's side [61]:
+
+- Batch recommendations are computed once a day and cached, so a failed compute step has no customer-facing impact.
+- Real-time recommendations aggregate streamed events and generate results on demand. They lose batch's economies of scale and are considerably trickier to run in production.
+
 ### 37.1.2 Four kinds of freshness
 
 | Freshness kind | Typical latency | Mechanism | Representative systems |
@@ -71,6 +78,14 @@ Design rules that recur across sources:
 - **Mint an impression or request ID at serving time and carry it into every downstream event.** Facebook's online joiner, Google Photon and Monolith all depend on such a key for the label join [1][3][4].
 - **Log features at serving time** rather than recomputing them later. This is the only robust defence against training/serving skew for real-time features, because the value served at time t is hard to reconstruct offline [1][34].
 - **Per-consumer topics.** Recos-Injector's per-service topics let each consumer get a filtered, compact stream and scale independently [21].
+
+**Pinterest real-time user signal serving.** Pinterest's log path runs from the Singer logging agent on serving hosts into Kafka. The Merced archiver copies Kafka to S3 for long retention, and a unified Flink source concatenates archived and live data behind one API, which the team calls "an unlimited log" [54]. On top of this, the real-time user signal service works in three steps [53]:
+
+1. It consumes trimmed engagement events (user ID, Pin ID, action type).
+2. A materialization step enriches each event with Pin and query features.
+3. It writes the result to a time-series store that rankers query online.
+
+The post reports about **1.2 million events/s** and a **p99 of about 10 seconds** from engagement to servable signal [53]. Services such as TransAct read their "last N actions" from this kind of store (Section 37.5.1).
 
 ---
 
@@ -115,6 +130,8 @@ Chronon (open-sourced by Airbnb and co-maintained with Stripe) makes the freshne
 ### 37.3.3 Marketplace variants: DoorDash Riviera, Uber, Lyft
 
 DoorDash's **Riviera** (2021) is a declarative framework for real-time features on Flink: features are defined in configuration and SQL, and the framework builds the streaming job. Its output lands in a Redis-based online feature store next to batch features from Fabricator [36]. Uber's Michelangelo used the same dual-path pattern: Kafka plus streaming jobs (Samza, later Flink) for near-real-time features such as a restaurant's recent average prep time, written to the same Cassandra store as batch features (approx.; see Chapter 8).
+
+Instacart's account of moving to real-time ML shows the same shape. Its pipeline reads raw service events from Kafka, transforms them into features with Flink, and sinks them into a feature store for on-demand access. The motivation was that batch-only features made predictions stale during a shopping journey. The post also names an organizational trap: different teams had adopted three different streaming tools, which made cross-team event features hard to build [57]. A secondary case study of Instacart's Griffin ML platform lists session-based recommendations among the applications this streaming path enabled (approx.) [58].
 
 **Lesson.** The streaming feature problem is solved. The remaining design work is (1) one declarative definition for batch, stream and backfill, (2) pre-aggregation on the write path for hot keys, and (3) logging served values to measure and remove skew.
 
@@ -212,6 +229,7 @@ TransAct V2 extends Homefeed ranking from about 100 real-time actions to lifelon
 - An auxiliary **Next Action Loss** predicts what the user does next [11].
 - Serving kernels (fused dequantization plus NN search, a single-kernel Triton Transformer) improved end-to-end inference latency by 103x (p50), 338x (p90) and 250x (p99) over the unoptimised baseline [11].
 - Reported online results: +6.35% repins, +1.41% time spent, -12.8% hides [12].
+- A literature review of the paper reports offline gains over the real-time-only TransAct baseline: +13.31% HIT@3 on repins and -11.25% HIT@3 on hides. It also notes that only the nearest-neighbour features are logged at request time, and the NN search is recomputed offline for training (approx.) [63].
 
 ### 37.5.3 Long histories with real-time recency: SIM and TWIN
 
@@ -313,11 +331,21 @@ Photon joins clicks to queries across datacenters with exactly-once semantics, b
 
 **Results.** Collisionless tables beat hashed ones. Shorter sync intervals (from hours down toward about 30 minutes in the experiments, approx.) gave consistently higher online AUC, and real-time training beat batch training for ads [1]. The repository is TensorFlow plus Bazel and was archived by ByteDance in October 2025 [2].
 
-### 37.7.4 Kuaishou PERSIA (2022)
+### 37.7.4 ShareChat: batch-to-real-time training with Kafka and Flink (2024)
+
+ShareChat's OARS 2024 workshop paper is one of the few public accounts of migrating an existing recommender from batch to real-time training [55]:
+
+- **Stack.** The team moved event ingestion from Google Pub/Sub to Kafka. It used Flink for streaming joins of feature and label events, with RocksDB state and checkpointing.
+- **Semantics.** The paper works through causal dependencies between events, event time versus processing time, and exactly-once versus at-least-once delivery.
+- **Cost.** Avro schemas plus compression cut event throughput by about 85%, and the redesign cut cost by about 40%.
+
+A companion ShareChat study analyses embeddings on a short-video app with more than 180 million users [56]. Embeddings trained in real time converge toward their final vectors faster than batch-trained ones, needing about one fifth as many views to mature. Batch-trained embeddings end up with markedly higher norms, which the author links to popularity bias. This is quantitative evidence that real-time training changes **what** is learned, not only **when**.
+
+### 37.7.5 Kuaishou PERSIA (2022)
 
 PERSIA splits training the same way. Embedding layers are updated **asynchronously** on CPU parameter servers, because sparse updates tolerate staleness, and the dense network is trained **synchronously** on GPUs, because its accuracy suffers under asynchrony. It reports models up to 100 trillion parameters in production at Kuaishou [47]. Monolith and PERSIA agree: **the sparse part is fast-moving and staleness-tolerant, and the dense part is slow-moving and sensitive**.
 
-### 37.7.5 Delayed feedback in streaming training
+### 37.7.6 Delayed feedback in streaming training
 
 Online training on conversions faces labels that arrive minutes to weeks late.
 
@@ -331,9 +359,17 @@ Online training on conversions faces labels that arrive minutes to weeks late.
 
 Twitter's design (Ktena et al., RecSys 2019) ingests every eligible impression **immediately as a negative** and again as a positive when the engagement arrives. FN-weighted and FN-calibrated losses undo the bias, and they beat waiting-window and delay-model baselines offline and in an online A/B test [5]. For continuous training this is the freshest option and has become a common default.
 
-### 37.7.6 Online learning for the policy layer
+### 37.7.7 Online learning for the policy layer
 
-Freshness also applies to exploration and fusion. Yahoo's LinUCB updates a per-article ridge regression online for a small, fast-changing pool of news stories [50]. Kuaishou's **Pantheon** learns personalized fusion weights jointly with its real-time ranker, deployed for about 400 million daily users [52]. When the candidate pool churns faster than a model can be retrained, a bandit or online-updated policy layer on top of a slower ranker is a cheap way to stay fresh.
+Freshness also applies to exploration and fusion. Yahoo's LinUCB updates a per-article ridge regression online for a small, fast-changing pool of news stories [50].
+
+**YouTube Online Matching (RecSys 2023).** Batch-trained recommenders are slow to find good new videos. YouTube therefore added a real-time bandit as an extra retrieval source in candidate generation [59]. Its parts:
+
+- An **offline** pipeline builds a sparse bipartite graph between users (or user clusters) and items.
+- An **online agent** aggregates bandit parameters in real time from the feedback stream.
+- **Diag-LinUCB**, an extension of LinUCB, makes the parameter updates distributable, which lets the system serve billions of users and millions of items.
+
+The paper reports a policy-update latency of about **45 minutes at p50 and 74 minutes at p95**. Live experiments on two use cases, fresh-content discovery and corpus exploration, showed significant top-line gains [59]. The design pattern is a hybrid: the expensive structure (the graph) is offline, and only a small set of bandit statistics is real time. Kuaishou's **Pantheon** learns personalized fusion weights jointly with its real-time ranker, deployed for about 400 million daily users [52]. When the candidate pool churns faster than a model can be retrained, a bandit or online-updated policy layer on top of a slower ranker is a cheap way to stay fresh.
 
 ---
 

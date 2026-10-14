@@ -8,6 +8,6 @@ ls "$BOOK"/chapters/*.md | sort -V > "$TMP/list"
 pandoc $(cat "$TMP/list") -f gfm-tex_math_dollars -t html5 -s --toc --toc-depth=2 \
   --metadata title="$TITLE" --metadata subtitle="$SUB" \
   --css "$HERE/style.css" --embed-resources -o "$TMP/book.html"
-NODE_PATH="$(npm root -g)" node "$HERE/print.js" "$TMP/book.html" "$OUT"
+NODE_PATH="$(npm root -g)" node "$HERE/print.js" "$TMP/book.html" "$OUT" "$TITLE"
 cp "$TMP/book.html" "${OUT%.pdf}.html"
 echo "built $OUT ($(wc -l < "$TMP/list") chapters)"
