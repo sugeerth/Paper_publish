@@ -104,7 +104,39 @@
 
 ## Part 3. [Likely] design prompts mapped to their sources
 
-Each prompt below is [Likely]: no candidate has reported it. The "Inferred from" line names the posting, blog post or product behind it. The citation is context only.
+Each prompt below is [Likely]: no candidate has reported it. Where a prompt has an "Inferred from" line, that line names the posting, blog post or product behind it. Every other prompt is mapped in table 3.0. The citation is context only.
+
+### 3.0 Source map: which source each [Likely] prompt is inferred from
+
+- **Direct:** the topic appears in the source's title or in the excerpt recorded in this bank.
+- **Indirect:** the source states only a general requirement (latency, cost, security, "tool misuse", "end-to-end ownership"), and the prompt is one reasonable reading of it. Rank indirect prompts lower when you prepare.
+- No source was re-opened to check this mapping (see Research limits).
+
+| Ref | Source | Type | Direct prompts | Indirect prompts |
+|---|---|---|---|---|
+| [19] | Senior MLE posting (Greenhouse) | Job posting | 21, 22, 28, 35 | 26, 29, 51, 54, 55, 69, 71 |
+| [20] | Staff MLE posting (Greenhouse) | Job posting | 21, 22, 35 | 69, 71 |
+| [21] | Senior MLE, Voice Experience (Greenhouse) | Job posting | 9 | 36, 37, 51, 53, 70, 74 |
+| [22] | Senior MLE (ASR) (Greenhouse) | Job posting | 10, 11, 12, 13 | none |
+| [23] | Senior MLE, Agentic Assist (Built In) | Job posting | 75 | 34 |
+| [24] | Senior MLE (Chat Agent) (Lever) | Job posting | 38 | 74 |
+| [25] | "How Cresta Grades Its Agents" | Blog | 21, 60, 61 | 62 |
+| [26] | "Swiss-Cheese Model" evaluations post | Blog | 20, 24, 27 | none |
+| [27] | "Real-Time Voice Agent Latency" | Blog | 9, 16, 72 | none |
+| [28] | Voice platform: inference graphs | Blog | 7, 8, 15, 17 | none |
+| [29] | Voice platform: voice stack | Blog | 7, 10, 14 | none |
+| [30] | Ocean-1 | Product (foundation model) | 48, 49, 52 | none |
+| [31] | "AI-Ready Knowledge" | Blog / Knowledge Assist | 39, 41, 42 | none |
+| [32] | Next-generation Insights (2026) | Product launch | 23, 56, 57, 58, 59 | 63 |
+| [33] | Fine-tuned LLMs for Knowledge Assist, summarization, chat suggestions | Blog | 39, 40, 44, 45 | none |
+| [34] | Fireworks "Story: Cresta Knowledge Assist" | Partner write-up | 39, 40, 46 | 43 |
+| [35] | Fireworks "Multi-LoRA" | Partner write-up | 46, 47 | none |
+| [36] | "Grounding Reality" hallucination post | Blog | 32, 33 | 73 |
+| [37] | Automated AI Agent Testing launch | Product launch | 18, 19, 25 | none |
+| [38] | Cresta Conductor | Product | 28, 30, 31 | none |
+| [39] | CX Today interview with the CEO | Press interview | 49, 50 | none |
+
+Prompts 64-68 are [Likely scale-up] items built on reported coding questions (section 3.7). Prompts 76-78 are [Self-check] study prompts (section 3.9).
 
 ### 3.1 Inferred from the voice platform posts and the Voice Experience and ASR postings
 
@@ -361,4 +393,6 @@ The tag on each question is the tag of the claim it checks.
 38. Cresta Blog, "Cresta Conductor: The Agent for AI Agent Development". https://cresta.com/blog/cresta-conductor-the-agent-for-ai-agent-development
 39. CX Today, "Cresta CEO Ping Wu: Many Contact Centers Misunderstand the Value of LLMs". https://www.cxtoday.com/contact-center/cresta-ceo-ping-wu-many-contact-centers-misunderstand-the-value-of-llms/
 
-*Source note:* All 39 references are carried over from the reviewed reference lists in chapters 01-08, with the same attributions. None was opened for this chapter: a fetch of prachub.com failed DNS lookup, and the web-search budget was exhausted. References 4, 5 and 9 support coding or online-assessment claims in other chapters. They are listed here so this index covers every interview-portal source in the bank, but no system design prompt rests on them.
+*Source note:* All 39 references are carried over from the reviewed reference lists in chapters 01-09, with the same attributions. None was opened for this chapter. A fetch of prachub.com failed DNS lookup while it was written, 12 more fetches failed the same way in review (see Research limits), and the web-search budget was exhausted. References 4, 5 and 9 support coding or online-assessment claims in other chapters. They are listed here so this index covers every interview-portal source in the bank, but no system design prompt rests on them.
+
+*Changed in review:* Every cited URL tried (12) failed DNS lookup, and web search was refused, so no reference could be verified, removed or added, and no new candidate-reported prompts were added. Changes come from reading this chapter against chapters 01-09. Recruiter question "Will an asynchronous CoderPad assessment come before the live rounds?" was retagged from [Reported] to [Likely], because its sources are a vendor case study and a job posting, not portal reports. Added a rule that process claims from non-portal sources are [Likely]. Section 3.7 items now use a named [Likely scale-up] tag. Section 3.9 items are now [Self-check], defined in table 1.1, because they are study prompts and not interview questions. The former Q79 ("which [Likely] areas map to your track") was removed as a duplicate of recruiter question 86, and Part 4 was renumbered 79-89. Added table 3.0, which maps every [Likely] prompt to its source and marks it direct or indirect; a script confirmed the table matches every inline citation. Recruiter question 79 now notes that the 60-minute length comes from SWE reports only. Chapter coverage was corrected from 01-08 to 01-09, and the JobsByCulture and ZeroG Talent citations in other chapters are recorded as not indexed.
