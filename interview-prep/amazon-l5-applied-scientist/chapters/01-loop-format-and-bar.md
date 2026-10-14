@@ -2,6 +2,8 @@
 
 > Scope: how the L5 Applied Scientist (AS II) process is structured, who sits in each seat, how the bar raiser and debrief work, how L5 is calibrated against L4 and L6, and the questions each seat tends to ask. Later chapters cover the technical content (ML breadth, depth, coding, ML design, LPs) in full. This chapter covers the format-defining questions and probes.
 >
+> Verification status (2026-10-14 review): a re-check of the cited URLs could not be completed. The egress proxy rejected every one of the 43 reference hosts, and no web search was available. The [Reported] tags and citations are therefore unchanged from the original research pass and have not been re-verified. No new questions were added, because none could be sourced.
+>
 > Research note: everything here comes from Amazon's own pages, candidate self-reports (Glassdoor, Blind, LeetCode, 1point3acres, Medium) and prep-vendor guides (IGotAnOffer, Interview Kickstart, Dataford and others). The live page fetcher could not reach these sites from this environment, so the content was read through search-engine excerpts of each page. Vendor guides are marketing material and are weighted below Amazon's own pages and first-person reports.
 
 ## Format notes (what to expect, 2025-2026)
@@ -75,7 +77,7 @@ Tag legend:
    - How would you handle missing values and class imbalance here?
 10. Solve one LeetCode-style easy/medium problem (one candidate reported a graph problem, others arrays or trees). [Reported] [10][20]
     - What is the time and space complexity, and can you do better?
-11. Tell me about a time you made a technical decision without complete data. [Reported] [26]
+11. Tell me about a time you made a technical decision without complete data. This is also reported as a bar raiser question. [Reported] [26]
     - What would have changed your mind?
 12. (Ads, 2024-25 report) Explain how transformers and attention work. One candidate with strong classical ML answers was rejected after not preparing for this. [Reported] [43]
     - How does a decoder-only LLM generate text at inference time?
@@ -168,69 +170,68 @@ Tag legend:
     - What would you do differently? [Reported] [22]
 59. Tell me about a time your model underperformed and you had to diagnose the issue. [Reported] [24]
     - What did you learn, and how did you pivot? [Reported] [26]
-60. Tell me about a time you made a critical scientific or technical decision without full data. [Reported] [26]
-61. (Pushback probe) I think your approach was wrong. Convince me otherwise. Candidates report BRs deliberately telling them they were wrong. [Reported] [41][42]
+60. (Pushback probe) I think your approach was wrong. Convince me otherwise. Candidates report BRs deliberately telling them they were wrong. [Reported] [41][42]
     - What data would make you concede?
-62. How was that measured? [Reported] [41][42]
-63. What was your exact individual contribution, stated without "we"? [Reported] [41][42]
-64. Tell me about a time you took initiative without waiting for permission. One rejection was reportedly explained as "seemed to wait for permission." [Likely]
-65. Tell me about a time you raised the quality bar on a deliverable even though it delayed you (Insist on the Highest Standards). [Likely]
-66. Tell me about a time you simplified a complex scientific approach so it could ship (Invent and Simplify). [Likely]
-67. Tell me about a time you had to decide quickly with incomplete information and the decision turned out wrong (Bias for Action / Are Right, A Lot). [Likely]
-68. Tell me about a time you dove into data or code to find a root cause that others missed (Dive Deep). [Likely]
-69. Tell me about the most ambitious science bet you have proposed (Think Big). [Likely]
-70. Tell me about a time you did more with less: compute, labels or headcount (Frugality). [Likely]
-71. Tell me about a time you mentored someone or raised the bar of your team's science (Hire and Develop the Best). [Likely]
-72. Tell me about a time you considered the downstream harm or fairness impact of a model (Success and Scale Bring Broad Responsibility). [Likely]
-73. Tell me about a time you made your team's work environment better (Strive to be Earth's Best Employer). [Likely]
-74. (TPM- or non-science BR) How do you set ETAs, map dependencies and communicate next steps on a science project? [Reported] [13]
+61. How was that measured? [Reported] [41][42]
+62. What was your exact individual contribution, stated without "we"? [Reported] [41][42]
+63. Tell me about a time you took initiative without waiting for permission. One rejection was reportedly explained as "seemed to wait for permission." [Likely]
+64. Tell me about a time you raised the quality bar on a deliverable even though it delayed you (Insist on the Highest Standards). [Likely]
+65. Tell me about a time you simplified a complex scientific approach so it could ship (Invent and Simplify). [Likely]
+66. Tell me about a time you had to decide quickly with incomplete information and the decision turned out wrong (Bias for Action / Are Right, A Lot). [Likely]
+67. Tell me about a time you dove into data or code to find a root cause that others missed (Dive Deep). [Likely]
+68. Tell me about the most ambitious science bet you have proposed (Think Big). [Likely]
+69. Tell me about a time you did more with less: compute, labels or headcount (Frugality). [Likely]
+70. Tell me about a time you mentored someone or raised the bar of your team's science (Hire and Develop the Best). [Likely]
+71. Tell me about a time you considered the downstream harm or fairness impact of a model (Success and Scale Bring Broad Responsibility). [Likely]
+72. Tell me about a time you made your team's work environment better (Strive to be Earth's Best Employer). [Likely]
+73. (TPM- or non-science BR) How do you set ETAs, map dependencies and communicate next steps on a science project? [Reported] [13]
     - When did a science timeline slip, and how did you tell stakeholders?
-75. (TPM BR) A few stats/math checks, such as interpreting a p-value or confidence interval. [Reported] [13]
+74. (TPM BR) A few stats/math checks, such as interpreting a p-value or confidence interval. [Reported] [13]
 
 ### H. LP questions embedded in technical rounds (each interviewer owns about 2-3 LPs)
 
-76. Tell me about a time you started from the customer and worked backwards to the science problem (Customer Obsession). [Likely]
+75. Tell me about a time you started from the customer and worked backwards to the science problem (Customer Obsession). [Likely]
     - Who was the customer, and how did you get their signal?
-77. Tell me about a time you took ownership of something outside your formal scope (Ownership). [Likely]
-78. Tell me about a time you delivered a model under a hard deadline (Deliver Results). [Likely]
+76. Tell me about a time you took ownership of something outside your formal scope (Ownership). [Likely]
+77. Tell me about a time you delivered a model under a hard deadline (Deliver Results). [Likely]
     - What did you descope, and what did that cost?
-79. Tell me about a time you learned a new area fast to unblock a project (Learn and Be Curious). [Likely]
-80. Tell me about a time you earned the trust of an engineering or product partner who doubted your science (Earn Trust). [Likely]
-81. Tell me about a time you were wrong about a technical call. How did you find out? (Are Right, A Lot). [Likely]
-82. Tell me about a time you pushed back on a stakeholder's metric or launch decision using data. [Likely]
+78. Tell me about a time you learned a new area fast to unblock a project (Learn and Be Curious). [Likely]
+79. Tell me about a time you earned the trust of an engineering or product partner who doubted your science (Earn Trust). [Likely]
+80. Tell me about a time you were wrong about a technical call. How did you find out? (Are Right, A Lot). [Likely]
+81. Tell me about a time you pushed back on a stakeholder's metric or launch decision using data. [Likely]
     - Did you commit after being overruled?
 
 ### I. Level-calibration probes (L5 vs L4 vs L6 signal)
 
-83. What was the largest scope you have owned end to end, from problem framing to production? [Likely]
+82. What was the largest scope you have owned end to end, from problem framing to production? [Likely]
     - Who else depended on it, beyond your own team?
-84. Tell me about a time your work influenced a sister team's roadmap or technical direction. [Likely]
-85. Tell me about a time you set the technical direction for other scientists or engineers, not just executed it. [Likely]
+83. Tell me about a time your work influenced a sister team's roadmap or technical direction. [Likely]
+84. Tell me about a time you set the technical direction for other scientists or engineers, not just executed it. [Likely]
     - How did you get buy-in without authority?
-86. What mechanism did you build (review, monitoring, tooling) that kept working without you in the room? [Likely]
-87. Give me a second example: a different project where you showed the same thing. L6 rejections often cite a lack of multiple strong examples. [Likely]
-88. How do you balance publishing or novelty against shipping on your current team? [Likely]
-89. (Depth round, applied to leveling) Where did you have to make a judgment call that your manager didn't make for you? [Likely]
-90. (HM) What would you expect to own in your first six months here? [Likely]
+85. What mechanism did you build (review, monitoring, tooling) that kept working without you in the room? [Likely]
+86. Give me a second example: a different project where you showed the same thing. L6 rejections often cite a lack of multiple strong examples. [Likely]
+87. How do you balance publishing or novelty against shipping on your current team? [Likely]
+88. (Depth round, applied to leveling) Where did you have to make a judgment call that your manager didn't make for you? [Likely]
+89. (HM) What would you expect to own in your first six months here? [Likely]
     - What would you need from me to get there?
 
 ### J. Questions to put to the recruiter or HM about format (candidate-side calibration)
 
-91. Is the loop four or five rounds? Is there a job talk, and how long is it? [Likely]
-92. Which rounds are breadth, depth, application/design and coding, and which one is the bar raiser? [Likely]
-93. Is the coding round DSA (LeetCode), ML-from-scratch, or data manipulation (pandas/SQL)? [Likely]
-94. Is the loop calibrated to L5, or is it an L5/L6 "up-level-able" loop? Can an L6 be considered if signal is strong? [Likely]
-95. If the loop is positive but this team's headcount closes, does the result carry to other teams (recycle/team match)? [Likely]
-96. How soon after the loop does the debrief happen, and when should I expect feedback? [Likely]
-97. If I'm not successful, what is the cool-down period, and does it apply org-wide? Reports range from none ("recycle") to 6-24 months. [Likely]
-98. Who on the panel is likely to be from outside the team? [Likely]
-99. Does the team expect GenAI/LLM depth even if the role is not LLM-titled? [Likely]
+90. Is the loop four or five rounds? Is there a job talk, and how long is it? [Likely]
+91. Which rounds are breadth, depth, application/design and coding, and which one is the bar raiser? [Likely]
+92. Is the coding round DSA (LeetCode), ML-from-scratch, or data manipulation (pandas/SQL)? [Likely]
+93. Is the loop calibrated to L5, or is it an L5/L6 "up-level-able" loop? Can an L6 be considered if signal is strong? [Likely]
+94. If the loop is positive but this team's headcount closes, does the result carry to other teams (recycle/team match)? [Likely]
+95. How soon after the loop does the debrief happen, and when should I expect feedback? [Likely]
+96. If I'm not successful, what is the cool-down period, and does it apply org-wide? Reports range from none ("recycle") to 6-24 months. [Likely]
+97. Who on the panel is likely to be from outside the team? [Likely]
+98. Does the team expect GenAI/LLM depth even if the role is not LLM-titled? [Likely]
 
 ### K. Debrief-driven follow-up (second loops, extra rounds)
 
-100. (Extra round after a split debrief) Let's revisit coding or design. Can you solve this follow-up problem? [Reported] [14]
-101. (New HM after team switch) Tell me about your project again, framed for our domain. [Reported] [12]
-102. (Down-level conversation) Would you accept an L4 / AS I offer? What would you need to see to reach L5 quickly? [Likely]
+99. (Extra round after a split debrief) Let's revisit coding or design. Can you solve this follow-up problem? [Reported] [14]
+100. (New HM after team switch) Tell me about your project again, framed for our domain. [Reported] [12]
+101. (Down-level conversation) Would you accept an L4 / AS I offer? What would you need to see to reach L5 quickly? [Likely]
 
 ---
 
