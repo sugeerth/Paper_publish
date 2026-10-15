@@ -28,7 +28,7 @@ This chapter treats the vector database as a systems problem with four coupled a
                                                         +-----------------------------+
 ```
 
-Sections 4.1 to 4.3 cover index families, filtering and tenancy as cross-cutting techniques. Section 4.4 walks through each system's architecture. Section 4.5 pulls out the object-storage-native patterns, and Section 4.6 compares the systems in one table.
+Sections 4.1 to 4.3 cover index families, filtering and tenancy as cross-cutting techniques. Section 4.4 walks through each system's architecture. Section 4.5 pulls out the object-storage-native patterns, Section 4.6 compares the systems in one table, and Section 4.7 covers further designs that sit beside the main systems: object-store-native vector buckets, GPU graph indexes, data-oblivious quantizers, multi-vector encodings and Postgres extensions beyond pgvector.
 
 ---
 
@@ -74,7 +74,7 @@ By 2025-2026 almost every engine treats quantization as orthogonal to the index 
 
 RaBitQ [17] (SIGMOD 2024) has become the de facto 1-bit scheme. Its library README [63] lists adoption in Milvus, Faiss, NVIDIA cuVS, VectorChord, Elasticsearch, turbopuffer, LanceDB, Qdrant and Weaviate. Faiss sizes it at `d/8 + 8` bytes per vector, recommends `IVF<K>,RaBitQfs<N>` for speed, and notes that a random rotation is required for accuracy [3].
 
-The universal companion technique is **oversample then rescore**. The quantized index returns `k * oversample` candidates, which are rescored against full-precision vectors kept on disk. Qdrant exposes `oversampling` and `rescore` per query [23]. Elasticsearch BBQ ties default oversampling to bit width (for `bbq_disk`, `bits=1` gives oversampling 3.0 and `bits=2` gives 1.5) [53]. OpenSearch's `on_disk` mode defaults to 32x compression with rescoring and `oversample_factor` 2.0 [55]. Pinecone's VQ-bench (September 2026) frames quantizers as compositions of a small set of primitives and benchmarks them in one harness [65].
+The universal companion technique is **oversample then rescore**. The quantized index returns `k * oversample` candidates, which are rescored against full-precision vectors kept on disk. Qdrant exposes `oversampling` and `rescore` per query [23]. Elasticsearch BBQ ties default oversampling to bit width (for `bbq_disk`, `bits=1` gives oversampling 3.0 and `bits=2` gives 1.5) [53]. OpenSearch's `on_disk` mode defaults to 32x compression with rescoring and `oversample_factor` 2.0 [55]. Pinecone's VQ-bench (September 2026, with a VecDB@VLDB 2026 paper) describes seven quantization primitives, re-expresses 25 common quantizers as pipelines of them, and benchmarks them in one MIT-licensed harness. Its authors note it favors composability over kernel speed [65].
 
 ### 4.1.4 DiskANN / Vamana: graphs that live on SSD
 
@@ -94,7 +94,7 @@ The universal companion technique is **oversample then rescore**. The quantized 
         pq_code_budget_gb_ratio, search_cache_budget_gb_ratio
 ```
 
-**Lineage.** Follow-up work covers streaming updates with stable recall through merges (FreshDiskANN [6]) and in-place edits (IP-DiskANN [64]), filtered search (Filtered-DiskANN [7]), and a 50-billion-point index distributed across 1,000 machines [8]. The 2023+ Rust rewrite, "DiskANN3," is a *stateless orchestrator* that reads and writes index terms through a `DataProvider` trait the host database implements. This lets it inherit the host's durability [9]. Providers include in-memory, SSD, Garnet (a key-value store) and Bf-tree, and the Azure Cosmos DB integration is described in a VLDB 2025 paper [11]. DiskANN ideas are also used in pgvectorscale, DataStax JVector, Intel SVS (exposed in Redis as `SVS-VAMANA`), and NVIDIA cuVS [8][61]. The NeurIPS 2021 and 2023 Big-ANN competitions, co-organized by the same group, supplied many of the public billion-scale, filtered and streaming benchmarks used to compare these designs [8][62].
+**Lineage.** Follow-up work covers streaming updates with stable recall through merges (FreshDiskANN [6]) and in-place edits (IP-DiskANN [64]), filtered search (Filtered-DiskANN [7]), and a 50-billion-point index distributed across 1,000 machines [8]. The current Rust rewrite, "DiskANN3" (the legacy C++ code now lives on a `cpp_main` branch), is a *stateless orchestrator* that reads and writes index terms through a `DataProvider` trait the host database implements. This lets it inherit the host's durability [9]. Providers include in-memory, SSD, Garnet (a key-value store) and Bf-tree, and the Azure Cosmos DB integration is described in a VLDB 2025 paper [11]. DiskANN ideas are also used in pgvectorscale, DataStax JVector, Intel SVS (exposed in Redis as `SVS-VAMANA`), and NVIDIA cuVS [8][61]. The NeurIPS 2021 and 2023 Big-ANN competitions, co-organized by the same group, supplied many of the public billion-scale, filtered and streaming benchmarks used to compare these designs [8][62].
 
 **Vendor-reported numbers.** Microsoft reports that DiskANN3 with the Garnet provider, measured with VectorDBBench on Wikipedia-10M Cohere embeddings (768-d) while ingesting 1,000 vectors/s in the background, held p99 under 5 ms with roughly 2x the QPS of the next-best system [66]. These are self-reported results.
 
@@ -102,7 +102,7 @@ The universal companion technique is **oversample then rescore**. The quantized 
 
 SPANN [12] (NeurIPS 2021) keeps only cluster centroids in memory, with a graph or tree over them, and stores posting lists on SSD. Boundary vectors are assigned to several nearby posting lists so that a small `nprobe` still finds them. SPFresh [13] (SOSP 2023) adds a lightweight rebalancing protocol: posting lists that grow too large are split and their neighbors reassigned locally, so the index stays balanced without global rebuilds.
 
-This family matters because it fits object storage. turbopuffer's docs argue that "a centroid-based index works well for object storage as it minimizes roundtrips and write-amplification, compared to graph-based indexes like HNSW or DiskANN": a cold query downloads the centroid index, then fetches every selected cluster "in one, massive roundtrip" [28]. Weaviate's HFresh index (based on SPFresh) keeps an HNSW over centroids in RAM with 8-bit RQ, stores posting lists on disk with 1-bit RQ, and rescores the top candidates against uncompressed vectors. Its tuning knobs are `searchProbe` and `replicas`, the number of posting lists each vector joins [40]. Elasticsearch's DiskBBQ uses hierarchical k-means with a default of 384 vectors per cluster. Its docs say it "performs well for recall levels up to around 95%", while 99%+ recall favors HNSW [53].
+This family matters because it fits object storage. turbopuffer's docs argue that "a centroid-based index works well for object storage as it minimizes roundtrips and write-amplification, compared to graph-based indexes like HNSW or DiskANN": a cold query downloads the centroid index, then fetches every selected cluster "in one, massive roundtrip" [28]. Weaviate's HFresh index (based on SPFresh) keeps an HNSW over centroids in RAM with 8-bit RQ, stores posting lists on disk with 1-bit RQ, and rescores the top candidates against uncompressed vectors. Its tuning knobs are `searchProbe` and `replicas`, the number of posting lists each vector joins [40]. Elasticsearch's DiskBBQ uses hierarchical k-means with a default `cluster_size` of 384 vectors per cluster (configurable from 64 to 65,536) [54]. Its docs say it "performs well for recall levels up to around 95%", while 99%+ recall favors HNSW [53].
 
 ### 4.1.6 ScaNN
 
@@ -244,7 +244,7 @@ Key techniques:
 - **A lambda architecture for freshness.** Indexed segments plus a freshness layer make writes searchable "within seconds."
 - **Namespaces as hard partitions.** Builders only partition within a namespace, so a query touches only that namespace's segments [25].
 
-**Numbers (Pinecone-reported).** Gong's costs fell 10x. Average query latency fell about 46.9% versus pods, and 85% on a Cohere-768 dataset. Cold starts are "a couple of seconds" for most datasets and up to about 20 s at billion scale [25]. Pinecone has since described a "slab-based architecture" update, linked from the same post [25].
+**Numbers (Pinecone-reported).** Gong reports a 10x cost reduction after moving to serverless, which Pinecone's Gong case study also states. The launch post's latency comparisons against pods (an average reduction of roughly half, with larger gains on a Cohere-768 dataset) could not be re-verified for this edition, so treat them as indicative. Cold starts are "a couple of seconds" for most datasets and up to about 20 s at billion scale [25]. Pinecone has since described a "slab-based architecture" update, linked from the same post [25].
 
 **Evolution.** In December 2025 Pinecone added Dedicated Read Nodes (DRN): provisioned replicas for throughput and shards for capacity, with data kept warm in memory and local SSD, hourly per-node pricing, and the same write path as on-demand [27]. This mirrors turbopuffer's namespace pinning (Section 4.4.2). Both object-storage-first vendors added a reserved-capacity tier for sustained high-QPS workloads.
 
@@ -370,7 +370,7 @@ Vespa treats ANN as one operator (`nearestNeighbor`) inside a full query and ran
 
 ### 4.4.10 Elasticsearch and OpenSearch
 
-**Elasticsearch.** Lucene builds a graph or IVF structure per segment, which merges consolidate. Float vectors are quantized by default: `bbq_hnsw` at 384 dimensions and above, and `int8_hnsw` below 384. From Stack 9.4, `bbq_disk` (DiskBBQ) is the default where licensed [54]. Raw floats stay on disk for rescoring and requantization [54]. Search can preload `vex`/`veq`/`veb`/`cenivf` files into the page cache [54]. Tuning is through `num_candidates` for HNSW and `visit_percentage` for DiskBBQ, and an auto-calibration mode picks quantization and oversampling per merged segment [52].
+**Elasticsearch.** Lucene builds a graph or IVF structure per segment, which merges consolidate. Float vectors are quantized by default. In Stack 9.0 they are always indexed as `int8_hnsw`. From 9.1 the default is `bbq_hnsw` at 384 dimensions and above and `int8_hnsw` below 384. From Stack 9.4, `bbq_disk` (DiskBBQ) is the default where licensed [54]. Raw floats stay on disk for rescoring and requantization [54]. Search can preload `vex`/`veq`/`veb`/`cenivf` files into the page cache [54]. Tuning is through `num_candidates` for HNSW and `visit_percentage` for DiskBBQ, and an auto-calibration mode picks quantization and oversampling per merged segment [52].
 
 **OpenSearch k-NN.** It offers Faiss, Lucene and JVector engines (JVector via the `disk_ann` method plugin). `mode: on_disk` (2.17+) defaults to Faiss HNSW with 32x compression and rescoring [55]. A remote **GPU index-build service** (3.0+) builds Faiss HNSW graphs off-cluster through a vector repository [57]. Efficient filtering differs by engine (Section 4.2.4) [56].
 
@@ -423,6 +423,38 @@ The cost is write latency (hundreds of ms) and per-namespace commit rate (turbop
 | OpenSearch | Faiss HNSW/IVF, Lucene, JVector | Lucene segments; remote GPU build | engine-specific efficient filters | index | on_disk 32x default [55] |
 | MongoDB Atlas | HNSW in `mongot` | separate Search Nodes | pre-filter fields in index | collection / filter | quantization cuts RAM 3.75x / 24x [59] |
 | Redis | FLAT, HNSW, SVS-VAMANA | in-memory | hybrid queries over secondary index | key prefix / index | SVS max degree 32 default [61] |
+| Amazon S3 Vectors | managed (undisclosed) | S3 vector buckets | metadata filters (up to 50 keys/vector) | vector index (10,000 per bucket) | 2B vectors/index; ~100 ms frequent, <1 s infrequent [67] |
+
+---
+
+## 4.7 Further designs and 2025-2026 developments
+
+### 4.7.1 Amazon S3 Vectors: the object store becomes the vector store
+
+Section 4.5 describes engines that put their source of truth on object storage. AWS took the next step and made the object store itself answer similarity queries. S3 Vectors adds *vector buckets* holding *vector indexes*, queried through an S3 API with no cluster to provision. At general availability (2 December 2025) AWS raised the limit to 2 billion vectors per index, 40x the 50M preview limit, and up to 10,000 indexes per bucket. AWS says infrequent queries return in under one second and frequent queries in about 100 ms or less, quotes 1,000 vectors/s for streaming single-vector writes, a top-k ceiling of 100, and up to 50 metadata keys per vector for filtering, and claims up to 90% lower cost for uploading, storing and querying vectors [67].
+
+The design point is cold, large, cheap retrieval with modest top-k and QPS. It sits below the serverless engines on both price and capability. In practice it works as a cold tier beneath hotter engines that serve high-QPS or hybrid workloads. Its index structure is not documented, so its recall behavior under filters has to be measured, not assumed.
+
+### 4.7.2 GPU graph construction and search: CAGRA and cuVS
+
+Graph build time is often the bottleneck when a corpus is re-embedded or re-indexed. CAGRA [68] (ICDE 2024) builds a fixed-degree k-NN graph on the GPU and then prunes and reorders edges to improve reachability, using a highly parallel algorithm. The authors report graph construction 2.2x to 27x faster than HNSW, large-batch query throughput 33x to 77x higher than HNSW at 90 to 95% recall (and 3.8x to 8.8x higher than earlier GPU methods), and single-query search 3.4x to 53x faster than HNSW at 95% recall. CAGRA ships in NVIDIA's cuVS library [69]. A common production pattern is to build the graph on a GPU and serve it on CPUs: a CAGRA graph can be converted to an HNSW-compatible layout. OpenSearch's remote GPU index-build service (Section 4.4.10) [57] and Milvus's GPU index variants [35] follow this split between building and serving. The design lesson is that GPUs pay off first in index builds and batch queries. For single-query RAG serving at low QPS, CPU graphs or cluster indexes on object storage usually remain cheaper.
+
+### 4.7.3 Data-oblivious quantizers: TurboQuant
+
+RaBitQ (Section 4.1.3) showed that a random rotation plus a very simple per-coordinate code can carry a provable error bound. TurboQuant [70] (Google Research; ICLR 2026) extends the same family. It randomly rotates each vector so that its coordinates follow a concentrated Beta distribution, applies a per-coordinate MSE-optimal scalar quantizer, and then applies a 1-bit Quantized Johnson-Lindenstrauss (QJL) transform to the residual, which yields an unbiased inner-product estimator. The scheme is *online* and data-oblivious: there is no codebook training, so indexing time is "virtually zero." The authors report better recall than product-quantization baselines for nearest-neighbor search. The same quantizer is also aimed at LLM KV-cache compression. For vector databases the appeal is operational. A training-free quantizer does not drift when the data distribution shifts (Section 4.1.2), and it can be applied per segment as data arrives. Qdrant has published material on TurboQuant-style quantization alongside 1-bit RaBitQ bit-plane scoring [63]. Expect PQ to give way to rotation-based codes as the default compressed representation in new engines. Vendor and paper figures for these codes are not yet independently reproduced.
+
+### 4.7.4 Multi-vector (late-interaction) retrieval: MUVERA
+
+ColBERT-style text models and ColPali-style page-image models emit one vector per token or patch. That multiplies index size and breaks the single-vector ANN contract. Vespa handles this natively with tensor fields and phased ranking (Section 4.4.9). MUVERA [71] (NeurIPS 2024) takes the other route. It compresses a multi-vector set into a single *fixed dimensional encoding* (FDE) whose inner product approximates Chamfer (MaxSim) similarity, so an ordinary MIPS index can retrieve candidates before exact multi-vector re-scoring. The paper reports PLAID-level recall while retrieving 2x to 5x fewer candidates, and on BEIR about 10% higher recall with 90% lower latency than PLAID. Weaviate added MUVERA encoding in v1.31, after multi-vector embeddings became generally available in v1.30. On LoTTE it reports about 70% lower memory and import times falling from over 20 minutes to 3 to 6 minutes, at some cost in recall that higher `ef` can win back [72]. For multimodal RAG over PDFs and screenshots (Chapter 10), the choice is between native multi-vector storage (exact but large) and FDE compression (cheap but approximate).
+
+### 4.7.5 Postgres beyond pgvector: pgvectorscale and VectorChord
+
+Two extensions bring Section 4.1's disk-oriented designs into Postgres while keeping pgvector's types:
+
+- **pgvectorscale** (Timescale) adds a `diskann` access method called StreamingDiskANN, plus Statistical Binary Quantization and label-based filtered search derived from Filtered-DiskANN [7]. Arbitrary `WHERE` clauses still post-filter, but in a streaming way that stays correct. Its README reports 28x lower p95 latency and 16x higher throughput than Pinecone's storage-optimized s1 pods at 99% recall on 50M Cohere-768 vectors, at 75% lower self-hosted cost. This is a vendor benchmark against a pod tier that serverless has since superseded [73].
+- **VectorChord** (TensorChord) adds a `vchordrq` index: IVF partitioning with RaBitQ codes and automatic reranking, plus native 4-bit and 8-bit RaBitQ types. It claims 100M vectors on a single i4i.xlarge and a path to 1B+ [74].
+
+Both extensions keep Postgres transactions and joins while moving the index off the "graph plus floats in shared buffers" model. That model is what limits pgvector HNSW at large scale (Section 4.4.8).
 
 ---
 
@@ -462,19 +494,19 @@ The cost is write latency (hundreds of ms) and per-namespace commit rate (turbop
 17. Gao, J., Long, C. "RaBitQ: Quantizing High-Dimensional Vectors with a Theoretical Error Bound for Approximate Nearest Neighbor Search." SIGMOD, 2024. https://doi.org/10.1145/3654970
 18. Patel, L., et al. "ACORN: Performant and Predicate-Agnostic Search Over Vector Embeddings and Structured Data." SIGMOD, 2024. https://arxiv.org/abs/2403.04871
 19. Vasnetsov, A. "Filterable HNSW Without Recall Loss." Qdrant, 2019. https://qdrant.tech/articles/filterable-hnsw/
-20. Couzon, D., Ghafouri, M. "Filtered Vector Search: What ACORN Fixes, and What Fixes ACORN." Qdrant, August 2026. https://qdrant.tech/articles/filtered-vector-search-acorn/
+20. Couzon, D., Ghafouri, M. "Filtered Vector Search: What ACORN Fixes, and What Fixes ACORN." Qdrant, July-August 2026. https://qdrant.tech/articles/filtered-vector-search-acorn/
 21. Qdrant. "Configure Multitenancy." Qdrant documentation, 2026. https://qdrant.tech/documentation/manage-data/multitenancy/
 22. Cossio, L., Gourlay, A., Myriel, D. "Introducing Gridstore: Qdrant's Custom Key-Value Store." Qdrant, 2025. https://qdrant.tech/articles/gridstore-key-value-storage/
 23. Kasliwal, N. "Binary Quantization: 40x Faster Vector Search." Qdrant, 2023. https://qdrant.tech/articles/binary-quantization/
 24. Kane, A., et al. "pgvector" README (v0.8.7). GitHub, 2026. https://github.com/pgvector/pgvector
-25. Sriharsha, R. "Reimagining the vector database to enable knowledgeable AI" (Pinecone serverless architecture). Pinecone, January 2024. https://www.pinecone.io/blog/serverless-architecture/
+25. Sriharsha, R. "Reimagining the vector database to enable knowledgeable AI" (Pinecone serverless architecture). Pinecone, January 2024. https://www.pinecone.io/blog/serverless-architecture/ (Gong figures also in Pinecone's Gong case study: https://www.pinecone.io/customers/gong/)
 26. Pinecone. "Great Algorithms Are Not Enough." Pinecone, October 2023. https://www.pinecone.io/blog/hnsw-not-enough/
 27. Johnson, G., Zhu, J., Umbaugh, B. "Pinecone Dedicated Read Nodes are now in Public Preview." Pinecone, December 2025. https://www.pinecone.io/blog/dedicated-read-nodes/
 28. turbopuffer. "Architecture." turbopuffer documentation, 2026. https://turbopuffer.com/docs/architecture
 29. turbopuffer. "Tradeoffs." turbopuffer documentation, 2026. https://turbopuffer.com/docs/tradeoffs
 30. turbopuffer. "Limits." turbopuffer documentation, 2026. https://turbopuffer.com/docs/limits
 31. turbopuffer. "Namespace Pinning." turbopuffer documentation, 2026. https://turbopuffer.com/docs/pinning
-32. turbopuffer. "ANN v3: 200ms p99 query latency over 100B vectors." turbopuffer blog, January 2026. https://turbopuffer.com/blog/ann-v3
+32. VanBenschoten, N. "ANN v3: 200ms p99 query latency over 100B vectors." turbopuffer blog, 21 January 2026. https://turbopuffer.com/blog/ann-v3
 33. Harrison, D. "RIP, vector database." turbopuffer blog, September 2026. https://turbopuffer.com/blog/rip-vector-database
 34. Serafimov, B. "Native filtering" (filtered vector search on a clustering index). turbopuffer blog, January 2025. https://turbopuffer.com/blog/native-filtering
 35. Milvus / Zilliz. "Milvus Architecture Overview." Milvus documentation (v3.0.x), 2026. https://milvus.io/docs/architecture_overview.md
@@ -507,7 +539,15 @@ The cost is write latency (hundreds of ms) and per-namespace commit rate (turbop
 62. Simhadri, H. V., et al. "Results of the Big ANN: NeurIPS'23 competition." arXiv, 2024. https://arxiv.org/abs/2409.17424
 63. Gao, J., et al. "RaBitQ-Library" (adoption list and implementations). VectorDB-NTU, GitHub, 2025-2026. https://github.com/VectorDB-NTU/RaBitQ-Library
 64. Microsoft Research and collaborators. "In-Place Updates of a Graph Index for Streaming Approximate Nearest Neighbor Search" (IP-DiskANN). arXiv, 2025. https://arxiv.org/abs/2502.13826
-65. Padaki, A., Ingber, A., Liberty, E. "VQ-bench: a Composable Vector Quantization Framework." Pinecone, September 2026. https://www.pinecone.io/blog/vq-bench/
+65. Padaki, A., Ingber, A., Liberty, E. "VQ-bench: A Composable Vector Quantization Framework." Pinecone blog, 17 September 2026, and VecDB@VLDB 2026 paper. https://arxiv.org/abs/2608.11240
 66. Microsoft. "Perf: Garnet Providers vs other Vector DBs (Zilliz, Pinecone, etc.)." DiskANN wiki, 2026. https://github.com/microsoft/DiskANN/wiki/Perf:-Garnet-Providers-vs-other-Vector-DBs-(Zilliz,-Pinecone,-etc.)
+67. Amazon Web Services. "Amazon S3 Vectors is now generally available with 40 times the scale of preview." AWS What's New, 2 December 2025. https://aws.amazon.com/about-aws/whats-new/2025/12/amazon-s3-vectors-generally-available/
+68. Ootomo, H., Naruse, A., Nolet, C., Wang, R., Feher, T., Wang, Y. "CAGRA: Highly Parallel Graph Construction and Approximate Nearest Neighbor Search for GPUs." ICDE, 2024. https://arxiv.org/abs/2308.15136
+69. NVIDIA RAPIDS. "cuVS: Vector Search and Clustering on the GPU." GitHub, 2024-2026. https://github.com/rapidsai/cuvs
+70. Zandieh, A., Daliri, M., Hadian, M., Mirrokni, V. "TurboQuant: Online Vector Quantization with Near-optimal Distortion Rate." ICLR, 2026; see also Google Research blog, "TurboQuant: Redefining AI efficiency with extreme compression," March 2026. https://research.google/blog/turboquant-redefining-ai-efficiency-with-extreme-compression/
+71. Dhulipala, L., Hadian, M., Jayaram, R., Lee, J., Mirrokni, V. "MUVERA: Multi-Vector Retrieval via Fixed Dimensional Encodings." NeurIPS, 2024. https://arxiv.org/abs/2405.19504
+72. Weaviate. "MUVERA" (multi-vector encoding in Weaviate v1.31). Weaviate blog, 2025. https://weaviate.io/blog/muvera
+73. Timescale. "pgvectorscale" README. GitHub, 2024-2026. https://github.com/timescale/pgvectorscale
+74. TensorChord. "VectorChord" README. GitHub, 2025-2026. https://github.com/tensorchord/VectorChord
 
-Source note: vendor documentation was read from each project's public documentation source repository. The turbopuffer documentation pages [28]-[31] were read from a verbatim mirror of turbopuffer.com/docs. The turbopuffer blog posts [32]-[34] were read through third-party excerpts and summaries, so their figures should be checked against the originals before reuse. Every performance number in this chapter is as reported by the vendor or authors and was not independently reproduced.
+Source note: vendor documentation was read from each project's public documentation source repository. The turbopuffer documentation pages [28]-[31] were read from a verbatim mirror of turbopuffer.com/docs. The turbopuffer blog posts [32]-[34] were read through third-party excerpts and summaries, so their figures should be checked against the originals before reuse. In the 2026-10 fact-check, documentation sources [3], [9], [24], [47], [51], [53]-[55], [59], [61], [63], [73] and [74] were re-read from their GitHub sources and the cited figures matched. The Weaviate filtering page [41] was re-read from the weaviate/docs repository, and it confirms ACORN as the default from v1.34 and the PathSeer strategy. Claims from [20], [27], [32], [33], [36], [65] and [67] were cross-checked through search results and secondary coverage only. Every performance number in this chapter is as reported by the vendor or authors and was not independently reproduced.

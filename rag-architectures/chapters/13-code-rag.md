@@ -136,7 +136,7 @@ Cody experimented with reusing its embeddings index for completions, but began m
                          prompt = prefix + user input + context --> LLM
 ```
 
-**Long context as a retrieval layer (late 2024).** Sourcegraph and Google tested Gemini 1.5 Flash with a 1M-token context in Cody. They reported higher "essential recall" and a lower hallucination rate than the production Cody of September 2024 [10]. Time to first token was 30 to 40 seconds for about 1 MB of context, and fell to about 5 seconds with prefetching and model-state caching [10]. To keep that cache valid, they proposed a **layered context** design. A *permalayer* of the "logical codebase" takes about 90% of the context budget. An append-only *action history* follows, and a small *global retrieval* layer holds far-away definitions found through code search and navigation [10]. Retrieval becomes a matter of choosing what to cache, while long-range retrieval remains for distant code.
+**Long context as a retrieval layer (late 2024).** Sourcegraph and Google tested Gemini 1.5 Flash with a 1M-token context in Cody. They reported higher "essential recall" and a lower hallucination rate than the production Cody of September 2024 [10]. Their evaluations suggested that long-context models can match local retrieval for codebases under about 4 MB, while larger codebases still need global code search and code intelligence [10]. Time to first token grows linearly with context length: it was 30 to 40 seconds for about 1 MB of context, and fell to about 5 seconds when context was prefetched and the model's execution state cached [10]. To keep that cache valid, they proposed a **layered context** design. A *permalayer* of the "logical codebase" takes about 90% of the context budget. An append-only *action history* follows, and a small *global retrieval* layer holds far-away definitions found through code search and navigation [10]. Retrieval becomes a matter of choosing what to cache, while long-range retrieval remains for distant code.
 
 **Lessons.** Cody shows an embedding-free design working at enterprise scale. It reuses a mature lexical engine, adds tuned ranking signals, and merges local and remote context with a global rank. The trade-off is weaker conceptual matching when queries share few tokens with the code, which is the SWE-bench-like regime in CodeRAG-Bench's measurements [39].
 
@@ -155,7 +155,7 @@ Augment's engineering blog is not directly accessible from this research environ
 - **Edit events.** For completions, Augment feeds a stream of recent edits. It reported this as its single largest improvement on internal benchmarks (+2.6%), ahead of a better base model (+1.5%), RL tuning (+1.3%) and smarter chunking (+0.4%) [15].
 - **Context Engine as MCP (2026).** The retrieval engine is now offered as an MCP server, either through the local Auggie CLI or a hosted HTTP endpoint, so other agents can use it [16].
 
-**The SWE-bench counterpoint.** Augment's open-source SWE-bench Verified agent scored 65.4%. It used Claude 3.7 Sonnet as the driver and o1 as the ensembler, with only bash, file view/edit and sequential-thinking tools [17]. Its builder, Colin Flaherty, said: "We explored adding various embedding-based retrieval tools, but found that for SWE-bench tasks this was not the bottleneck - grep and find were sufficient" [18]. He named where embeddings still matter: large codebases, unstructured content such as Slack and docs, third-party code that models have not memorized, and non-text media. He also noted that SWE-bench repositories are smaller than real ones and its tasks mostly take under an hour [18]. His recommendation was to expose existing retrieval systems as tools inside an agent loop, add rerankers, and evaluate end to end, because a persistent agent can mask a weak retriever [18].
+**The SWE-bench counterpoint.** Augment's open-source SWE-bench Verified agent scored 65.4%. It used Claude 3.7 Sonnet as the driver and o1 as the ensembler, with only bash, file view/edit and sequential-thinking tools [17]. Its builder, Colin Flaherty, said: "We explored adding various embedding-based retrieval tools, but found that for SWE-bench tasks this was not the bottleneck - grep and find were sufficient" [18]. He named where embeddings still matter: large codebases, unstructured content such as Slack and docs, third-party code that models have not memorized, and non-text media. He also noted that SWE-bench repositories are smaller than real ones and that about 90% of its problems take a good engineer under an hour [18]. His recommendation was to expose existing retrieval systems as tools inside an agent loop, add rerankers, and evaluate end to end, because a persistent agent can mask a weak retriever [18].
 
 ## 13.6 Windsurf and Cognition: SWE-grep, an RL-trained fast-context subagent
 
@@ -186,15 +186,15 @@ Cognition evaluated on its internal Cognition CodeSearch Eval, built from real r
 **Current design.** Claude Code runs an agentic loop of gather context, act and verify [22]. The retrieval tools are [23][24]:
 
 - `Grep`, built on ripgrep, which respects `.gitignore`, and `Glob` for filename patterns. On macOS, Linux and WSL these are now left out of the default tool set. Claude instead runs `find` and `grep` through Bash, which in Claude's shell are embedded versions of `bfs` and `ugrep` [23].
-- An optional `LSP` tool for definitions, references and type errors through language servers [23].
-- The built-in **Explore** subagent, which is read-only (Write and Edit are denied). It is called with a thoroughness level of *quick*, *medium* or *very thorough* and returns only its findings, which "keeps exploration results out of your main conversation context" [24].
-- `CLAUDE.md` project memory loaded at session start. MCP tool definitions are deferred and loaded on demand through tool search [22].
+- An optional `LSP` tool for definitions, references and type errors through language servers. It stays inactive until the user installs a code-intelligence plugin for the language, and it does not run in cloud sessions [23].
+- The built-in **Explore** subagent, which is read-only (Write and Edit are denied). It is called with a thoroughness level of *quick*, *medium* or *very thorough* and returns only its findings, which "keeps exploration results out of your main conversation context" [24]. To keep research fast and cheap, Explore starts without the CLAUDE.md files and git status snapshot that other subagents load [24].
+- `CLAUDE.md` project memory (or an `AGENTS.md` file in its place) loaded at session start. MCP tool definitions are deferred and loaded on demand through tool search [22].
 
 Anthropic's context-engineering guidance frames this as "just in time" retrieval: the agent keeps lightweight references (paths, queries) and loads data through tools, and Claude Code is described as a hybrid of CLAUDE.md loaded up front with glob/grep retrieval on demand. This sidesteps "stale indexing and complex syntax trees" [21]. The same guidance names the cost: runtime exploration is slower than retrieving precomputed data, and agents without guidance waste context on dead ends [21].
 
-**Benchmark lineage.** Anthropic's SWE-bench Verified scaffold for the upgraded Claude 3.5 Sonnet (49%) had only a bash tool and a string-replace editor. Navigation was directory listing and `sed` line ranges, with no retrieval index. Many successful runs took hundreds of turns and more than 100k tokens [25].
+**Benchmark lineage.** Anthropic's SWE-bench Verified scaffold for the upgraded Claude 3.5 Sonnet (49%, against a previous state of the art of 45%) had only a bash tool and a string-replace editor. Navigation used the editor's `view` command (directory listings two levels deep, or files with an optional line range) and the bash tool's suggested `sed -n` line ranges, with no retrieval index. Many successful runs took hundreds of turns and more than 100k tokens [25].
 
-**Counter-evidence.** Zilliz's `claude-context` MCP server adds hybrid BM25 plus dense code search with AST chunking and Merkle-tree incremental indexing. In its evaluation, a GPT-4o-mini ReAct agent on 30 SWE-bench Verified instances (3 runs each) reached the same retrieval F1 as a grep-only agent (0.40 for both). It used 39.4% fewer tokens (73,373 vs 44,449) and 36.3% fewer tool calls [26]. This is a vendor study on a small sample, but its result matches the trade-off Anthropic describes: an index buys speed and tokens, not necessarily accuracy.
+**Counter-evidence.** Zilliz's `claude-context` MCP server adds hybrid BM25 plus dense code search with AST chunking and Merkle-tree incremental indexing. In its evaluation, a GPT-4o-mini ReAct agent on 30 SWE-bench Verified instances (3 runs each) reached the same retrieval F1 as a grep-only agent (0.40 for both). It used 39.4% fewer tokens (44,449 vs 73,373 per instance) and 36.3% fewer tool calls (5.3 vs 8.3) [26]. The 30 instances were filtered to 15-60-minute problems that modify exactly two files [26]. This is a vendor study on a small sample, but its result matches the trade-off Anthropic describes: an index buys speed and tokens, not necessarily accuracy.
 
 ## 13.8 Aider: the PageRank-ranked repository map
 
@@ -272,6 +272,8 @@ Function-level values are approximate because of extraction artefacts in the sou
 
 The SWE-bench literature functions as a set of controlled experiments on code retrieval. The main results:
 
+A note on the benchmark itself: most 2024-2026 numbers cited here use **SWE-bench Verified**, a 500-instance subset that OpenAI released in August 2024 after human annotators screened out issues with underspecified descriptions or unfair tests [45]. Lite (300 instances) and the full test set (2,294) appear in earlier papers, so numbers across subsets are not directly comparable.
+
 **1. Static RAG baselines were weak.** BM25 RAG resolved 1.96% (Claude 2) on SWE-bench in 2023, and its performance fell as context grew [31]. Agents with purpose-built navigation tools changed the picture. SWE-agent's ACI reached 12.47% on full SWE-bench and 18.00% on Lite with GPT-4 Turbo. The RAG baseline scored 2.67% on Lite and a shell-only agent 11.00% [32]. Moatless Tools took a middle path: its author argues that rather than relying on an agent to reason its way to a solution, it is crucial to build good tools that insert the right context into the prompt. It appears as an agent baseline in later localization studies [34][44].
 
 **2. Search tool design matters more than search power.** SWE-agent's ablation on Lite found [32]:
@@ -293,7 +295,7 @@ With iterative search, agents inspected every match exhaustively and wasted thei
 | Embeddings after LLM filters irrelevant folders | 70.33% | $0.04 |
 | Combined (most common top-N of both) | 81.67% | $0.06 |
 
-Skeletons also beat full files for element localization: 58.33% vs 53.67%, at a fraction of the tokens [33]. Agentless resolved 32.00% of Lite at $0.70 per issue with GPT-4o, and later reached 40.7% (Lite) and 50.8% (Verified) with Claude 3.5 Sonnet [33].
+Skeletons also beat full files for element localization: 58.33% vs 53.67%, at a fraction of the tokens [33]. Agentless's July 2024 release reported 27.3% of Lite at $0.34 per issue; the revised paper reports 32.00% of Lite at $0.70 per issue with GPT-4o, and later reached 40.7% (Lite) and 50.8% (Verified) with Claude 3.5 Sonnet [33].
 
 **4. Graphs help, mostly through precise entity lookup.** LocAgent builds a heterogeneous graph of directories, files, classes and functions with *contain*, *import*, *invoke* and *inherit* edges, plus a BM25 entity index [34]. The agent gets three tools: `SearchEntity` (hierarchical keyword index; returns fold, preview or full code), `TraverseGraph` (type-aware multi-hop BFS) and `RetrieveEntity`. It reports up to 92.7% file-level accuracy with a fine-tuned Qwen2.5-Coder-32B, about 86% lower cost than proprietary models, and a 12% gain in downstream Pass@10 resolution [34]. RepoGraph adds a repository graph to existing frameworks. A third-party review of these papers reports gains of about +2 points in resolve rate (for example, Agentless 27.33% to 29.67% with GPT-4o), at a cost of several thousand extra tokens per issue [36].
 
@@ -315,7 +317,26 @@ Skeletons also beat full files for element localization: 58.33% vs 53.67%, at a 
   NL issue -> code            | dense >> BM25 (SWE-bench NDCG)       | [39]
 ```
 
-## 13.11 Comparison of production and research designs
+## 13.11 Repository-level completion benchmarks: RepoBench and CrossCodeEval
+
+SWE-bench measures retrieval for issue resolution. Two earlier benchmarks isolate retrieval for **code completion**, the sub-second regime of Section 13.4.
+
+- **RepoBench** (ICLR 2024) splits the problem into three tasks: RepoBench-R (retrieve the most relevant cross-file snippet), RepoBench-C (complete the next line given cross-file and in-file context) and RepoBench-P (the full retrieve-then-complete pipeline). Completion is scored with exact match, edit similarity and CodeBLEU [46]. Separating retrieval from generation makes it possible to tell whether a regression comes from the retriever or the model.
+- **CrossCodeEval** (NeurIPS 2023 Datasets and Benchmarks) covers Python, Java, TypeScript and C#. Its examples are built so that the correct completion needs a definition from another file in the repository. The harness runs each model with and without retrieved cross-file context, which measures the value of retrieval directly [47].
+
+Both benchmarks support the pattern in Section 13.10: for completion, retrieved cross-file context helps when it contains the needed definition, and lexical or simple similarity retrieval (the Jaccard windows Cody uses [8], or RepoCoder's iterative loop [37]) is a strong baseline at low latency.
+
+## 13.12 Code graph databases: CodexGraph
+
+LocAgent and RepoGraph (Section 13.10) give an agent fixed traversal tools over an in-memory graph. **CodexGraph** (2024) instead loads a static-analysis graph of the repository (modules, classes, functions, with contains, inherits, calls and similar edges) into a graph database and lets the LLM write **graph queries** in Cypher against it [48]. A primary agent states what it needs; a translation agent writes and runs the queries; the results return as structured context. The appeal is expressiveness: a single query can answer "all subclasses of X that override method Y", which would take many grep calls. The cost is a schema the model must learn, query errors to recover from, and an index that must be rebuilt as the code changes, which brings back the freshness problem of Section 13.1. CodexGraph should be read as evidence that structured queries are a useful tool alongside grep, not as a replacement for it.
+
+## 13.13 Context files as pre-retrieval: CLAUDE.md and AGENTS.md
+
+Agentic systems without an index still load some context unconditionally. Claude Code reads `CLAUDE.md` at session start [22], and Anthropic describes this as the up-front half of a hybrid strategy [21]. In 2025 a vendor-neutral convention, **AGENTS.md**, emerged: "a README for agents", a predictable file at the repository root (with nested files for subprojects) holding build and test commands, conventions and pointers into the codebase [49]. Claude Code can read an AGENTS.md in place of a CLAUDE.md [22].
+
+These files are a form of curated retrieval. A human (or the agent, through auto-memory) writes down the facts that agentic search would otherwise rediscover in every session: where the entry points are, which directories matter, and which commands verify a change. They cost context on every turn, so they work best when short and when they point to files rather than copy them. They also go stale, like any index, but they fail visibly, because a wrong path in a context file produces an immediate tool error rather than a silently missing search result.
+
+## 13.14 Comparison of production and research designs
 
 | System | Primary retrieval | Index & freshness | Structure use | Where it runs | Public numbers |
 |---|---|---|---|---|---|
@@ -330,7 +351,7 @@ Skeletons also beat full files for element localization: 58.33% vs 53.67%, at a 
 | LocAgent [34] | Agent over code graph + BM25 entity index | Built per repo snapshot | Heterogeneous graph, multi-hop BFS | Pipeline | 92.7% file accuracy (fine-tuned 32B) |
 | SweRank [35] | Bi-encoder + LLM listwise reranker | Embedding index | Function-level units | Pipeline | 83.21% file Acc@1 (reported) |
 
-## 13.12 Failure modes catalogue
+## 13.15 Failure modes catalogue
 
 - **Staleness.** The index lags the working tree, so newly written or branch-only code is missing. Cherny cited this as the reason Claude Code dropped vector RAG [20]. The fixes are Merkle-tree sync [1], diffing against the indexed commit [6], and real-time per-branch indexes [12].
 - **Leakage between users or tenants.** Shared or copied indexes can expose code a user should not see. Cursor drops results whose file hash the client cannot prove it holds [1]. Augment's documentation describes proof-of-possession for file access (reported) [16].
@@ -353,7 +374,7 @@ Skeletons also beat full files for element localization: 58.33% vs 53.67%, at a 
 
 ## References
 
-Note on access: the research environment could not reach several vendor and arXiv domains directly. Content for [1], [2], [3], [5], [12]-[16], [19], [35], [36] and [43] was read from verbatim or near-verbatim copies, or from third-party reading notes, hosted on GitHub. The URLs below are the original sources named in those copies. The Sourcegraph posts [7]-[10] were read from Sourcegraph's own website source repository (github.com/sourcegraph/about). The Aider [27]-[30], Copilot [6] and benchmark repositories were read directly.
+Note on access: the research environment could not reach several vendor and arXiv domains directly. Content for [1], [2], [3], [5], [12]-[16], [19], [35], [36] and [43] was read from verbatim or near-verbatim copies, or from third-party reading notes, hosted on GitHub. The URLs below are the original sources named in those copies. The Sourcegraph posts [7]-[10] were read from Sourcegraph's own website source repository (github.com/sourcegraph/about). The Aider [27]-[30], Copilot [6] and benchmark repositories were read directly. In the October 2026 fact-check pass, [6], [7]-[11], [17], [18], [21]-[30], [33], [34], [46], [47] and [49] were re-read from their original or source repositories; vendor blogs for Cursor, Cognition, GitHub, Augment and Voyage, and arXiv abstract pages, were not reachable and were left as previously sourced.
 
 1. Stribling, J. (Cursor). "Securely indexing large codebases." Cursor Blog, January 27, 2026. https://cursor.com/blog/secure-codebase-indexing
 2. Heule, S., Jia, E., Jain, N. (Cursor). "Improving agent with semantic search." Cursor Blog, November 6, 2025. https://cursor.com/blog/semsearch
@@ -372,14 +393,14 @@ Note on access: the research environment could not reach several vendor and arXi
 15. Augment Code. "Context beats modeling." Augment Blog, 2025. https://www.augmentcode.com/blog/context-modeling
 16. Augment Code. "Context Engine MCP overview." Augment Documentation, 2026. https://docs.augmentcode.com/context-services/mcp/overview
 17. Augment Code. "Augment SWE-bench Verified Agent" (65.4% with Claude 3.7 Sonnet + o1 ensembler). GitHub, 2025. https://github.com/augmentcode/augment-swebench-agent
-18. Liu, J. (567 Labs), with Flaherty, C. "Why Grep Beat Embeddings in Our SWE-Bench Agent (Lessons from Augment)." Systematically Improving RAG talks, 2025. https://567-labs.github.io/systematically-improving-rag/talks/colin-rag-agents/
+18. Liu, J. (567 Labs), with Flaherty, C. "Why Grep Beat Embeddings in Our SWE-Bench Agent (Lessons from Augment)." Systematically Improving RAG talks, June 30, 2025 (source: github.com/567-labs/systematically-improving-rag, docs/talks/colin-rag-agents.md). https://567-labs.github.io/systematically-improving-rag/talks/colin-rag-agents/
 19. Pan, B., Baronio, C., Tam, A., Marsella, P., Jain, M., Chiu, D., Swyx, Alberti, S. (Cognition). "Introducing SWE-grep and SWE-grep-mini: RL for Multi-Turn, Fast Context Retrieval." Cognition Blog, October 16, 2025. https://cognition.ai/blog/swe-grep
 20. Orosz, G., with Cherny, B. "Building Claude Code with Boris Cherny." The Pragmatic Engineer podcast, March 4, 2026 (transcript, 49:42-52:07). https://youtu.be/julbw1JuAz0
 21. Rajasekaran, P., Dixon, E., Ryan, C., Hadfield, J. (Anthropic). "Effective context engineering for AI agents." Anthropic Engineering, September 29, 2025. https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
 22. Anthropic. "How Claude Code works." Claude Code documentation, 2026. https://code.claude.com/docs/en/how-claude-code-works
 23. Anthropic. "Tools reference" (Grep, Glob, LSP behaviour). Claude Code documentation, 2026. https://code.claude.com/docs/en/tools-reference
 24. Anthropic. "Subagents" (built-in Explore subagent). Claude Code documentation, 2026. https://code.claude.com/docs/en/sub-agents
-25. Anthropic. "Raising the bar on SWE-bench Verified with Claude 3.5 Sonnet." Anthropic Research, 2024-2025. https://www.anthropic.com/research/swe-bench-sonnet
+25. Anthropic. "Raising the bar on SWE-bench Verified with Claude 3.5 Sonnet." Anthropic Engineering, January 6, 2025. https://www.anthropic.com/engineering/swe-bench-sonnet
 26. Zilliz. "claude-context" MCP server and evaluation (grep-only vs. hybrid semantic search). GitHub, 2025. https://github.com/zilliztech/claude-context (evaluation: https://github.com/zilliztech/claude-context/tree/master/evaluation)
 27. Gauthier, P. (Aider). "Building a better repository map with tree sitter." Aider Blog, October 22, 2023. https://aider.chat/2023/10/22/repomap.html
 28. Aider. "Repository map." Aider documentation, 2024-2026. https://aider.chat/docs/repomap.html
@@ -399,3 +420,8 @@ Note on access: the research environment could not reach several vendor and arXi
 42. Voyage AI. "voyage-code-3: More Accurate Code Retrieval." Voyage AI Blog, December 4, 2024. https://blog.voyageai.com/2024/12/04/voyage-code-3/
 43. Zhang, L., et al. (Microsoft). "SWE-bench Goes Live!" (SWE-bench-Live). arXiv 2505.23419, 2025. https://arxiv.org/abs/2505.23419
 44. Örwall, A. "Moatless Tools" (context-insertion tools for LLM code editing; SWE-bench agent). GitHub, 2024-2025. https://github.com/aorwall/moatless-tools
+45. OpenAI. "Introducing SWE-bench Verified." OpenAI, August 13, 2024. https://openai.com/index/introducing-swe-bench-verified/
+46. Liu, T., Xu, C., McAuley, J. "RepoBench: Benchmarking Repository-Level Code Auto-Completion Systems." ICLR 2024 (arXiv 2306.03091); code: https://github.com/Leolty/repobench . https://arxiv.org/abs/2306.03091
+47. Ding, Y., Wang, Z., Ahmad, W. U., et al. "CrossCodeEval: A Diverse and Multilingual Benchmark for Cross-File Code Completion." NeurIPS 2023 Datasets and Benchmarks (arXiv 2310.11248); code: https://github.com/amazon-science/cceval . https://arxiv.org/abs/2310.11248
+48. Liu, X., Lan, B., Hu, Z., et al. "CodexGraph: Bridging Large Language Models and Code Repositories via Code Graph Databases." arXiv 2408.03910, 2024 (NAACL 2025). https://arxiv.org/abs/2408.03910
+49. AGENTS.md. "AGENTS.md: a simple, open format for guiding coding agents." 2025. https://agents.md (source: https://github.com/openai/agents.md)

@@ -4,8 +4,8 @@
 
 Most production RAG systems are not written from scratch. They are assembled from one of two kinds of building blocks:
 
-1. **Open-source orchestration frameworks.** LangChain/LangGraph, LlamaIndex, Haystack, DSPy, Semantic Kernel (now Microsoft Agent Framework), the Vercel AI SDK and RAGFlow. These give you abstractions for loaders, splitters, embedders, vector stores, retrievers, rerankers, prompts and agents. You still own the infrastructure.
-2. **Managed retrieval services.** Amazon Bedrock Knowledge Bases, Google's Vertex AI RAG Engine and Vertex AI Search, Azure AI Search, OpenAI file search and vector stores, and Anthropic's Citations API. These take over some or all of ingestion, chunking, embedding, indexing, ranking and grounded generation behind an API.
+1. **Open-source orchestration frameworks.** LangChain/LangGraph, LlamaIndex, Haystack, DSPy, Semantic Kernel (now Microsoft Agent Framework), the Vercel AI SDK and RAGFlow, increasingly connected to data through the Model Context Protocol. These give you abstractions for loaders, splitters, embedders, vector stores, retrievers, rerankers, prompts and agents. You still own the infrastructure.
+2. **Managed retrieval services.** Amazon Bedrock Knowledge Bases, Google's Vertex AI RAG Engine and Vertex AI Search, Azure AI Search, OpenAI file search and vector stores, Anthropic's Citations API, the Gemini API's File Search tool and Cloudflare AI Search. These take over some or all of ingestion, chunking, embedding, indexing, ranking and grounded generation behind an API.
 
 Between 2023 and 2026 the two camps converged. The frameworks moved from fixed "retrieve then generate" chains toward agent loops in which retrieval is one tool among many. LangChain v1 moved its classic retrievers into a legacy package and now centres on `create_agent` [3]. Haystack documents a "pipelines vs agents" decision [14]. LlamaIndex says its "primary focus has shifted towards LlamaParse" [5]. The managed services moved the same way, from single-shot vector search toward *agentic retrieval*: LLM query planning, parallel subqueries and iterative refinement run server-side. Azure AI Search's knowledge bases with retrieval reasoning effort levels [49][50], Bedrock's query decomposition [35] and Vertex AI RAG Engine's LLM ranker [44] are all examples.
 
@@ -118,7 +118,7 @@ The documentation explains why 2-step latency is predictable: "the maximum numbe
 
 ### 15.2.3 Haystack (deepset)
 
-**Problem addressed.** Haystack is a Python framework (roughly 26.7k stars) for "modular pipelines and agent workflows with explicit control over retrieval, routing, memory, and generation" [11]. Its README lists users including Apple, Meta, Databricks, NVIDIA, the European Commission, Airbus and Netflix. deepset sells a managed or self-hosted Haystack Enterprise Platform [11]. At the time of writing, the main branch's version file read `3.4.0-rc0`.
+**Problem addressed.** Haystack is a Python framework (roughly 26.7k stars) for "modular pipelines and agent workflows with explicit control over retrieval, routing, memory, and generation" [11]. Its README lists users including Apple, Meta, Databricks, NVIDIA, the European Commission, Airbus and Netflix. deepset sells a managed or self-hosted Haystack Enterprise Platform [11]. At the time of writing, the latest PyPI release of `haystack-ai` was 3.3.0 and the main branch's version file read `3.4.0-rc0`.
 
 **Architecture.**
 
@@ -139,7 +139,7 @@ The documentation explains why 2-step latency is predictable: "the maximum numbe
 
 ### 15.2.4 DSPy
 
-**Problem addressed.** Hand-written prompts in multi-stage RAG pipelines are brittle and tied to one model. DSPy (Stanford NLP, roughly 38.6k stars, `version="3.4.0"`) treats an LM pipeline as a *program* whose prompts and even weights are *compiled* against a metric. The tagline is "programming—not prompting—language models" [16][19].
+**Problem addressed.** Hand-written prompts in multi-stage RAG pipelines are brittle and tied to one model. DSPy (Stanford NLP, roughly 38.6k stars, version 3.4.x; 3.4.1 on PyPI in October 2026) treats an LM pipeline as a *program* whose prompts and even weights are *compiled* against a metric. The tagline is "programming—not prompting—language models" [16][19].
 
 **Architecture.**
 
@@ -164,7 +164,7 @@ class RAG(dspy.Module):
 
 **Published numbers (official tutorials).**
 
-- *RAG tutorial* [20]. The setup is a RAG-QA Arena tech corpus, documents truncated to 6,000 characters, OpenAI `text-embedding-3-small` at 512 dimensions, and k=5. Semantic F1 went from about 42% (chain-of-thought, no retrieval) to 55% (unoptimised RAG) to about 61% after `MIPROv2(auto="medium")`. The optimisation run cost about $1.5 and took 20-30 minutes on 200 examples. MIPROv2 splits these 20% train and 80% validation by default.
+- *RAG tutorial* [20]. The setup is a RAG-QA Arena tech corpus, documents truncated to 6,000 characters, OpenAI `text-embedding-3-small` at 512 dimensions, and k=5. Semantic F1 on a 300-question dev set went from about 42% (chain-of-thought, no retrieval) to 55.5% (unoptimised RAG) to about 61% after `MIPROv2(auto="medium")`. The optimisation run cost about $1.5 and took 20-30 minutes on 200 examples. MIPROv2 splits these 20% train and 80% validation by default.
 - *Multi-hop search tutorial* [21]. A 4-hop `Hop` module (query generation plus note-taking) over BM25 went from about 30% to "a little below 60%" top-5 recall. This took about 35 minutes and about $5 of GPT-4o calls used to optimise prompts for Llama-3.1-8B.
 
 **Failure modes.** The tutorial itself warns that prompt optimisation "is not a magic button" and can overfit the training set. Held-out evaluation is essential [20]. DSPy also moves the difficulty into *metric design*: the bootstrap filters on traces that score well, so a weak metric (for example, an LLM-judged semantic F1) bounds what you can reach.
@@ -187,13 +187,13 @@ class RAG(dspy.Module):
 
 Results are wrapped with a default `ContextPrompt` and `CitationsPrompt` ("Include citations to the source document with document name and link..."). Optional `SourceName` and `SourceLink` fields let the agent cite [24].
 
-Packaged context providers exist for Azure AI Search, Microsoft Foundry file search, Neo4j GraphRAG, Redis, Cosmos DB and Mem0 [24]. The Go preview of Agent Framework does not yet support RAG [25].
+The RAG documentation points to service-specific context providers for Azure AI Search, Microsoft Foundry file search and Neo4j GraphRAG (graph traversal with Cypher). In Python, any Semantic Kernel VectorStore connector (Azure AI Search, Qdrant, Pinecone, Redis, Weaviate, in-memory and others) can be bridged into an Agent Framework tool through `create_search_function` [24]. Go support for RAG is listed as "coming soon" [24][25].
 
 **Lesson.** The pre-invoke versus on-demand switch is the 2-step versus agentic choice from 15.2.1, exposed as one configuration flag. Making that a deploy-time decision rather than a rewrite is good framework design.
 
 ### 15.2.6 Vercel AI SDK
 
-**Problem addressed.** The AI SDK is a TypeScript toolkit for building AI features in web apps. The `ai` package was at version 7.0.x at the time of writing. RAG is not a separate subsystem. It is built from `embed`/`embedMany`, `cosineSimilarity`, a `rerank` function and tool-calling agents [27][28].
+**Problem addressed.** The AI SDK is a TypeScript toolkit for building AI features in web apps. The `ai` package was at version 7.0.x (7.0.140 on npm) at the time of writing. RAG is not a separate subsystem. It is built from `embed`/`embedMany`, `cosineSimilarity`, a `rerank` function and tool-calling agents [27][28].
 
 **Reference RAG design (official guide)** [27]:
 
@@ -241,6 +241,16 @@ Details from the guide [27]:
 
 **Lessons.** RAGFlow's history shows a common arc: adopt GraphRAG and RAPTOR, find that graph construction is the cost bottleneck (hence checkpointing), then fold the structures into a general "compile the corpus into derived artefacts" step. Human-editable chunks are a practical answer to parsing errors that no automatic pipeline removes [30][31].
 
+### 15.2.8 Model Context Protocol as the shared retrieval interface
+
+**Problem addressed.** Every framework above ships its own retriever and tool abstractions, so a retrieval backend written for one does not plug into another. Anthropic introduced the **Model Context Protocol (MCP)** on November 25, 2024 as "an open standard that enables developers to build secure, two-way connections" between data sources and AI tools. Data owners expose an **MCP server** and AI applications act as **MCP clients** [62]. The specification and SDKs are maintained in the open `modelcontextprotocol` organisation [63].
+
+**Relevance to RAG.**
+
+- A retrieval service wrapped once as an MCP server (exposing search as a *tool*, or documents as *resources*) becomes callable from any MCP-capable agent runtime. This is the "retrieval as a tool" pattern (15.5, item 1) made vendor-neutral.
+- Managed services now consume MCP as well as expose it. Azure AI Search knowledge bases accept arbitrary MCP servers as knowledge sources [55], and Agent Framework advertises MCP interoperability in its 1.0 release [22].
+- The trade-off is control. An MCP tool hides chunking, ranking and thresholds behind a function signature, so evaluation and access control have to be enforced at the server.
+
 ## 15.3 Managed RAG services
 
 ### 15.3.1 Amazon Bedrock Knowledge Bases
@@ -271,7 +281,7 @@ Details from the guide [27]:
 
 **Key techniques, from AWS's official sample repository** [33]:
 
-- **Chunking strategies** [34]. The choices are `FIXED_SIZE`, `HIERARCHICAL`, `SEMANTIC` and `NONE`, or a custom Lambda. Example settings: fixed at 300 tokens with 20% overlap; hierarchical with 1,500-token parents, 300-token children and 60-token overlap; semantic with a 300-token maximum, buffer size 1 and a 95th-percentile breakpoint threshold. The chunking strategy cannot be changed after the data source is created. The repository also shows Anthropic-style contextual retrieval implemented as a custom Lambda chunker [33].
+- **Chunking strategies** [34]. The choices are `FIXED_SIZE`, `HIERARCHICAL`, `SEMANTIC` and `NONE`, or a custom Lambda. Example settings: fixed at 300 tokens with 20% overlap; hierarchical with 1,500-token parents, 300-token children and 60-token overlap; semantic with a 300-token maximum, buffer size 1 and a 95th-percentile breakpoint threshold. The chunking strategy cannot be changed after the data source is created. The repository also shows Anthropic-style contextual retrieval (see 15.5, item 9) implemented as a custom Lambda chunker [33][61].
 - **Two query APIs.** `Retrieve` returns chunks with S3 location, score and metadata. `RetrieveAndGenerate` also generates a cited answer [34][42].
 - **Query decomposition** [35]. `orchestrationConfiguration.queryTransformationConfiguration.type = QUERY_DECOMPOSITION` splits a multi-part question into sub-queries that are retrieved separately, then pooled and ranked. The sample shows a two-intent question about a building's location and a whistleblower scandal. Without decomposition, the query embedding is dominated by the scandal, and decomposition recovers the chunks about the building.
 - **Reranking** with Bedrock-hosted reranker models overrides the default ranking. Retrieving fewer but better chunks also cuts generation cost and latency [36].
@@ -284,7 +294,7 @@ Details from the guide [27]:
 **Failure modes and operational notes.**
 
 - Chunking is fixed at data-source creation, so experimenting with chunking means re-creating the source [34].
-- Ingestion jobs serialise per KB [38].
+- Ingestion jobs serialise per KB: the sample notes "you can only kick-off one ingestion job at one time" [38].
 - Embedding a multi-intent query dilutes its semantics. That is the motivation for decomposition [35].
 - Grounding thresholds trade false blocks against hallucination risk and must be tuned per domain [43].
 
@@ -303,7 +313,7 @@ RAG Engine became generally available on January 10, 2025 [44]. By 2026 the samp
 
 - **Sources:** Cloud Storage, Google Drive, Jira, Slack, local files and websites, among others [44].
 - **Chunking:** configurable per import. The samples use `chunk_size=1024, chunk_overlap=100` and `512/50`, with `max_embedding_requests_per_min` throttling [45].
-- **Backends:** RAG Engine's managed vector storage, Vertex AI Vector Search, Pinecone, Weaviate, Feature Store, or a Vertex AI Search engine. The last is presented as the option for "low-latency retrieval at scale" [44][46].
+- **Backends:** RAG Engine's managed vector storage, Vertex AI Vector Search, Pinecone, Weaviate, Feature Store, or a Vertex AI Search engine. The launch post presents Vertex AI Search as the backend for large corpora because it handles large data volumes "with exceptionally low latency" [44][46]. Sources also include BigQuery datasets, and generation can use Model Garden models such as Gemini, Llama and Claude [44].
 - **Retrieval:** `similarity_top_k`, `vector_distance_threshold` and an **LLM ranker** (`rag.Ranking(llm_ranker=...)`) [44][45]. A sample comment notes that only one corpus could be queried per call at that time [46].
 - **Generation:** retrieval is attached to Gemini as a `Tool.from_retrieval(...)`. Alternatively, `retrieve_contexts` returns raw contexts for use with any model [45].
 
@@ -421,6 +431,7 @@ There is also a standalone `vector_stores.search` endpoint for retrieval without
 - **Ranking.** `ranking_options.ranker` is `auto` or a pinned `default_2024_08_21`. `score_threshold` runs from 0 to 1, where higher values return "only the most relevant results, but may return fewer". `hybrid_search.embedding_weight` and `text_weight` weight the RRF fusion of dense and sparse keyword matches.
 - **Search endpoint options.** The search endpoint adds `rewrite_query` (default false) and accepts multiple queries.
 - **Lifecycle.** `expires_after` policies control vector-store lifetime.
+- **Scale.** Vector stores created before November 2025 hold at most 10,000 files; stores created from November 2025 onward can hold up to 100,000,000 files [57].
 
 **Measured behaviour.** In OpenAI's cookbook, file search over 21 OpenAI blog PDFs with LLM-generated questions (gpt-4o-mini, k=5, `tool_choice="required"`) scored **Recall@5 0.905, MRR 0.905, MAP 0.895** [56]. The misses were telling. A generic question ("What is OpenAI's mission as stated in the document?") matched a different document, and another question resolved to a more on-topic file than the one it was generated from. The cookbook itself says synthetic questions are "imperfect" and recommends human-verified evaluation sets [56].
 
@@ -432,7 +443,7 @@ There is also a standalone `vector_stores.search` endpoint for retrieval without
 
 ### 15.3.5 Anthropic Citations API and search result blocks
 
-**Problem addressed.** Prompt-based citation ("quote your sources in brackets") is unreliable. Models fabricate or misattribute quotes, and output tokens spent on quotes cost money. Anthropic's Citations API moves citation into the API contract. It is generally available on the Anthropic API and Google Cloud's Vertex AI. The announcement page on claude.com is dated June 23, 2025, with a June 30, 2025 update adding Amazon Bedrock [58]. The current documentation lists GA on the Claude API, Bedrock, Google Cloud and Microsoft Foundry [59]. It handles **L4 only**: retrieval stays with you.
+**Problem addressed.** Prompt-based citation ("quote your sources in brackets") is unreliable. Models fabricate or misattribute quotes, and output tokens spent on quotes cost money. Anthropic's Citations API moves citation into the API contract. It was first announced in January 2025 as generally available on the Anthropic API and Google Cloud's Vertex AI; the announcement as now hosted on claude.com carries a June 23, 2025 date stamp and a June 30, 2025 update adding Amazon Bedrock [58]. The current documentation lists GA on the Claude API, Claude Platform on AWS, Amazon Bedrock, Google Cloud and Microsoft Foundry, and says all active models support citations [59]. It handles **L4 only**: retrieval stays with you.
 
 **Mechanics** [59]:
 
@@ -458,6 +469,31 @@ There is also a standalone `vector_stores.search` endpoint for retrieval without
 
 **Design lesson.** Citation granularity is set by how you package context. Put each retrieved chunk in its own plain-text document if you want sentence-level citations inside chunks. Use custom-content documents if each chunk should be cited as a whole [59].
 
+### 15.3.6 Gemini API File Search
+
+**Problem addressed.** Vertex AI RAG Engine (15.3.2) targets Google Cloud projects. The Gemini Developer API added its own hosted RAG tool, **File Search**, aimed at the same niche as OpenAI file search: upload documents to a managed store and attach it to generation as a tool, with citations [64].
+
+**Mechanics (official quickstart)** [64]:
+
+- A **File Search Store** is created with `client.file_search_stores.create(...)`. Files are uploaded directly (`upload_to_file_search_store`) or imported from the Files API. Ingestion is asynchronous, so the client polls before searching.
+- At generation time the store is passed as a `file_search` tool. Options include `top_k` (chunks passed to generation) and a `metadata_filter` expression over custom document metadata (for example `genre = "fiction"`).
+- Responses carry `grounding_metadata`: `grounding_chunks` hold the retrieved text, document title and `page_number`, and `grounding_supports` map spans of the answer to supporting chunks. At the time of writing the quickstart notes that grounding metadata is not yet returned through the newer Interactions API.
+- **Multimodal stores** use the `gemini-embedding-2` model to embed images directly rather than through OCR, so image queries and media citations are possible.
+- The quickstart warns that the API key grants access to all data uploaded to file stores, unlike most Gemini API keys, so key hygiene becomes data security.
+
+**Lesson.** By 2026 three model vendors (OpenAI, Google and, through the Citations API, Anthropic) offer citation-bearing grounding at the API layer. Only OpenAI and Google also host the index.
+
+### 15.3.7 Cloudflare AI Search (formerly AutoRAG)
+
+**Problem addressed.** Cloudflare's AI Search, launched in 2025 under the name AutoRAG, is an edge-hosted managed RAG pipeline built on Cloudflare's Vectorize vector database, Workers AI models and R2 storage [65].
+
+**Pipeline** [65]:
+
+- **Indexing** (asynchronous): ingest from a website, an R2 bucket or uploaded items; convert to Markdown with Workers AI's Markdown Conversion; chunk; embed (multimodal models embed image pixels, text-only models embed generated captions); optionally build a BM25 keyword index; store. Connected sources are re-checked and re-indexed automatically.
+- **Querying** (synchronous): optional LLM query rewriting, query embedding, vector search, optional parallel BM25 search, configurable fusion, optional cross-encoder reranking, and then either raw results (Search endpoint) or a generated answer (Chat Completions endpoint).
+
+**Lesson.** The Cloudflare documentation contrasts AI Search with plain Vectorize the same way this chapter contrasts managed services with frameworks: managed chunking, embedding and continuous sync against full control of the retrieval pipeline [65]. It is another independent arrival at the hybrid-plus-rerank default (15.5, item 3).
+
 ## 15.4 Comparison tables
 
 ### 15.4.1 Open-source frameworks
@@ -480,6 +516,8 @@ There is also a standalone `vector_stores.search` endpoint for retrieval without
 | Vertex AI RAG Engine / Search | Chunk size and overlap per import | Managed store, Vector Search, Pinecone, Weaviate, Feature Store, Vertex AI Search | top-k, distance threshold, LLM ranker | Via Gemini tool use | Grounding APIs, check-grounding [48] |
 | Azure AI Search | Integrated vectorization; Text Split, Content Understanding | Search index; remote SharePoint, web, MCP, Fabric and others | BM25 + vector RRF (k=60), semantic ranker on top 50 | Knowledge bases: minimal, low, medium, auto | Answer synthesis (preview), references, `citationUrl` |
 | OpenAI file search | Auto or static (800/400 default, up to 4,096) | Hosted vector stores | Hybrid RRF weights, score threshold, filters, 1-50 results | Model-driven tool calls | File-citation annotations |
+| Gemini API File Search | Managed; upload or import from Files API | Hosted File Search Stores (text and multimodal) | `top_k`, metadata filter | Model-driven tool calls | `grounding_chunks` with page numbers, `grounding_supports` [64] |
+| Cloudflare AI Search | Managed Markdown conversion and chunking; continuous sync | Vectorize + BM25 keyword index | Query rewrite, hybrid fusion, cross-encoder rerank | None built in | Optional generated answer over retrieved chunks [65] |
 | Anthropic Citations | You chunk (sentence auto-chunking or custom blocks) | None (bring your own) | None | Search-result blocks from tools | Span-level citations; `cited_text` not billed as output |
 
 ## 15.5 Cross-cutting patterns and failure modes
@@ -492,6 +530,7 @@ There is also a standalone `vector_stores.search` endpoint for retrieval without
 6. **Graph structures are being productised and then generalised.** Bedrock's Neptune GraphRAG [38], LlamaIndex's PropertyGraphIndex [10], Agent Framework's Neo4j provider [24] and RAGFlow's move from GraphRAG/RAPTOR to Knowledge Compilation [31] all show this. Graph-build cost is the recurring pain point.
 7. **Cost scales with fan-out.** In agentic retrieval, reranking tokens dominate. In Microsoft's example, $3.30 of the $4.32 total is reranking [49]. In DSPy, the optimisation itself costs dollars per run [20][21]. Budget for the multiplicative fan-out factors (sources x subqueries x reranked chunks) [49].
 8. **Citations should be structural, not prompted.** Anthropic's API-level citations [59], Azure references and `citationUrl` [55], OpenAI annotations [56] and Bedrock RetrieveAndGenerate citations [34] replace prompt-format conventions. Beware incompatibilities such as citations plus structured outputs [59].
+9. **Contextualising chunks before indexing is a cheap, portable win.** Anthropic's *contextual retrieval* (September 2024) prepends an LLM-written, chunk-specific context to each chunk before embedding and BM25 indexing. On Anthropic's benchmarks, contextual embeddings cut the top-20 retrieval failure rate by 35% (5.7% to 3.7%), adding contextual BM25 cut it by 49% (to 2.9%), and adding reranking by 67% (to 1.9%). With prompt caching the one-time cost was estimated at $1.02 per million document tokens [61]. Because it lives entirely in L1, it works with any framework or service that accepts custom chunks; AWS's Bedrock samples implement it as a Lambda chunker [33].
 
 ## Key takeaways for system designers
 
@@ -566,3 +605,8 @@ There is also a standalone `vector_stores.search` endpoint for retrieval without
 58. "Introducing Citations on the Anthropic API". Anthropic. 2025. https://claude.com/blog/introducing-citations-api
 59. "Citations" (Claude API documentation). Anthropic. 2026. https://platform.claude.com/docs/en/build-with-claude/citations
 60. "Search results" (Claude API documentation). Anthropic. 2026. https://platform.claude.com/docs/en/build-with-claude/search-results
+61. "Introducing Contextual Retrieval". Anthropic. September 19, 2024. https://www.anthropic.com/news/contextual-retrieval
+62. "Introducing the Model Context Protocol". Anthropic. November 25, 2024. https://www.anthropic.com/news/model-context-protocol
+63. Model Context Protocol specification and documentation repository. Model Context Protocol project. 2024-2026. https://github.com/modelcontextprotocol/modelcontextprotocol
+64. "File Search Quickstart" (Gemini API cookbook). Google. 2025-2026. https://github.com/google-gemini/cookbook/blob/main/quickstarts/File_Search.ipynb
+65. "How AI Search works" (Cloudflare AI Search docs source). Cloudflare. 2025-2026. https://github.com/cloudflare/cloudflare-docs/blob/production/src/content/docs/ai-search/concepts/how-ai-search-works.mdx

@@ -42,11 +42,13 @@ The chapter covers, in order:
   auto-tuning, FastGraphRAG, and LazyGraphRAG.
 - LightRAG: dual-level keyword retrieval over an entity/relation graph.
 - HippoRAG and HippoRAG 2: OpenIE knowledge graphs with Personalized PageRank (PPR) as
-  associative memory. Also fast-graphrag and GFM-RAG, which build on the same idea.
+  associative memory. Also fast-graphrag, GFM-RAG, and the relation-free LinearRAG,
+  which build on the same idea.
 - The Neo4j GraphRAG stack: property-graph retrievers, Text2Cypher, the KG builder, and
   LLM Graph Builder.
 - Other industrial designs: AWS GraphRAG Toolkit, Zep/Graphiti temporal knowledge graphs,
-  Ant Group's KAG, Think-on-Graph, and LinkedIn's customer-service KG.
+  Ant Group's KAG, Think-on-Graph, LinkedIn's customer-service KG, NodeRAG's
+  heterogeneous graph, and RL-trained agentic traversal (Graph-R1).
 - KG construction with LLMs: schemas, extraction, entity resolution, and pruning.
 - The evidence on when graphs beat vectors, and when they do not.
 
@@ -234,7 +236,11 @@ News with 50 global questions [7]:
 |----------------------------------|-------------------------|-------------------------|---------------------------------------|
 | Static global search, level 1    | ~1,500                  | baseline                | baseline                              |
 | Dynamic selection, up to level 1 | ~470 (average)          | -77% (average)          | no significant difference             |
-| Dynamic selection, up to level 3 | more than L1 dynamic    | about +34%              | comprehensiveness 58.8%, empowerment 60.0% win rate |
+| Dynamic selection, up to level 3 | more than L1 dynamic    | about +34%              | win rates: comprehensiveness 58.8%, diversity 48.0%, empowerment 60.0% |
+
+The level-3 comparison covers only the 29 of 50 questions for which dynamic selection
+pulled in more reports than the static baseline [7], so it is not a like-for-like
+comparison with the level-1 row.
 
 The lesson is that a cheap relevance classifier, placed in front of an expensive
 summarizer, recovers most of the efficiency of retrieval without giving up corpus-level
@@ -251,8 +257,8 @@ The `--method fast` indexer replaces LLM extraction with NLP [14]:
 - The LLM still writes community reports.
 
 The docs recommend much smaller chunks (50-100 tokens) so the co-occurrence graph is less
-noisy. They describe the result as much cheaper but noisier and "less useful outside
-GraphRAG". Use Standard when you need high-fidelity entities and graph exploration. Use
+noisy. They describe the result as much cheaper but noisier, and say the extracted graph
+is "less directly relevant for use outside of GraphRAG". Use Standard when you need high-fidelity entities and graph exploration. Use
 Fast when the main need is global summarization at low cost [14].
 
 ### 1.8 GraphRAG 1.0 engineering changes
@@ -391,8 +397,8 @@ Key techniques:
   expanded to their graph neighbourhood and source text [20][21].
 - **Query modes** [21]: `local` (entity-focused), `global` (relationship-focused),
   `hybrid`, `naive` (plain chunk vectors), and `mix` (all of these combined; now the
-  default). A reranker is the default in mixed queries since August 2025. The README says
-  it adds about 1-2 s of latency and recommends `BAAI/bge-reranker-v2-m3` locally [21].
+  default; it merges local, global, and naive results). Reranker support was added in
+  August 2025. The README says reranking typically adds about 1-2 s of latency and recommends `BAAI/bge-reranker-v2-m3` locally [21].
 - **Incremental update.** New documents are extracted and merged into the existing graph
   without rebuilding any community structure. Deleting a document rebuilds the affected
   entities and relations from the LLM cache [21].
@@ -516,9 +522,9 @@ regression [25]. As described in the paper [24]:
 
 The repository claims HippoRAG 2 beats other methods in all three categories. It describes
 online retrieval as cost- and latency-efficient and offline indexing as using
-"significantly fewer resources" than GraphRAG, RAPTOR, or LightRAG [25]. The paper reports
-roughly a 7-point average gain on associative tasks over a strong embedding baseline (an
-approximate figure). Supported back ends include OpenAI/Azure, Bedrock, vLLM (for example
+"significantly fewer resources" than GraphRAG, RAPTOR, or LightRAG [25]. The paper's
+abstract reports a 7% improvement on associative memory tasks over the state-of-the-art
+embedding model it compares against [24]. Supported back ends include OpenAI/Azure, Bedrock, vLLM (for example
 Llama-3.3-70B-Instruct), NV-Embed-v2, and GritLM embeddings, with Parquet, Qdrant, Chroma,
 or Milvus as stores [25].
 
@@ -538,6 +544,25 @@ or Milvus as stores [25].
 **Lesson.** PPR, or a GNN that learns to imitate it, is a cheap and deterministic way to
 do multi-hop retrieval. It moves the "hop" from repeated LLM calls (IRCoT) into a graph
 walk that costs milliseconds.
+
+### 3.4 LinearRAG: dropping relation extraction altogether (ICLR 2026)
+
+LinearRAG (Hong Kong Polytechnic University, October 2025; ICLR 2026) pushes the PPR idea
+toward lower indexing cost [50]. Its argument is that LLM relation extraction is the
+unreliable, expensive part of graph RAG: it yields noisy or inconsistent edges, and those
+edges then mislead the graph walk. LinearRAG therefore builds a relation-free
+**Tri-Graph** from lightweight entity extraction plus semantic links between entities,
+sentences, and passages. The authors state that construction scales linearly with corpus
+size and needs no extra LLM tokens [50]. Retrieval has two stages:
+
+1. **Local semantic bridging** activates the entities relevant to the query.
+2. **Global importance aggregation** runs Personalized PageRank over the activated
+   subgraph to rank passages.
+
+The paper reports gains over graph and dense baselines on four multi-hop datasets; these
+are the authors' own results [50]. The design point is that much of the multi-hop benefit
+in HippoRAG-style systems comes from entity co-occurrence and the walk, not from typed
+predicates. LazyGraphRAG (section 1.9) made the same bet for global questions.
 
 ---
 
@@ -635,10 +660,14 @@ It is a practical reference for multi-strategy retrieval over one graph.
 
 The AWS `graphrag-toolkit` has two parts [34][35]:
 
-- **lexical-graph** builds a "hierarchical lexical graph" from unstructured text and
-  answers questions with a traversal-based search engine. In the toolkit's docs, the
-  hierarchy runs from sources and chunks, through topics, statements, and facts, to
-  entities.
+- **lexical-graph** builds a "hierarchical lexical graph" (HLG) from unstructured text and
+  answers questions with traversal-based search. The accompanying paper (Ghassel et al.,
+  KDD 2025) describes three tiers [49]: a lineage tier that traces every atomic
+  proposition (statement) back to its source chunk, a summarization tier that clusters
+  propositions into latent topics, and an entity-relationship tier that links entities
+  across documents. Two retrievers sit on top: *StatementGraphRAG*, an entity-aware beam
+  search over statements for precise factoid questions, and *TopicGraphRAG*, which selects
+  topics first and then expands along entity links for exploratory questions [49].
 - **BYOKG-RAG** answers questions over a knowledge graph the user already has.
 
 Supported stores are Neptune Analytics, Neptune Database, and Neo4j for the graph, and
@@ -705,12 +734,45 @@ tickets [45]:
 - At query time, the system extracts entities and intents, and retrieves sub-graphs either
   by translating the question into a graph query or by embedding search.
 
-The paper reports large retrieval gains over chunk-based RAG, roughly a 77.6% gain in MRR,
-and about a 28.6% drop in median per-issue resolution time after deployment. These figures
-are approximate, taken from the paper's abstract. The design point is that the graph
+The abstract reports that the method beats a chunk-based RAG baseline by 77.6% (relative)
+in MRR and by 0.32 in BLEU, and that after about six months of deployment with LinkedIn's
+customer-service team it cut median per-issue resolution time by 28.6% [45]. The design point is that the graph
 encodes **document structure** (intra-ticket trees) as well as entities.
 
-### 5.6 Survey context
+### 5.6 NodeRAG: heterogeneous node types
+
+NodeRAG (Columbia, Penn, and Lehigh; April 2025) argues that most graph RAG work
+neglects the design of the graph itself [51]. Instead of a single entity/relation layer,
+it builds a **heterogeneous graph** with functionally distinct node types. Decomposed
+document content (text units, entities, relationships) sits next to LLM-derived insight
+and summary nodes, and the graph is built in decomposition, augmentation, and enrichment
+stages. Graph algorithms such as PPR can then find the key multi-hop nodes directly, and
+each retrieved node has a clear role, which makes retrieval easier to explain. Against
+GraphRAG and LightRAG the authors report lower indexing time, query time, and storage,
+and better multi-hop and open-ended QA with fewer retrieval tokens [51]. NodeRAG reads as
+a synthesis of GraphRAG (summary nodes), LightRAG (entity/relation units), and HippoRAG 2
+(passage nodes plus PPR) in one typed graph.
+
+### 5.7 Agentic GraphRAG trained with reinforcement learning: Graph-R1
+
+Think-on-Graph (section 5.4) prompts a frozen LLM to traverse a graph. Graph-R1 (July
+2025; ICML 2026) instead *trains* the traversal policy [52]. It targets three weaknesses
+of standard GraphRAG: high construction cost, fixed one-shot retrieval, and heavy
+dependence on long-context reasoning. Graph-R1:
+
+- builds a lightweight **knowledge hypergraph**, in which an n-ary hyperedge can join
+  several entities into one fact;
+- treats retrieval as a multi-turn agent-environment loop, in which the model decides
+  what to query next and when to stop; and
+- optimizes the whole loop end to end with RL, using one reward that combines answer
+  quality, retrieval relevance, and the structural reliability of the graph paths it took.
+
+The authors report that it beats prompt-based GraphRAG and RL-trained text-retrieval
+baselines on accuracy, retrieval efficiency, and generation quality [52]. It is one of a
+growing set of 2025-2026 systems that bring the "search agent trained with RL" pattern
+(covered in the agentic RAG chapter) to graph indexes.
+
+### 5.8 Survey context
 
 The Graph RAG survey by Peng et al. [46] splits the field into three stages: graph-based
 indexing, graph-guided retrieval, and graph-enhanced generation. The systems in this
@@ -804,7 +866,7 @@ On the other side:
 - **Single-hop factual lookup.** HippoRAG 2 was motivated by structure-augmented RAG
   falling below strong dense retrievers on simple factual QA [25]. BenchmarkQED's one
   non-significant result was relevance on data-local queries, where vector RAG ranks
-  directly relevant chunks well [10]. GraphRAG-Bench starts from the observation that
+  directly relevant chunks well [10]. GraphRAG-Bench (ICLR 2026) starts from the observation that
   "GraphRAG frequently underperforms vanilla RAG on many real-world tasks" [43]. It sorts
   tasks into four levels: fact retrieval, complex reasoning, contextual summarization, and
   creative generation. The paper's analysis finds graph structure helps mainly on the
@@ -832,7 +894,8 @@ On the other side:
 | HippoRAG / 2 [23][24] | LLM OpenIE triples + synonymy edges (+ passage nodes in v2) | medium | PPR from query entities or triples | limited (v2: sense-making) | strong | append | 10-30x cheaper than IRCoT (v1) |
 | fast-graphrag [27] | LLM graph | medium | PPR | limited | strong | append | $0.08 vs $0.48 on one book |
 | Neo4j GraphRAG [28][29] | schema-typed property graph + lexical graph | medium-high | vector/hybrid entry + Cypher; Text2Cypher; tools | app-defined | strong (explicit Cypher) | DB writes | n/a |
-| AWS lexical graph [35] | sources, chunks, topics, statements, facts, entities | high | traversal-based search | moderate | good | versioned updates | n/a |
+| LinearRAG [50] | entities + semantic links (no relations) | low (no relation extraction) | entity activation, then PPR over subgraph | limited | strong | append | linear-time construction (paper) |
+| AWS lexical graph [35][49] | three tiers: statements with lineage, topics, entities | high | traversal-based search | moderate | good | versioned updates | n/a |
 | Graphiti / Zep [32] | episodic, time-stamped triplets | per episode | embeddings + BM25 + traversal | weak | good | native, real-time | sub-second (claimed) |
 | KAG [36] | schema-constrained KG with mutual chunk index | high (lightweight build -89% tokens) | logical-form operators | moderate | strong | rebuild | n/a |
 
@@ -954,9 +1017,13 @@ Do facts change over time and must history be queryable? -> temporal KG (Graphit
 40. Luo, L., et al. "GFM-RAG: Graph Foundation Model for Retrieval Augmented Generation" (GitHub repository; arXiv 2502.01113; NeurIPS 2025). 2025. https://github.com/RManLuo/gfm-rag
 41. Sun, J., et al. "Think-on-Graph: Deep and Responsible Reasoning of Large Language Model on Knowledge Graph" (ICLR 2024; GitHub repository). 2024. https://github.com/IDEA-FinAI/ToG
 42. Chen, B., et al. (BUPT GAMMA). "PathRAG" GitHub repository. 2025. https://github.com/BUPT-GAMMA/PathRAG
-43. GraphRAG-Bench. "When to use Graphs in RAG: A Comprehensive Benchmark and Analysis for Graph Retrieval-Augmented Generation" (GitHub repository; arXiv 2506.05690). 2025. https://github.com/GraphRAG-Bench/GraphRAG-Benchmark
+43. GraphRAG-Bench. "When to use Graphs in RAG: A Comprehensive Benchmark and Analysis for Graph Retrieval-Augmented Generation" (GitHub repository; arXiv 2506.05690). 2025 (ICLR 2026). https://github.com/GraphRAG-Bench/GraphRAG-Benchmark
 44. Han, H., et al. "RAG vs. GraphRAG: A Systematic Evaluation and Key Insights." arXiv, 2025. https://arxiv.org/abs/2502.11371
 45. Xu, Z., et al. (LinkedIn). "Retrieval-Augmented Generation with Knowledge Graphs for Customer Service Question Answering." SIGIR 2024. https://arxiv.org/abs/2404.17723
 46. Peng, B., et al. "Graph Retrieval-Augmented Generation: A Survey." arXiv, 2024. https://arxiv.org/abs/2408.08921
 47. He, X., et al. "G-Retriever: Retrieval-Augmented Generation for Textual Graph Understanding and Question Answering." arXiv, 2024. https://arxiv.org/abs/2402.07630
 48. Azure Samples / Microsoft. "GraphRAG Accelerator" GitHub repository. 2024. https://github.com/Azure-Samples/graphrag-accelerator
+49. Ghassel, A., et al. (Queen's University / Amazon). "Hierarchical Lexical Graph for Enhanced Multi-Hop Retrieval." KDD 2025; arXiv 2506.08074. https://arxiv.org/abs/2506.08074
+50. Zhuang, et al. (Hong Kong Polytechnic University). "LinearRAG: Linear Graph Retrieval Augmented Generation on Large-scale Corpora." ICLR 2026; arXiv 2510.10114. https://arxiv.org/abs/2510.10114 (code: https://github.com/DEEP-PolyU/LinearRAG)
+51. Xu, T., et al. "NodeRAG: Structuring Graph-based RAG with Heterogeneous Nodes." arXiv, 2025. https://arxiv.org/abs/2504.11544 (code: https://github.com/Terry-Xu-666/NodeRAG)
+52. Luo, H., E, H., et al. "Graph-R1: Towards Agentic GraphRAG Framework via End-to-end Reinforcement Learning." arXiv 2507.21892, 2025 (ICML 2026). https://arxiv.org/abs/2507.21892

@@ -12,7 +12,7 @@ A fourth concern runs across all three: **privacy of the derived artifacts**. Em
 
 OWASP's 2025 Top 10 for LLM applications added a dedicated entry, LLM08 "Vector and Embedding Weaknesses". It names unauthorized access and leakage, cross-context leaks in multi-tenant stores, embedding inversion, data poisoning and behaviour alteration as the core RAG risks. Its recommended mitigations are permission-aware vector stores with strict partitioning, source validation and hidden-content detection, data classification, and "detailed, immutable logs of retrieval activity" [11].
 
-This chapter takes each threat in turn: permission-aware retrieval and document-level security (16.1), multi-tenant isolation (16.2), indirect prompt injection and its defenses (16.3), corpus poisoning and robust RAG (16.4), privacy leakage including PII, datastore extraction, membership inference and embedding inversion (16.5), and auditability and governance (16.6). It closes with comparison tables, an end-to-end reference architecture and design takeaways.
+This chapter takes each threat in turn: permission-aware retrieval and document-level security (16.1), multi-tenant isolation (16.2), indirect prompt injection and its defenses (16.3), corpus poisoning and robust RAG (16.4), privacy leakage including PII, datastore extraction, membership inference and embedding inversion (16.5), and auditability, governance and the regulatory landscape (16.6), with a note on agentic retrieval through tool connectors and MCP in 16.3. It closes with comparison tables, an end-to-end reference architecture and design takeaways.
 
 A note on sources. This chapter relies mainly on the papers' official code repositories, vendor documentation repositories and arXiv preprints, as they stood in October 2026. Where a number comes from a paper abstract rather than a re-checked table, it is marked approximate.
 
@@ -43,7 +43,7 @@ A note on sources. This chapter relies mainly on the papers' official code repos
 
 ### Problem
 
-Enterprise corpora such as SharePoint, Google Drive, Confluence, Jira, Slack, email and file shares carry per-document and often per-item ACLs. These are inherited through folder, site and group hierarchies and change constantly. A RAG index that flattens the corpus into chunks and vectors drops that metadata unless it is carried along deliberately. The result is the canonical failure: an employee asks "what are the salary bands for my team?" and the assistant answers from an HR spreadsheet the employee could never open directly. The AuthZed workshop on agentic RAG starts from exactly this scenario, showing "semantic search leaking documents across departments" and then fixing it with a permission check that the agent cannot bypass [14].
+Enterprise corpora such as SharePoint, Google Drive, Confluence, Jira, Slack, email and file shares carry per-document and often per-item ACLs. These are inherited through folder, site and group hierarchies and change constantly. A RAG index that flattens the corpus into chunks and vectors drops that metadata unless it is carried along deliberately. The result is the canonical failure: an employee asks "what are the salary bands for my team?" and the assistant answers from an HR spreadsheet the employee could never open directly. The AuthZed SpiceDB workshop starts from exactly this scenario, noting that semantic search ranks documents by "what they're _about_, not by _who's allowed to read them_", and then fixes it with a permission check outside the model's control [14].
 
 ### Design space: where the authorization check happens
 
@@ -65,7 +65,7 @@ There are three places to enforce document-level access, and production systems 
       + exact source semantics                - slow, rate-limited, no global ranking
 ```
 
-The SpiceDB workshop "Secure Your RAG Pipelines With Fine Grained Authorization" teaches (A) and (B) side by side. Pre-filtering restricts the vector query "to a list of object IDs the user is authorized to access". Post-filtering retrieves first and "then check[s] permissions" on the results. The reference stack is OpenAI, Pinecone, LangChain and SpiceDB [14]. The workshop argues for relationship-based access control (ReBAC), the model introduced by Google's Zanzibar [16] and implemented in open source by SpiceDB and OpenFGA [15]. ReBAC fits document hierarchies better than flat RBAC, because "viewer of folder implies viewer of document" is a relation and not a role.
+The SpiceDB workshop "Secure Your RAG Pipelines With Fine Grained Authorization" teaches (A) and (B) side by side. Pre-filtering first calls SpiceDB's `LookupResources` to get the documents the user may read, then searches only within that set using a Qdrant payload filter. Post-filtering retrieves first and checks each hit with `CheckPermission`, dropping any the user cannot access. The current reference stack is SpiceDB, Qdrant, fastembed for local embeddings, an OpenAI-compatible chat model and LangGraph [14]. The workshop argues for relationship-based access control (ReBAC), the model introduced by Google's Zanzibar [16] and implemented in open source by SpiceDB and OpenFGA [15]. ReBAC fits document hierarchies better than flat RBAC, because "viewer of folder implies viewer of document" is a relation and not a role.
 
 Trade-offs between (A) and (B):
 
@@ -82,7 +82,7 @@ Azure AI Search shows how a managed service moved from (A)-by-convention to nati
 **Native document-level access (preview, 2025-2026).** The newer overview describes three ingestion paths plus a query-time enforcement mode [10]:
 
 - *POSIX-like ACLs and RBAC scopes* from ADLS Gen2 (and container-level RBAC for blobs). These are ingested by the ADLS Gen2 indexer or pushed with the documents, optionally resolving identities through Microsoft Graph. Group-based grants are recommended over per-user grants.
-- *SharePoint in Microsoft 365 ACLs*, extracted by the SharePoint indexer, including site groups. Items with unique permissions sync incrementally on each indexer run (from the 2026-05-01-preview API). Permission changes *inherited* from a site, library, list or folder require an explicit refresh.
+- *SharePoint in Microsoft 365 ACLs*, extracted by the SharePoint indexer, including site groups. Items with unique permissions can sync incrementally on indexer runs in recent preview API versions. Permission changes *inherited* from a site, library, list or folder require an explicit refresh.
 - *Microsoft Purview sensitivity labels*, extracted from Blob, ADLS Gen2, SharePoint and OneLake and stored as metadata. Chunked indexes need index projections so the label reaches every chunk. Enforcement requires RBAC authentication and is limited to single-tenant scenarios.
 - *Query-time enforcement*: the client sends the end user's Entra token in the `x-ms-query-source-authorization` header. The service extracts user, group and scope claims and returns only documents the caller can read. The calling application also needs an index data-reader role.
 
@@ -92,7 +92,7 @@ The documentation names the key failure mode plainly: "permission changes in the
 
 Lexical and hybrid engines have long offered document-level security (DLS) that applies to RAG retrieval for free. OpenSearch attaches a query to a role. Parameter substitution such as `${user.name}`, `${user.roles}` and `${attr.jwt.<name>}` personalizes the query, and a `terms_set` query over a `keyword`-typed `security_attributes` field gives attribute-based access. DLS queries from multiple roles combine with OR. There are practical caveats [12]:
 
-- DLS restricts reads but not writes. "A user who can index documents may create ones they cannot see", which is a poisoning vector (16.4).
+- DLS restricts reads but not writes. The documentation notes that a DLS-restricted user "can still modify or remove documents that are hidden by DLS"; write access is governed by index permissions, so a user with write rights can index documents they cannot later retrieve. That is a poisoning vector (16.4).
 - Analyzed `text` fields can match ACL values unexpectedly, because hyphenated IDs are tokenized. Use `keyword`.
 - Complex DLS queries add cluster overhead. The DLS configuration is capped at 1024 KB.
 - The `plugins.security.dfm_empty_overrides_all` flag lets a non-DLS role lift restrictions. That is a governance footgun.
@@ -133,6 +133,8 @@ SaaS RAG platforms serve many customers from shared infrastructure. OWASP's LLM0
 
 **Encryption-based isolation.** Some vendors add per-tenant keys on top. IronCore Labs' Alloy SDK combines "standard", "deterministic" and "vector" encryption for AI data. It offers integrations for protecting embeddings in vector databases, with BYOK/CMK key management [39]. Per-tenant keys turn a filter bug from plaintext disclosure into ciphertext disclosure, and support crypto-shredding on tenant offboarding. The README does not quantify the security level against inversion. Treat distance-preserving encryption as defense-in-depth, not as a proof.
 
+**Confidential computing for the serving path.** A complementary approach protects data *in use* rather than at rest. Apple's Private Cloud Compute (announced June 2024) runs inference on hardened servers with no privileged runtime access for operators, stateless processing of user requests, and publicly inspectable software images that clients verify before sending data [53]. Cloud providers now offer comparable confidential-GPU instances. For RAG, this pattern can cover the embedder, the retriever and the generator, so that a cloud operator or a co-tenant cannot read decrypted chunks or prompts. It does not fix authorization bugs inside the trusted boundary, and attestation only proves *which code* runs, not that the code enforces the right ACLs.
+
 ### Lessons
 
 - Enforce the tenant boundary *below* the application code: a separate namespace or shard, or an API key scoped to one tenant. Do not rely on every query builder remembering a `WHERE`.
@@ -171,7 +173,7 @@ No single defense is sufficient. The literature converges on layering.
 
 **3. Detection classifiers.**
 
-- *Input classifiers*: Meta's Llama Prompt Guard 2 comes in 86M (mDeBERTa) and 22M (DeBERTa-xsmall) versions. It labels text as benign or malicious when it "explicitly tries to override prior instructions". It has a 512-token window, so long retrieved documents must be split and scanned in parallel. Reported figures: AUC 0.998 (English), recall 97.5% at 1% FPR, about 92 ms on an A100 for 86M; about 19 ms for 22M. On AgentDojo it reached 81.2% attack prevention at a 3% utility cost, versus 67.6% for Prompt Guard 1 [22]. Meta dropped v1's separate "injection" label as too broad and warns that adaptive attacks may evade detection [22].
+- *Input classifiers*: Meta's Llama Prompt Guard 2 comes in 86M (mDeBERTa) and 22M (DeBERTa-xsmall) versions. It labels text as benign or malicious when it "explicitly tries to override prior instructions". It has a 512-token window, so long retrieved documents must be split and scanned in parallel. Reported figures for 86M: AUC 0.998 (English), recall 97.5% at 1% FPR, 92.4 ms per 512-token classification on an A100. For 22M: AUC 0.995, recall 88.7%, 19.3 ms. On AgentDojo the 86M model reached 81.2% attack prevention at a 3% utility reduction (22M: 78.4%), versus 67.6% for Prompt Guard 1 [22]. Meta dropped v1's separate "injection" label as too broad and warns that adaptive attacks may evade detection [22].
 - *Hosted shields*: Azure Prompt Shields analyses one `userPrompt` plus up to five `documents` per call. Document-attack categories include manipulated content, privilege escalation, data theft, availability, fraud and malware, plus rule-change, conversation-mockup, role-play and encoding tricks [21].
 - *Game-theoretic and localizing detectors*: DataSentinel (IEEE S&P 2025) is a fine-tuned detector. PromptLocate (S&P 2026) localizes the injected span so the clean data can be recovered and still used [26].
 - *Activation probes*: Microsoft's TaskTracker detects "task drift" from the difference between the model's activations before and after it reads a data block. It needs no generation and no fine-tuning, and reports over 0.99 ROC AUC out of distribution across Mistral 7B, Llama-3 8B/70B, Mixtral and Phi-3 [24].
@@ -179,8 +181,9 @@ No single defense is sufficient. The literature converges on layering.
 
 **4. Architectural isolation (design-level guarantees).** Detection is probabilistic, and adaptive attackers search for its blind spots. The strongest results come from changing the system so that untrusted text *cannot* reach a decision point:
 
-- **CaMeL** (Google, Google DeepMind and ETH Zurich, 2025) [30]. A privileged LLM sees only the trusted user query and writes a program. A quarantined LLM parses untrusted data into values but cannot call tools. A custom interpreter executes the program, tracking capabilities (provenance and allowed readers) on every value, and enforces security policies before tool calls. In this design, injected text can corrupt a *value* but cannot change *control flow*. The paper reports solving roughly two-thirds of AgentDojo tasks with provable security, against higher utility for undefended agents (approximate) [30][31]. The repository warns that the interpreter is a research artifact [30].
+- **CaMeL** (Google, Google DeepMind and ETH Zurich, 2025) [30]. A privileged LLM sees only the trusted user query and writes a program. A quarantined LLM parses untrusted data into values but cannot call tools. A custom interpreter executes the program, tracking capabilities (provenance and allowed readers) on every value, and enforces security policies before tool calls. In this design, injected text can corrupt a *value* but cannot change *control flow*. The paper reports solving roughly two-thirds to three-quarters of AgentDojo tasks with provable security (the figure differs between preprint versions), against higher utility for undefended agents (approximate) [30][31]. The repository describes itself as "a research artifact released to reproduce the results in our paper" and warns that the interpreter likely contains bugs and might not be fully secure [30].
 - **Design-pattern catalog** (Beurer-Kellner et al., 2025) [42]. Six patterns that trade capability for provable resistance: action-selector, plan-then-execute, LLM map-reduce, dual LLM, code-then-execute and context-minimization. For RAG, *plan-then-execute* (fix the tool plan before reading retrieved data) and *context-minimization* (drop the user's raw prompt before the response step) apply directly.
+- **Information-flow control (FIDES)** (Microsoft Research, 2025) [51]. FIDES attaches confidentiality and integrity labels to every piece of data an agent's planner handles and propagates them deterministically. Untrusted tool or retrieval results can be kept out of the planner's context as opaque variables and inspected only by constrained sub-queries. Policies such as "no low-integrity data may decide a tool call" or "no confidential data may flow to a public sink" are then checked by the system, not by the model. Like CaMeL, it turns the trifecta into an enforceable data-flow policy rather than a hope that the model ignores injected text.
 - **Gemini's defense-in-depth experience** [48]. Google DeepMind reported that defenses tuned against static attacks often fail against adaptive ones. Their approach combines adversarial training of the model with system-level defenses and continuous automated red-teaming.
 
 ```
@@ -199,6 +202,12 @@ No single defense is sufficient. The literature converges on layering.
 ```
 
 **5. Output-side controls.** Block or proxy external image and link rendering in answers. Allow-list domains. Strip Markdown images whose URLs contain query strings. Require human confirmation for side-effecting tools. These break the third leg of the trifecta [41].
+
+**6. Evaluate against adaptive attackers.** A 2025 study by researchers from OpenAI, Anthropic, Google DeepMind and academia, "The Attacker Moves Second", re-attacked a dozen published jailbreak and prompt-injection defenses with adaptive methods (gradient search, reinforcement learning, search-based attacks and human red-teaming). It reported bypassing most of them at high success rates, even when the original papers had reported near-zero attack success (approximate, from the paper's summary) [52]. The practical consequence for RAG: a defense's reported ASR against a fixed attack set is an upper bound on its value, not a security level. Only designs whose guarantee does not depend on the model's behaviour (16.3, family 4; output egress controls) survive this threat model by construction.
+
+### Agentic retrieval over tool connectors and MCP
+
+Since 2025 many "RAG" systems retrieve through agent tools, often exposed via the Model Context Protocol (MCP), rather than through a single retriever. This widens every boundary in this chapter. Tool *descriptions* and tool *results* are both untrusted text that enters the context. A malicious or compromised connector can carry hidden instructions in its metadata ("tool poisoning"). Connectors frequently hold broad OAuth scopes, recreating the confused-deputy problem of 16.1 at the tool layer. OWASP's Top 10 for Agentic Applications (2026), released by the GenAI Security Project in December 2025, catalogues these risks, starting with ASI01 "Agent Goal Hijack" and covering tool misuse, identity and privilege abuse, supply-chain compromise of tools, and memory and context poisoning [54]. For governed RAG, the lessons transfer directly: pin and review connector versions, scope each connector's credentials to the requesting user (on-behalf-of, never a shared service account), scan tool descriptions and outputs like retrieved documents, and log tool calls with the same provenance fields as retrieval (16.6).
 
 ### Benchmarks
 
@@ -247,7 +256,7 @@ There is a black-box variant (`LM_targeted`) and a white-box variant (HotFlip-op
 
 ### Robust-RAG defenses
 
-**Isolate-then-aggregate (RobustRAG).** RobustRAG (Xiang et al., 2024) generates a response from each retrieved passage *in isolation*. It then aggregates them with secure keyword aggregation or decoding aggregation, so that no single passage, or no k·η passages, can dominate. This yields *certifiable* robustness bounds against a bounded number of corrupted passages [33]. The cost is k separate LLM calls per query, or k parallel decoding streams. The repository evaluates RealTimeQA, Open NQ and BioGen against poisoning and prompt-injection attacks, with Mistral-7B, Llama-7B and GPT-3.5 [33].
+**Isolate-then-aggregate (RobustRAG).** RobustRAG (Xiang et al., 2024) generates a response from each retrieved passage *in isolation*. It then aggregates them with secure keyword aggregation or decoding aggregation (the repository also ships a simple voting baseline for multiple-choice settings), so that no single passage, or no k·η passages, can dominate. This yields *certifiable* robustness bounds against a bounded number of corrupted passages [33]. The cost is k separate LLM calls per query, or k parallel decoding streams. The repository evaluates RealTimeQA, Open NQ and BioGen against poisoning and prompt-injection attacks, with Mistral-7B, Llama-7B and GPT-3.5 [33].
 
 **Cluster-and-filter (TrustRAG).** TrustRAG (Zhou et al., 2025; AAAI 2026 TrustAgent workshop) adds a pre-generation stage that clusters retrieved embeddings with k-means to isolate tight, suspicious groups. Many PoisonedRAG passages are near-duplicates of the query and of each other. A second stage uses the model's own knowledge and a self-assessment of retrieval correctness to resolve conflicts before generating [34].
 
@@ -347,6 +356,14 @@ Full-fidelity logs of prompts and retrieved context recreate the very datastore 
 
 Microsoft 365 Copilot shows the vendor side of this tension. Prompts, responses and citations are stored as per-user activity history, encrypted at rest, discoverable through Purview and content search, governed by Purview retention policies, deletable by the user, and not used to train foundation models [13].
 
+### Regulatory and standards landscape (2024-2026)
+
+Several frameworks now turn the controls in this chapter into obligations or auditable requirements:
+
+- **EU AI Act** (Regulation (EU) 2024/1689) entered into force on 1 August 2024, with prohibitions applying from February 2025 and general-purpose AI model obligations from August 2025 [55]. For high-risk systems it requires data governance (Art. 10), automatic logging of events over the system's lifetime (Art. 12), transparency to deployers and human oversight. A RAG assistant used in a high-risk domain (employment screening, credit, essential services) inherits these duties, and the per-turn audit record above is a natural way to meet Art. 12. The Commission's late-2025 "Digital Omnibus" proposal would defer some high-risk deadlines, so the exact dates should be checked at deployment time.
+- **ISO/IEC 42001:2023** specifies an AI management system (AIMS): policies, risk assessment, impact assessment, data-quality and supplier controls, with third-party certification available [56]. It is the most common way enterprises evidence AI governance to customers, and RAG-specific controls (ACL propagation, ingestion review, revocation SLOs) slot into its Annex A controls.
+- **NIST AI 600-1** [46] and **OWASP** LLM08 [11] and Agentic Top 10 [54] supply the risk vocabulary that auditors map onto these management-system controls.
+
 ### Governance controls beyond logging
 
 - **Data classification feeding retrieval.** Sensitivity labels projected onto chunks [10] allow policy such as "Highly Confidential is never sent to external models" or "never summarized for users outside the label's scope".
@@ -380,7 +397,8 @@ Microsoft 365 Copilot shows the vendor side of this tension. Prompts, responses 
 | Prompt Guard 2 [22] | classifier | no (use as-is) | 97.5% recall @1% FPR; 81.2% APR on AgentDojo | 512-token windows; adaptive evasion |
 | TaskTracker [24] | activation probe | probe only | >0.99 ROC AUC OOD | needs white-box model access |
 | DataSentinel / PromptLocate [26] | detector / localizer | fine-tuned detector | detect then recover clean data | extra model call |
-| CaMeL [30] | system architecture | no | ~2/3 AgentDojo tasks with provable security (approx.) | utility loss; engineering complexity |
+| CaMeL [30] | system architecture | no | ~2/3-3/4 AgentDojo tasks with provable security (approx.) | utility loss; engineering complexity |
+| FIDES information-flow control [51] | system architecture | no | deterministic label-based policy checks on tool calls | planner design effort; label granularity |
 | Egress controls [41] | output / tools | no | removes the exfiltration leg | limits features (links, images) |
 
 ### Permission-enforcement options compared
@@ -448,19 +466,19 @@ Cost and latency notes from the sources: `search.in` filters with thousands of p
 6. John X. Morris et al. "vec2text" library repository. 2023-2025. https://github.com/jxmorris12/vec2text
 7. Haoran Li, Mingshi Xu, Yangqiu Song. "Sentence Embedding Leaks More Information than You Expect: Generative Embedding Inversion Attack to Recover the Whole Sentence" (GEIA). Findings of ACL 2023. https://github.com/HKUST-KnowComp/GEIA
 8. Congzheng Song, Ananth Raghunathan. "Information Leakage in Embedding Models." ACM CCS 2020 (arXiv 2020). https://arxiv.org/abs/2004.00053
-9. Microsoft. "Security filters for trimming results in Azure AI Search." Azure AI Search documentation, 2026. https://github.com/MicrosoftDocs/azure-ai-docs/blob/main/articles/search/search-security-trimming-for-azure-search.md
-10. Microsoft. "Document-level access control in Azure AI Search" (overview). Azure AI Search documentation, 2026. https://github.com/MicrosoftDocs/azure-ai-docs/blob/main/articles/search/search-document-level-access-overview.md
+9. Microsoft. "Security filters for trimming results in Azure AI Search." Azure AI Search documentation, 2026. https://learn.microsoft.com/en-us/azure/search/search-security-trimming-for-azure-search
+10. Microsoft. "Document-level access control in Azure AI Search" (overview). Azure AI Search documentation, 2026. https://learn.microsoft.com/en-us/azure/search/search-document-level-access-overview
 11. OWASP GenAI Security Project. "LLM08:2025 Vector and Embedding Weaknesses." OWASP Top 10 for LLM Applications 2025. https://github.com/OWASP/www-project-top-10-for-large-language-model-applications/blob/main/2_0_vulns/LLM08_VectorAndEmbeddingWeaknesses.md
 12. OpenSearch Project. "Document-level security." OpenSearch documentation, 2026. https://github.com/opensearch-project/documentation-website/blob/main/_security/access-control/document-level-security.md
 13. Microsoft. "Data, Privacy, and Security for Microsoft 365 Copilot." Microsoft 365 documentation, 2026. https://github.com/MicrosoftDocs/microsoft-365-docs/blob/public/copilot/microsoft-365-copilot-privacy.md
-14. AuthZed. "SpiceDB workshops: Secure Your RAG Pipelines With Fine Grained Authorization (Pre-Filter and Post-Filter); Building Authorization for Agentic RAG Systems." 2025. https://github.com/authzed/workshops/tree/main/secure-rag-pipelines
+14. AuthZed. "SpiceDB workshops: Secure Your RAG Pipelines With Fine Grained Authorization (pre-filter with LookupResources, post-filter with CheckPermission; SpiceDB + Qdrant + LangGraph)." 2025-2026. https://github.com/authzed/workshops/tree/main/secure-rag-pipelines
 15. OpenFGA. "OpenFGA: a high-performance and flexible authorization/permission engine inspired by Google Zanzibar." 2022-2026. https://github.com/openfga/openfga
 16. Ruoming Pang et al. "Zanzibar: Google's Consistent, Global Authorization System." USENIX ATC 2019. https://www.usenix.org/conference/atc19/presentation/pang
 17. Weaviate. "Multi-tenancy operations." Weaviate documentation, 2026. https://github.com/weaviate/docs/blob/main/docs/weaviate/manage-collections/multi-tenancy.mdx
 18. Microsoft. "Presidio: data protection and de-identification SDK." 2019-2026. https://github.com/microsoft/presidio
 19. Microsoft. "Presidio Anonymizer" documentation (operators, hashing salt, overlap handling). 2026. https://github.com/microsoft/presidio/blob/main/docs/anonymizer/index.md
 20. Protect AI. "LLM Guard: The Security Toolkit for LLM Interactions" (archived). 2023-2025. https://github.com/protectai/llm-guard
-21. Microsoft. "Prompt Shields: user prompt attacks and document attacks" (Azure AI Content Safety include). 2026. https://github.com/MicrosoftDocs/azure-ai-docs/blob/main/articles/ai-services/content-safety/includes/prompt-shield-attack-info.md
+21. Microsoft. "Prompt Shields in Azure AI Content Safety" (user prompt attacks and document attacks; spotlighting preview). 2026. https://learn.microsoft.com/en-us/azure/ai-services/content-safety/concepts/jailbreak-detection
 22. Meta. "Llama Prompt Guard 2 model card (86M / 22M)." 2025. https://github.com/meta-llama/PurpleLlama/blob/main/Llama-Prompt-Guard-2/86M/MODEL_CARD.md
 23. Meta. "LlamaFirewall." PurpleLlama repository, 2025. https://github.com/meta-llama/PurpleLlama/tree/main/LlamaFirewall
 24. Sahar Abdelnabi, Aideen Fay, Giovanni Cherubin, Ahmed Salem, Mario Fritz, Andrew Paverd. "Get my drift? Catching LLM Task Drift with Activation Deltas" (TaskTracker). SaTML 2025. https://github.com/microsoft/TaskTracker
@@ -472,7 +490,7 @@ Cost and latency notes from the sources: `search.in` filters with thousands of p
 30. Edoardo Debenedetti, Ilia Shumailov, Tianqi Fan, Jamie Hayes, Nicholas Carlini, Daniel Fabian, Christoph Kern, Chongyang Shi, Florian Tramèr. "Defeating Prompt Injections by Design" (CaMeL). 2025. https://github.com/google-research/camel-prompt-injection
 31. Edoardo Debenedetti, Jie Zhang, Mislav Balunović, Luca Beurer-Kellner, Marc Fischer, Florian Tramèr. "AgentDojo: A Dynamic Environment to Evaluate Prompt Injection Attacks and Defenses for LLM Agents." NeurIPS 2024 Datasets and Benchmarks. https://github.com/ethz-spylab/agentdojo
 32. Zexuan Zhong, Ziqing Huang, Alexander Wettig, Danqi Chen. "Poisoning Retrieval Corpora by Injecting Adversarial Passages." EMNLP 2023. https://github.com/princeton-nlp/corpus-poisoning
-33. Chong Xiang, Tong Wu, Zexuan Zhong, David Wagner, Danqi Chen, Prateek Mittal. "Certifiably Robust RAG against Retrieval Corruption" (RobustRAG). 2024. https://github.com/inspire-group/RobustRAG
+33. Chong Xiang, Tong Wu, Zexuan Zhong, David Wagner, Danqi Chen, Prateek Mittal. "Certifiably Robust RAG against Retrieval Corruption" (RobustRAG). arXiv 2405.15556, 2024. https://github.com/inspire-group/RobustRAG
 34. Huichi Zhou, Kin-Hei Lee, Zhonghao Zhan, Yue Chen, Zhenhao Li, Zhaoyang Wang, Hamed Haddadi, Emine Yilmaz. "TrustRAG: Enhancing Robustness and Trustworthiness in RAG." 2025 (AAAI 2026 TrustAgent workshop). https://github.com/HuichiZhou/TrustRAG
 35. Zhaorun Chen, Zhen Xiang, Chaowei Xiao, Dawn Song, Bo Li. "AgentPoison: Red-teaming LLM Agents via Poisoning Memory or Knowledge Bases." NeurIPS 2024. https://github.com/BillChan226/AgentPoison
 36. Xun Liang, Simin Niu, Zhiyu Li et al. "SafeRAG: Benchmarking Security in Retrieval-Augmented Generation of Large Language Models." 2025. https://github.com/IAAR-Shanghai/SafeRAG
@@ -490,3 +508,9 @@ Cost and latency notes from the sources: `search.in` filters with thousands of p
 48. Chongyang Shi et al. "Lessons from Defending Gemini Against Indirect Prompt Injections." Google DeepMind, 2025. https://arxiv.org/abs/2505.14534
 49. Ayush RoyChowdhury et al. "ConfusedPilot: Confused Deputy Risks in RAG-based LLMs." UT Austin / Symmetry Systems, 2024. https://arxiv.org/abs/2408.04870
 50. Jiaqi Xue et al. "BadRAG: Identifying Vulnerabilities in Retrieval Augmented Generation of Large Language Models." 2024. https://arxiv.org/abs/2406.00083
+51. Manuel Costa, Boris Köpf, Aashish Kolluri, Andrew Paverd, Mark Russinovich, Ahmed Salem, Shruti Tople, Lukas Wutschitz, Santiago Zanella-Béguelin. "Securing AI Agents with Information-Flow Control" (FIDES). Microsoft, arXiv 2505.23643, 2025. https://github.com/microsoft/fides
+52. Milad Nasr, Nicholas Carlini, Chawin Sitawarin, Sander V. Schulhoff, Jamie Hayes, Florian Tramèr et al. "The Attacker Moves Second: Stronger Adaptive Attacks Bypass Defenses against LLM Jailbreaks and Prompt Injections." arXiv 2510.09023, 2025. https://arxiv.org/abs/2510.09023
+53. Apple Security Engineering and Architecture. "Private Cloud Compute: A new frontier for AI privacy in the cloud." June 2024. https://security.apple.com/blog/private-cloud-compute/
+54. OWASP GenAI Security Project. "OWASP Top 10 for Agentic Applications for 2026" (ASI01-ASI10). December 2025. https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/
+55. European Parliament and Council. "Regulation (EU) 2024/1689 laying down harmonised rules on artificial intelligence (Artificial Intelligence Act)." Official Journal of the EU, 12 July 2024. https://eur-lex.europa.eu/eli/reg/2024/1689/oj
+56. ISO/IEC. "ISO/IEC 42001:2023 Information technology - Artificial intelligence - Management system." December 2023. https://www.iso.org/standard/42001

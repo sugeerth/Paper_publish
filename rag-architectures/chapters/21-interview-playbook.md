@@ -2,7 +2,7 @@
 
 ## Overview
 
-"Design a retrieval-augmented assistant" has become a standard prompt in ML, AI-engineer, and forward-deployed-engineer interviews. Typical versions include "design a system that answers employee questions from our internal wiki", "design a customer-support bot", "design context retrieval for a coding assistant", and "design a Perplexity-style answer engine" [1][2][3]. Prep platforms and candidate reports agree on what separates strong answers. Strong candidates treat retrieval as the hard part and generation as the easy part. They scope the corpus (size, change rate, formats such as scanned PDFs and tables) before naming any technology. They spend the closing minutes on evaluation and failure diagnosis: "a wrong RAG answer is either a retrieval failure or a generation failure, and the interview is mostly about proving you can tell which" [2][4][5].
+"Design a retrieval-augmented assistant" has become a standard prompt in ML, AI-engineer, and forward-deployed-engineer interviews. Typical versions include "design a system that answers employee questions from our internal wiki", "design a customer-support bot", "design context retrieval for a coding assistant", and "design a Perplexity-style answer engine" [1][2][3]. Prep platforms and candidate reports agree on what separates strong answers. Strong candidates treat retrieval as the hard part and generation as the easy part. They scope the corpus (size, change rate, formats such as scanned PDFs and tables) before naming any technology. They spend the closing minutes on evaluation and failure diagnosis. The recurring theme is that a wrong RAG answer is either a retrieval failure or a generation failure, and a strong candidate can show how to tell which [2][4][5].
 
 This chapter is a playbook built on publicly documented production systems. It covers:
 
@@ -13,7 +13,8 @@ This chapter is a playbook built on publicly documented production systems. It c
    - **Customer support:** LinkedIn's knowledge-graph RAG, DoorDash, Klarna, Intercom Fin.
    - **Code assistants:** GitHub Copilot, Sourcegraph Cody, Cursor, Augment.
    - **Web answer engines:** Perplexity on Vespa, plus the FreshLLMs line of research.
-4. A comparison table, a bank of common follow-up questions with model answers, and takeaways.
+4. The 2024-2026 developments interviewers now probe: agentic just-in-time retrieval, multi-agent deep research, MCP connectors, built-in citations, GraphRAG, and vision-based document retrieval.
+5. A comparison table, a bank of common follow-up questions with model answers, and takeaways.
 
 The other chapters of this atlas go deep on components: chunking (Ch. 2), embeddings (Ch. 3), vector databases (Ch. 4), hybrid search (Ch. 5), evaluation (Ch. 11), and security (Ch. 16). This chapter covers how to assemble them under interview time pressure and defend the tradeoffs.
 
@@ -110,7 +111,7 @@ Third-party price trackers list text-embedding-3-small at about $0.02 per millio
 
 ### 2.3 Vector index memory
 
-OpenSearch-style HNSW sizing for float32 vectors is approximately 1.1 x (4·d + 8·M) bytes per vector, where d is the dimension and M the graph degree [16]. Its binary-quantized variant uses 1.1 x (d/8 + 8·M) style terms. The exact constants differ by engine. ScyllaDB, for example, uses N x (D x B + 16m) x 1.2 [16].
+OpenSearch-style HNSW sizing for float32 vectors is approximately 1.1 x (4·d + 8·M) bytes per vector, where d is the dimension and M the graph degree [16]. Its binary-quantized variant replaces the 4·d vector term with roughly d/8 bytes. The exact constants and overhead factors differ by engine; ScyllaDB, for example, publishes its own sizing formula with a different graph term and overhead multiplier [16].
 
 Worked example (d = 1,536, M = 16): 1.1 x (6,144 + 128) ≈ 6.9 KB per vector, so about 6.8-6.9 GB per million vectors in RAM.
 
@@ -144,7 +145,7 @@ LLM time-to-first-token     300-1000 ms  (depends on model and prompt size)
 guardrail check             50-500 ms    (cheap similarity first, LLM judge if needed)
 ```
 
-Dropbox's Dash team describes a retrieval target of completing more than 95% of requests within roughly 1-2 seconds. They treat retrieval as the layer that shapes both speed and answer quality [17].
+Dropbox's Dash team describes a latency target on the order of 1-2 seconds for the large majority (about 95%) of queries. They treat retrieval as the layer that shapes both speed and answer quality [17].
 
 ## 3. Design A: Enterprise Q&A assistant
 
@@ -190,7 +191,7 @@ Dropbox's Dash team describes a retrieval target of completing more than 95% of 
 - **Pre-filter versus post-filter for ACLs.** Pre-filtering (ACL principals as index filter fields) is safe and gives full recall within the user's visible set. It requires ANN engines that handle selective filters well, and an ACL change triggers re-indexing of metadata. Post-filtering (retrieve top-N, drop unauthorized) is simpler but leaks through timing and counts. It can also return empty results when the user sees only a small slice of the corpus. Third-party analyses of Glean describe it as filtering by permission from the start rather than retrieve-then-filter [23]. Treat that as commentary, not official documentation. Always add a final "can this user still read the cited doc?" check at render time, because ACLs change between indexing and query.
 - **RAG over fine-tuning.** Glean argues fine-tuning is poorly suited to factual recall and permissioning, and recommends a centralized, permission-aware index with RAG [21]. Uber chose RAG for its on-call copilot Genie mainly for time to market, since fine-tuning needs curated examples and ongoing compute [24].
 - **Hybrid retrieval plus reranking** is table stakes. Use the 35% / 49% / 67% failure-reduction ladder from Contextual Retrieval to justify each added stage [6].
-- **Agentic escalation for hard questions.** Dropbox Dash pairs RAG for fast single-shot answers with multi-step agents (planning plus a custom interpreter) for complex tasks [17]. Uber later moved its security and privacy domain to an "Enhanced Agentic RAG" design. After traditional RAG fell short on a curated 100+ query test set, it reported about 27% relative more acceptable answers and about 60% relative fewer incorrect-advice answers (as summarized secondhand) [25].
+- **Agentic escalation for hard questions.** Dropbox Dash pairs RAG for fast single-shot answers with multi-step agents (planning plus a custom interpreter) for complex tasks [17]. Uber later moved its security and privacy domain to an "Enhanced Agentic RAG" (EAg-RAG) design. After traditional RAG fell short on a curated 100+ query test set, it reported about 27% relative more acceptable answers and about 60% relative fewer incorrect-advice answers [25].
 
 ### 3.5 Scale and outcomes (public)
 
@@ -230,7 +231,7 @@ DoorDash reports that the guardrail reduced hallucinations by about 90% and seve
 
 **Klarna [28].** In its first month, Klarna's assistant handled 2.3 million conversations, about two-thirds of its customer-service chats. Klarna equated that to the workload of 700 full-time agents. It operates in 23 markets and more than 35 languages. Klarna reported customer satisfaction on par with humans and a 25% drop in repeat inquiries, with resolution time down from about 11 to under 2 minutes. These are company-reported launch numbers.
 
-**Intercom Fin [29].** Third-party guides describe Fin as a bespoke multi-phase RAG pipeline: query refinement, retrieval, reranking, generation, and validation. They say it uses custom retrieval and reranker models trained on customer-service interactions; the phase counts differ between sources. Anthropic's case study reports a 51% average resolution rate across Intercom's customers, and up to 86% for some [29]. Note the metric definition. Guides point out that "assumed" resolutions (the customer leaves after the last answer) count alongside confirmed ones, so headline rates may overstate satisfaction [29]. This makes a strong follow-up talking point about metric hygiene.
+**Intercom Fin [29].** Third-party guides describe Fin as a bespoke multi-phase RAG pipeline: query refinement, retrieval, reranking, generation, and validation. They say it uses custom retrieval and reranker models trained on customer-service interactions; the phase counts differ between sources. Anthropic's case study reports a 51% average resolution rate "out of the box" (before customization), and up to 86% of support volume for some customers; it also notes Fin answers in more than 45 languages [29]. Note the metric definition. Guides point out that "assumed" resolutions (the customer leaves after the last answer) count alongside confirmed ones, so headline rates may overstate satisfaction [29]. This makes a strong follow-up talking point about metric hygiene.
 
 ### 4.4 Architecture
 
@@ -335,12 +336,12 @@ Take a 100,000-file monorepo averaging 300 lines per file: 30M lines. With funct
 
 - **The corpus is the web:** billions of documents, adversarial SEO, and continuous change.
 - **Freshness** is a first-class requirement. FreshLLMs showed all tested LLMs struggle with fast-changing and false-premise questions [37].
-- **Scale.** Perplexity's research post describes a production search system handling about 200 million daily queries, built on hybrid retrieval, multi-stage ranking, distributed indexing, and a self-improving content-understanding module [38]. That works out to an average of roughly 2,300 QPS (my arithmetic).
+- **Scale.** Perplexity's research post describes a production search system handling about 200 million daily queries, built on hybrid retrieval, multi-stage ranking, distributed indexing, and a self-improving content-understanding module [38]. That works out to an average of roughly 2,300 QPS (simple arithmetic, not a published figure).
 - **Granularity.** Perplexity argues that a search API for AI should treat sections and spans of documents as retrievable units, not only whole pages [38].
 
 ### 6.3 Reference architecture: Perplexity on Vespa
 
-Perplexity moved its search in-house onto Vespa (announced April 2025). Its stated requirements were: combine keyword and semantic search, filter, rank individual passages, and index new content continuously at consumer latency. It wanted all of this in one platform rather than stitched-together databases, vector stores, and ranking services [39]. Vespa's materials also highlight distributed machine-learned ranking inference that combines many relevance signals [39]. Perplexity published an open evaluation framework (search_evals) and reported a median latency of about 358 ms for its Search API. These are company-run benchmarks [38].
+Perplexity moved its search in-house onto Vespa (announced by Vespa in 2025). Its stated requirements were: combine keyword and semantic search, filter, rank individual passages, and index new content continuously at consumer latency. It wanted all of this in one platform rather than stitched-together databases, vector stores, and ranking services [39]. Vespa's materials also highlight distributed machine-learned ranking inference that combines many relevance signals [39]. Perplexity published an open evaluation framework (search_evals) and reported a median latency of about 358 ms for its Search API. These are company-run benchmarks [38].
 
 The method lineage is public. FreshPrompt injects search-engine results (answer box, organic results, related questions) into the prompt, ordered by date. With GPT-4 it gave about +49 points of absolute accuracy on FreshQA under strict evaluation. Both the number and the order of evidence snippets mattered, and asking for concise answers reduced hallucination [37]. Trade press has described Perplexity's "online LLMs" as inspired by this work [40].
 
@@ -378,7 +379,35 @@ The method lineage is public. FreshPrompt injects search-engine results (answer 
 - Citation-answer mismatch, where the claim is not supported by the cited span. Add a post-hoc attribution check.
 - Fan-out tail latency across thousands of shards. Hedge requests and set per-shard timeouts.
 
-## 7. Comparison of the four designs
+## 7. 2024-2026 developments interviewers now probe
+
+The four designs above are the "classic" pipeline answers. Since 2024 several developments have changed what a strong answer sounds like, and interviewers increasingly ask about them as follow-ups.
+
+### 7.1 Agentic, just-in-time retrieval (especially for code)
+
+Anthropic's context-engineering guidance (September 2025) contrasts "embedding-based pre-inference time retrieval" with agents that keep lightweight references (file paths, stored queries) and load data at runtime with tools. Claude Code uses grep, glob, and head/tail to explore a repository instead of a pre-built vector index. Anthropic says these primitives avoid "the issues of stale indexing and complex syntax trees". It also recommends a hybrid: put small, stable context (such as CLAUDE.md files) into the prompt up front and fetch everything else just-in-time [42]. The tradeoff it names: runtime exploration is slower than retrieving pre-computed data and needs good tools to avoid wasting context. In a code-assistant interview, contrast this with Cursor's and Augment's continuously synced embedding indices (Section 5.3). Embedding indices win for fuzzy "where is the logic that..." queries over huge monorepos. Agentic search wins on freshness, has no index to secure, and copes better with exact identifiers. Many products now combine the two.
+
+### 7.2 Multi-agent "deep research" for complex answers
+
+For web answer engines and enterprise research modes, the multi-hop escalation path is now often a multi-agent system. Anthropic's Research feature (June 2025) uses a lead agent that plans and spawns parallel subagents to search, then synthesizes their results with citations. On Anthropic's internal research evaluation, an Opus 4 lead with Sonnet 4 subagents scored 90.2% higher than a single Opus 4 agent. Anthropic also reports that multi-agent runs use about 15x the tokens of a chat interaction, and that token usage alone explained about 80% of performance variance on BrowseComp [43]. Interview point: the deep-research mode is a cost/latency tier of its own. Route only complex, high-value queries there, and say how you would bound spend.
+
+### 7.3 MCP as the connector layer
+
+Anthropic introduced the Model Context Protocol (MCP) on November 25, 2024 as an open standard for connecting AI assistants to content repositories, business tools, and development environments [44]. In an enterprise Q&A design, MCP servers can stand in for some bespoke connectors, and the assistant can query live systems instead of a copied index. The design questions change accordingly. Does the MCP call run with the end user's delegated credentials, so the source system enforces ACLs, or with a service identity that needs trimming? How do you combine federated live queries, which are fresh and permission-exact but slower, with a central index, which is fast and supports ranking? Tool outputs must be treated as untrusted input, as in the prompt-injection answer in Section 9.
+
+### 7.4 Built-in citation APIs
+
+Model providers now offer grounding features that return citations natively. Anthropic's Citations feature (2025) splits supplied documents into sentences (or uses caller-provided chunks) and returns the exact passages backing each claim. Anthropic reported that it increased recall accuracy by up to 15% over most custom citation implementations in internal evaluations. One customer, Endex, reported source hallucinations and formatting issues falling from 10% to 0% [45]. This does not replace retrieval, which still selects the documents. It does simplify the "citation-answer mismatch" check in Section 6.5, because the cited span is returned as structured data and can be verified directly.
+
+### 7.5 GraphRAG for global "sensemaking" questions
+
+Microsoft's GraphRAG (Edge et al., 2024) extracts an entity knowledge graph from the corpus with an LLM, detects communities, and pre-generates community summaries. It answers "global" questions ("what are the main themes across all incident reports?") with a map-reduce over those summaries. Chunk-level retrieval handles such questions poorly because no single chunk contains the answer. The paper reports gains in comprehensiveness and diversity over naive RAG on such queries [46]. The cost is a large, LLM-heavy indexing step that must be redone as content changes. Mention it for corpus-level analytics questions, not for the factual lookups that dominate support and enterprise Q&A.
+
+### 7.6 Vision-based retrieval for visually rich documents
+
+When the corpus is scanned PDFs, slides, and tables (the scoping question from Section 1.2), the parse-then-chunk pipeline is often where quality is lost. ColPali (Faysse et al., 2024; ICLR 2025) embeds page images directly with a vision-language model and scores them with ColBERT-style late interaction. It skips OCR and layout parsing, and the authors report it outperforming text-pipeline baselines on their ViDoRe benchmark [47]. The tradeoff is storage: late interaction keeps many vectors per page, which multiplies index size compared with the single-vector math in Section 2.3. In an interview, offer it as the fallback for document types where OCR quality has been measured to be poor.
+
+## 8. Comparison of the four designs
 
 | Dimension | Enterprise Q&A | Support bot | Code assistant | Web answer engine |
 |---|---|---|---|---|
@@ -391,7 +420,7 @@ The method lineage is public. FreshPrompt injects search-engine results (answer 
 | Primary metric | Helpfulness, citation precision | Resolution, CSAT, repeat contacts | Acceptance rate, context recall | Answer accuracy, latency, freshness |
 | Typical escalation | Agentic multi-step [17][25] | Human agent | Agent loop (grep/read/test) | Multi-hop research mode |
 
-## 8. Common follow-up questions and strong answers
+## 9. Common follow-up questions and strong answers
 
 **"How do you know if a bad answer is a retrieval or a generation failure?"**
 Log retrieved chunk IDs for every answer. Build a labeled set of question, gold passages, and gold answer. Measure retrieval recall@k against the gold passages separately from answer correctness given gold context. If the gold passage was not retrieved, the failure is retrieval (failure points 1-2 in [13]). If it was retrieved but the answer was wrong, the failure is consolidation, extraction, or generation (points 3-7). Interviewers report this diagnosis skill is the core of the evaluation discussion [4].
@@ -445,7 +474,7 @@ Treat retrieved text as data:
 
 See Chapter 16 for detail.
 
-## 9. Interview anti-patterns
+## 10. Interview anti-patterns
 
 - Drawing "user -> vector DB -> LLM" and stopping. There is no ingestion path, no ACLs, no reranker, and no evaluation [2][3].
 - Choosing a vector database by brand before stating corpus size, QPS, or filter selectivity.
@@ -470,25 +499,26 @@ See Chapter 16 for detail.
 7. **Structure beats flat text when the data has it.** LinkedIn's ticket knowledge graph improved MRR by about 78% [27], code graphs help code assistants [32], and authority graphs help enterprise search [22].
 8. **Evaluate retrieval and generation separately, offline and online.** Expect robustness to come from operation, not upfront design [13]. Uber, DoorDash, and LinkedIn all built judge-based evaluation pipelines [24][26][41].
 9. **Read headline metrics critically.** Resolution and deflection rates depend on definitions [29]. Company benchmarks are self-reported [38][39].
+10. **Know the 2024-2026 alternatives.** Be ready to argue when agentic just-in-time search beats a pre-built index [42], when a multi-agent research tier is worth its ~15x token cost [43], how MCP connectors change the permission model [44], and when GraphRAG [46] or vision-based retrieval [47] fits the corpus better than chunk-and-embed.
 
 ## References
 
 1. "Enterprise RAG: Problem Framing and Requirements" (Grokking the ML System Design Interview), Educative, 2025. https://www.educative.io/courses/grokking-the-machine-learning-system-design-interview/enterprise-rag-problem-framing-requirements
-2. "What interviewers actually grade in a RAG design round", techinterview.org, 2026. https://www.techinterview.org/post/3233476088/rag-system-design-interview/?format=md
+2. "What interviewers actually grade in a RAG design round", techinterview.org, 2026. https://www.techinterview.org/post/3233476088/rag-system-design-interview/
 3. "RAG mock interview transcript", System Design Space, 2025. https://system-design.space/en/chapter/rag-mock-interview-transcript
 4. "What RAG evaluation interviews test beyond recall@k" (AI interviews tag), techinterview.org, 2026. https://www.techinterview.org/post/tag/ai-interviews/
 5. "Design a Retrieval-Augmented Generation (RAG) system", Hello Interview community, 2025. https://www.hellointerview.com/community/questions/rag-system-design/cmoaemvhf1emv09adwqq9wk3f
 6. "Introducing Contextual Retrieval", Anthropic, 2024. https://www.anthropic.com/news/contextual-retrieval
 7. G. V. Cormack, C. L. A. Clarke, S. Büttcher, "Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods", SIGIR 2009. https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf
-8. S.-Q. Yan et al., "Corrective Retrieval Augmented Generation", arXiv:2401.15884, 2024. https://www.datacamp.com/tutorial/corrective-rag-crag (tutorial summary; paper: arXiv 2401.15884)
+8. S.-Q. Yan, J.-C. Gu, Y. Zhu, Z.-H. Ling, "Corrective Retrieval Augmented Generation", arXiv:2401.15884, 2024. https://arxiv.org/abs/2401.15884
 9. "Responding to Anthropic's Contextual Retrieval for RAG Apps... Why Context is NOT All you Need", Almond AI (Medium), 2024. https://medium.com/almond-ai/responding-to-anthropics-contextual-retrieval-for-rag-apps-why-context-is-not-all-you-need-af503985aa55
 10. Z. Li et al. (Google DeepMind, Univ. of Michigan), "Retrieval Augmented Generation or Long-Context LLMs? A Comprehensive Study and Hybrid Approach", EMNLP 2024 Industry. https://arxiv.org/abs/2407.16833v1
 11. N. F. Liu et al., "Lost in the Middle: How Language Models Use Long Contexts", TACL 2024 (arXiv 2023). https://arxiv.org/abs/2307.03172v3
 12. "Binary and Scalar Embedding Quantization for Significantly Faster & Cheaper Retrieval", Hugging Face and mixedbread.ai, 2024. https://huggingface.co/blog/embedding-quantization ; see also Sentence Transformers docs: https://sbert.net/examples/applications/embedding-quantization
 13. S. Barnett et al., "Seven Failure Points When Engineering a Retrieval Augmented Generation System", CAIN 2024. https://arxiv.org/abs/2401.05856v1
-14. "Dear all, I have the questions about the openAI assistant chunk size and chunk overlap of file search tool?", OpenAI Developer Community, 2024. https://community.openai.com/t/dear-all-i-have-the-questions-about-the-openai-assistant-chunk-size-and-chunk-overlap-of-file-search-tool/831342
+14. "File search" (chunking strategy defaults and limits), OpenAI Platform documentation. https://platform.openai.com/docs/assistants/tools/file-search ; community discussion: https://community.openai.com/t/dear-all-i-have-the-questions-about-the-openai-assistant-chunk-size-and-chunk-overlap-of-file-search-tool/831342
 15. "OpenAI Embeddings Pricing 2026", CostBench, 2026. https://www.costbench.com/software/embedding-apis/openai-embeddings/
-16. "Faiss product quantization / binary quantization memory estimation", OpenSearch Documentation 3.x, 2025. https://docs.opensearch.org/3.1/vector-search/optimizing-storage/binary-quantization/ ; ScyllaDB vector search sizing: https://cloud.docs.scylladb.com/master/vector-search/vector-search-sizing.html
+16. "Faiss product quantization / binary quantization memory estimation", OpenSearch Documentation 3.x, 2025. https://docs.opensearch.org/latest/vector-search/optimizing-storage/binary-quantization/ ; ScyllaDB vector search sizing: https://cloud.docs.scylladb.com/master/vector-search/vector-search-sizing.html
 17. "Building Dash: How RAG and AI agents help us meet the needs of businesses", Dropbox Tech Blog, 2024. https://dropbox.tech/machine-learning/building-dash-rag-multi-step-ai-agents-business-users
 18. "Enhance AI responses by using Retrieval Augmented Generation" (Copilot Studio guidance), Microsoft Learn, 2025. https://learn.microsoft.com/en-za/microsoft-Copilot-studio/guidance/retrieval-augmented-generation
 19. "SharePoint document-level access control for RAG", Microsoft ISE Developer Blog, 2026. https://devblogs.microsoft.com/ise/sharepoint-doc-level-access/
@@ -497,14 +527,14 @@ See Chapter 16 for detail.
 22. "Agentic reasoning: the future of work AI", Glean, 2025. https://www.glean.com/jp/blog/agentic-reasoning-future-ai
 23. "Enterprise AI system design: Atlassian and Glean architecture", K. RT (Medium), 2025. https://medium.com/@kevinrt6911/enterprise-ai-system-design-atlassian-glean-architecture-a36d80f5bc7f
 24. "Genie: Uber's Gen AI On-Call Copilot", Uber Engineering, 2024. https://www.uber.com/blog/genie-ubers-gen-ai-on-call-copilot
-25. "Enhanced Agentic RAG for On-Call Engineering Support" (summary of Uber), ZenML LLMOps Database, 2025. https://zenml.io/llmops-database/enhanced-agentic-rag-for-on-call-engineering-support
-26. "Path to high-quality LLM-based Dasher support automation", DoorDash Engineering, 2024. https://careersatdoordash.com/?p=12568 ; summary: https://www.zenml.io/llmops-database/llm-based-dasher-support-automation-with-rag-and-quality-controls
+25. "Enhanced Agentic-RAG: What If Chatbots Could Deliver Near-Human Precision?", Uber Engineering, 2025. https://www.uber.com/blog/enhanced-agentic-rag/ ; summary: ZenML LLMOps Database, https://www.zenml.io/llmops-database/enhanced-agentic-rag-for-on-call-engineering-support
+26. "Path to high-quality LLM-based Dasher support automation", DoorDash Engineering, 2024. https://careersatdoordash.com/blog/large-language-modules-based-dasher-support-automation/ ; summary: https://www.zenml.io/llmops-database/llm-based-dasher-support-automation-with-rag-and-quality-controls
 27. Z. Xu, M. J. Cruz et al. (LinkedIn), "Retrieval-Augmented Generation with Knowledge Graphs for Customer Service Question Answering", SIGIR 2024. https://arxiv.org/abs/2404.17723v1
 28. "Klarna AI assistant handles two-thirds of customer service chats in its first month", coverage of Klarna announcement, 2024. https://the-decoder.com/klarna-says-openais-ai-agent-does-the-work-of-700-support-agents/ ; https://siliconcanals.com/klarna-unveils-ai-assistant/
-29. "Intercom" customer case study, Anthropic, 2025. https://www.anthropic.com/customers/intercom ; "Intercom Fin AI explained", Macha: https://www.getmacha.com/blog/intercom-fin-ai-explained
+29. "Intercom" customer case study, Anthropic, 2025. https://claude.com/customers/intercom ; "Intercom Fin AI explained", Macha: https://www.getmacha.com/blog/intercom-fin-ai-explained
 30. S. Es, J. James, L. Espinosa-Anke, S. Schockaert, "Ragas: Automated Evaluation of Retrieval Augmented Generation", EACL 2024 demo (arXiv 2023). https://arxiv.org/pdf/2309.15217
 31. "How GitHub Copilot is getting better at understanding your code", GitHub Blog, 2023. https://github.blog/ai-and-ml/github-copilot/how-github-copilot-is-getting-better-at-understanding-your-code/
-32. "Cody Context" documentation, Sourcegraph, 2024. https://5.5.sourcegraph.com/cody/core-concepts/context
+32. "Cody Context" documentation, Sourcegraph, 2024. https://sourcegraph.com/docs/cody/core-concepts/context
 33. J. Hartman et al., "AI-assisted Coding with Cody: Lessons from Context Retrieval and Evaluation for Code Recommendations", RecSys 2024. https://arxiv.org/html/2408.05344v1 ; blog: https://sourcegraph.com/blog/lessons-from-building-ai-coding-assistants-context-retrieval-and-evaluation
 34. "Supercharging AI Coding Assistants with Gemini Models' Long Context", Google Developers Blog, 2024. https://developers.googleblog.com/en/supercharging-ai-coding-assistants-with-massive-context/
 35. "Securely indexing large codebases" (secure codebase indexing), Cursor, 2025. https://cursor.com/blog/secure-codebase-indexing
@@ -514,3 +544,9 @@ See Chapter 16 for detail.
 39. "Perplexity at a Glance" case study and "Perplexity Partners with Vespa.ai to Bring its Search Function In-House", Vespa.ai, 2025. https://vespa.ai/case-studies/perplexity/ ; https://vespa.ai/perplexity-partners-with-vespa-ai/
 40. "How Perplexity's Online LLM Was Inspired by FreshLLMs Paper", The New Stack, 2023. https://thenewstack.io/how-perplexitys-online-llm-was-inspired-by-freshllms-paper/
 41. "5 Lessons From LinkedIn's First Foray Into GenAI Development", The New Stack, 2024. https://thenewstack.io/5-lessons-from-linkedins-first-foray-into-genai-development/
+42. "Effective context engineering for AI agents", Anthropic Engineering, September 2025. https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
+43. "How we built our multi-agent research system", Anthropic Engineering, June 2025. https://www.anthropic.com/engineering/built-multi-agent-research-system
+44. "Introducing the Model Context Protocol", Anthropic, November 2024. https://www.anthropic.com/news/model-context-protocol
+45. "Introducing Citations on the Anthropic API", Anthropic, 2025. https://claude.com/blog/introducing-citations-api
+46. D. Edge et al. (Microsoft Research), "From Local to Global: A Graph RAG Approach to Query-Focused Summarization", arXiv:2404.16130, 2024. https://arxiv.org/abs/2404.16130
+47. M. Faysse et al., "ColPali: Efficient Document Retrieval with Vision Language Models", ICLR 2025 (arXiv 2024). https://arxiv.org/abs/2407.01449

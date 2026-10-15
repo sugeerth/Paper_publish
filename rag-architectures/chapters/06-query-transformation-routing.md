@@ -18,9 +18,12 @@ This chapter covers the publicly documented designs for that stage:
 
 1. **Generative expansion.** HyDE writes a hypothetical answer document and searches with its
    embedding [1][2]. Query2doc appends a generated pseudo-document to a sparse query [3].
+   Later work shows when expansion hurts strong retrievers and how to steer it with the
+   corpus itself [45][46][47].
 2. **Multi-query and RAG-Fusion.** An LLM writes several paraphrases, each is retrieved
    separately, and the ranked lists are merged with Reciprocal Rank Fusion (RRF) [6][11][12].
-   This section includes the 2026 debate over whether fusion gains survive reranking [7][8][9].
+   This section includes the 2026 debate over whether fusion gains survive reranking [7][8][9],
+   and adaptive rewrite-strategy selection (DMQR-RAG) [48].
 3. **Abstraction.** Step-back prompting asks a more general question first and retrieves for
    it alongside the original question [5][16].
 4. **Decomposition.** Least-to-most, Self-Ask, IRCoT, sub-question engines, and the managed
@@ -28,9 +31,10 @@ This chapter covers the publicly documented designs for that stage:
 5. **Learned rewriters.** Rewrite-Retrieve-Read, RQ-RAG, DeepRetrieval and Search-R1 train
    the query writer with retrieval or answer feedback instead of prompting it [4][37][41][42].
 6. **Conversational rewriting.** Condense-question and history-aware retrievers, and the
-   conversational-search research line (LLM4CS, ConvGQR, CHIQ) [13][22][38][39][40].
+   conversational-search research line (LLM4CS, ConvGQR, CHIQ, ConvSearch-R1)
+   [13][22][38][39][40][49].
 7. **Routing.** LLM classifiers, embedding-based semantic routers, complexity routers and
-   effort routers [17][21][26][29][32][33].
+   effort routers [17][21][26][29][32][33][50].
 8. **Structured query construction.** Metadata filter extraction and "self-query", in which
    an LLM turns natural language into a search string plus a typed filter expression
    [14][15][23][28].
@@ -65,22 +69,22 @@ conversation, route, extract filters, then decompose or expand.
 ```
 
 A note on sources. This chapter relies mainly on primary artifacts: official code
-repositories for papers, framework source code, and vendor documentation sources. Where a
-number comes from a paper abstract that could not be re-fetched for this edition, it is marked
+repositories for papers, framework source code, and vendor documentation, plus paper
+abstracts. Figures that are reported only by a paper's authors or by a vendor are marked
 as such.
 
 ## 1. Taxonomy: what is being transformed, and why
 
-The query-side techniques fall into five families. They differ in what they assume is wrong
+The query-side techniques fall into seven families. They differ in what they assume is wrong
 with the raw query:
 
 | Family | Diagnosis of the raw query | Output | Representative designs |
 |---|---|---|---|
-| Expansion by generation | Query and documents look different in embedding space (short question vs long answer passage) | A document-shaped string | HyDE [1], Query2doc [3] |
-| Paraphrase / multi-query | One phrasing misses relevant documents because of vocabulary mismatch | N alternative queries | MultiQueryRetriever [12], RAG-Fusion [6], Azure query rewrite [24] |
+| Expansion by generation | Query and documents look different in embedding space (short question vs long answer passage) | A document-shaped string | HyDE [1], Query2doc [3], CSQE [46] |
+| Paraphrase / multi-query | One phrasing misses relevant documents because of vocabulary mismatch | N alternative queries | MultiQueryRetriever [12], RAG-Fusion [6], DMQR-RAG [48], Azure query rewrite [24] |
 | Abstraction | The query is too specific to retrieve the principles or background it needs | A higher-level question | Step-back [5] |
 | Decomposition | The query contains several information needs, or needs multiple hops | Sub-questions, possibly sequential | Least-to-most [36], Self-Ask [34], IRCoT [35], sub-question engines [19], Bedrock/Azure planners [25][27] |
-| Contextualization | The query is not standalone because it depends on earlier turns | A standalone question | Condense-question [22], history-aware retriever [13], LLM4CS [38] |
+| Contextualization | The query is not standalone because it depends on earlier turns | A standalone question | Condense-question [22], history-aware retriever [13], LLM4CS [38], ConvSearch-R1 [49] |
 | Routing | The query should go somewhere specific (an index, a tool, a model, an effort level, or no retrieval at all) | A decision label, optionally with parameters | Semantic router [29], RouterQueryEngine [21], Adaptive-RAG [33], RouteLLM [32] |
 | Structuring | The query mixes semantic content with hard constraints | Query text + typed filter + limit | SelfQueryRetriever [15], auto-retriever [23], Bedrock implicit filters [28] |
 
@@ -133,7 +137,9 @@ right neighbourhood; its facts do not need to be correct [1][2].
 **Numbers.** The repository's TREC DL19 notebook, run with saved outputs, reports Contriever
 alone at nDCG@10 0.445, MAP 0.240 and Recall@1000 0.746. Contriever with HyDE (GPT-3, 8
 samples) reaches nDCG@10 0.597, MAP 0.404 and Recall@1000 0.873 [2]. That is roughly +15
-nDCG points with no training. The paper also claims gains across web search, QA and fact
+nDCG points with no training. The paper's own Table 1 reports a slightly higher DL19
+figure for HyDE (nDCG@10 61.3, mAP 41.8, against Contriever's 44.5 and 24.0), close to the
+fine-tuned Contriever-ft (62.1) [1]; the notebook rerun is the reproducible number. The paper also claims gains across web search, QA and fact
 verification, and across languages (e.g. Swahili, Korean, Japanese), with performance
 "comparable to fine-tuned retrievers" [1].
 
@@ -144,9 +150,10 @@ verification, and across languages (e.g. Swahili, Korean, Japanese), with perfor
   neighbourhood with full confidence.
 - *Latency.* A full generated passage (and in the reference setup, eight of them) must be
   written before retrieval starts. This is the most expensive step in the pipeline.
-- *Strong-encoder regime.* HyDE was designed for the label-free setting. Gains against
-  modern supervised embedders are not established by the primary sources read here, so it
-  should be validated per corpus rather than assumed.
+- *Strong-encoder regime.* HyDE was designed for the label-free setting. A large study
+  across 24 retrievers found that generative expansion helps weak retrievers but tends to
+  hurt strong ones (Section 2.3) [45], so gains against modern supervised embedders should
+  be validated per corpus rather than assumed.
 - *Mitigation.* Keep the original query in the embedding mix (the default in both the
   reference code and LlamaIndex) so that a bad hypothesis cannot fully take over the search
   [2][18].
@@ -156,10 +163,37 @@ verification, and across languages (e.g. Swahili, Korean, Japanese), with perfor
 Query2doc (Wang, Yang and Wei, Microsoft, EMNLP 2023) applies the same idea to sparse and
 dense retrieval. It few-shot prompts an LLM to write a pseudo-document, then concatenates it
 to the original query, repeating the query several times so that it is not outweighed by the
-longer pseudo-document in BM25. The abstract reports BM25 gains of 3% to 15% on MS MARCO and
-TREC DL without fine-tuning (figure from the paper abstract, not re-verified here) [3]. The
+longer pseudo-document in BM25. The abstract reports BM25 gains of roughly 3% to 15% on
+ad-hoc benchmarks such as MS MARCO and TREC DL without fine-tuning, and gains for
+state-of-the-art dense retrievers as well [3]. The
 lesson: generative expansion also works for keyword retrieval, and the original query must
 be explicitly re-weighted against the much longer generated text.
+
+### 2.3 When expansion hurts, and corpus-steered expansion
+
+Three follow-up papers sharpen the guidance on generative expansion:
+
+- **Prompt form matters.** Jagerman et al. (Google, 2023) compared zero-shot, few-shot and
+  chain-of-thought (CoT) prompts for LLM query expansion on MS MARCO and BEIR, and found CoT
+  prompts the most effective, because they make the model reason step by step and emit
+  many related terms. Like Query2doc, they up-weight the original query by repeating it
+  (five times) before the expansion text. A CoT/PRF variant also feeds the top-3 retrieved
+  documents into the prompt [47].
+- **Expansion helps weak retrievers and hurts strong ones.** Weller et al. (Findings of EACL
+  2024) tested eleven expansion techniques across twelve datasets and twenty-four retrieval
+  models. They report a strong negative correlation between a retriever's baseline quality
+  and its gain from expansion: expansion adds recall but also noise, which makes it harder
+  to rank the truly relevant documents above near misses. Their recommendation is to use
+  expansion for weaker models or when the target corpus differs strongly in format from
+  the retriever's training data, and otherwise to avoid it [45]. This is the strongest
+  published evidence behind the "strong-encoder regime" caveat in Section 2.1.
+- **Ground the expansion in the corpus.** Corpus-Steered Query Expansion (CSQE; Lei et al.,
+  EACL 2024) targets HyDE's knowledge-bound failure mode. It retrieves once, asks the LLM to
+  identify the pivotal sentences in the initially retrieved documents, and adds those
+  corpus sentences to the query alongside the LLM's own generated expansion. The authors
+  report strong training-free results, especially on queries for which the LLM lacks
+  knowledge [46]. This is a pseudo-relevance-feedback loop with an LLM as the relevance
+  judge, and it costs one extra retrieval round before the final search.
 
 ## 3. Multi-query retrieval and RAG-Fusion
 
@@ -216,14 +250,16 @@ explicitly asks for different angles, synonyms, and narrower and broader framing
 
 The most useful public evidence on multi-query in production comes from a 2026 exchange.
 
-- **The industry paper.** "Scaling RAG Fusion: Lessons from an Industry Deployment" (arXiv
+- **The industry paper.** "Scaling Retrieval Augmented Generation with RAG Fusion: Lessons
+  from an Industry Deployment" (Medrano, Verma and Chhabra, Dell Technologies; arXiv
   2603.02153, March 2026) reported that on 115 synthetic enterprise-support queries,
   two-query fusion (the original query plus one LLM rewrite), followed by FlashRank reranking
   and top-K truncation, matched or slightly underperformed a single-query baseline. Its
   proposed mechanism is that the reranker re-anchors on the original query, and the
   rewrite's marginal candidates are squeezed out at truncation. The paper concedes that
-  fusion still helps in "recall-scarce" regimes (as summarized in [7]; the paper is cited as
-  [9]).
+  fusion still helps in "recall-scarce" regimes. The abstract's own framing is that fusion
+  raised raw recall but the gains "largely" disappeared after reranking and truncation,
+  while adding redundancy and latency [9] (configuration details as summarized in [7]).
 - **The replication.** Raudaschl replicated the setup on BEIR NFCorpus (3,633 biomedical
   documents, n=200 queries, paired-bootstrap 95% CIs) and disclosed his stake as the
   technique's originator [7]. The paper's exact configuration (vector-only, N=1 rewrite,
@@ -305,6 +341,20 @@ Azure AI Search ships multi-query as a service feature (preview) [24]:
   specific and required exact matches for unique identifiers or product codes" [24]. This is
   the same identifier-search weakness noted in [6].
 
+### 3.6 Adaptive multi-query: choosing the rewrite strategy per query
+
+RAG-Fusion uses one paraphrase prompt for every query. DMQR-RAG (Li et al., Renmin
+University and Kuaishou, November 2024) instead defines four rewriting strategies that
+operate at different levels of information (for example, keeping the query's information
+fixed, expanding it, or reducing it to its core keywords), and adds an adaptive selection
+step, driven by lightweight prompting with few-shot examples, that picks which strategies
+to apply to each query so as to minimize the number of rewrites. The authors report that
+multi-query rewriting generally beat single-query rewriting on academic and industrial
+datasets, and that DMQR-RAG outperformed vanilla RAG-Fusion; their ablation attributes much
+of the gain to query-specific strategy selection [48]. The design converges with the 2026
+RAG-Fusion "diverse" prompt (Section 3.2): diversity of rewrite *type*, not merely the
+number of paraphrases, is what recovers missed documents.
+
 ## 4. Step-back prompting
 
 **Problem.** Some questions are hard to answer directly because they are full of specifics,
@@ -315,10 +365,11 @@ retrieving for the governing principle or the broader history works.
 **Technique.** Step-back prompting (Zheng et al., Google DeepMind, 2023; ICLR 2024) is a
 two-step method. The model first generates a *step-back question* about a higher-level
 concept or principle, for example "what is the education history of this person?" rather
-than "which school did X attend between 1954 and 1954?". It then reasons over the answer to
+than "which school did Estella Leopold attend between August and November 1954?". It then reasons over the answer to
 that question to solve the original one [5]. The abstract reports that with PaLM-2L, step-back
 prompting improved MMLU Physics and Chemistry by about 7% and 11%, TimeQA by about 27%, and
-MuSiQue by about 7% (approximate; abstract figures not re-verified here) [5].
+MuSiQue by 7% (abstract figures). The authors also report gains with GPT-4 and
+Llama2-70B [5].
 
 **RAG architecture.** In retrieval pipelines, the step-back question is used as an extra
 retrieval query, not as a replacement. LangChain's reference chain retrieves twice in
@@ -362,7 +413,8 @@ query.
   reasoning sentence becomes the query for the next retrieval step, and the retrieved
   paragraphs condition the next reasoning step. It was evaluated on HotpotQA,
   2WikiMultihopQA, MuSiQue and IIRC. The paper reports gains of up to about 21 retrieval
-  points and up to about 15 QA points (abstract figures, approximate) [35].
+  points and up to 15 QA points with GPT-3, with gains also holding out of distribution
+and with much smaller models such as Flan-T5 [35].
 
 ### 5.2 Framework patterns: answer individually vs. answer recursively
 
@@ -434,7 +486,10 @@ planner [25][26]:
   pass of planning and source selection. `medium` adds a high-precision semantic classifier
   and at most one retry ("Each iteration adds latency and cost, so the system constrains
   retry to one pass"). `auto` starts with a lightweight pass and escalates to planning, up to
-  medium effort, only if grounding is insufficient.
+  medium effort, only if grounding is insufficient. Microsoft introduced `auto` in an August
+  2026 preview and, in its own evaluation, reports that it retained 97.6% of
+  `medium`'s evidence recall while cutting average query-planning token usage by 46.9%
+  (vendor-reported figures) [50].
 - **Limits** (preview): at `low`, 5,000 answer tokens and up to 50 documents for semantic
   ranking (10 with L3 classification). At `medium`, 10,000 answer tokens and 50 documents (20
   with L3) [26].
@@ -464,8 +519,8 @@ Decomposition also appears inside larger architectures:
   subagents with separate search tasks. The prompts include explicit effort-scaling rules:
   "Simple fact-finding requires just 1 agent with 3-10 tool calls, direct comparisons might
   need 2-4 subagents with 10-15 calls each, and complex research might use more than 10
-  subagents". The system outperformed single-agent Claude Opus 4 by 90.2% on an internal
-  research eval. Multi-agent systems used about 15x the tokens of chat interactions [44].
+  subagents". The system (Claude Opus 4 as lead agent, Claude Sonnet 4 subagents)
+  outperformed single-agent Claude Opus 4 by 90.2% on an internal research eval. Multi-agent systems used about 15x the tokens of chat interactions [44].
   The post also documents a query-formulation failure: agents "default to overly long,
   specific queries that return few results". The fix was to prompt them to "start with
   short, broad queries ... then progressively narrow focus" [44].
@@ -563,9 +618,18 @@ The TREC CAsT and iKAT conversational-search benchmarks led to a series of rewri
   response alongside the rewrite is HyDE applied to conversation.
 - **ConvGQR** (Mo et al., ACL 2023) combines generative query rewriting with generated
   potential answers for query expansion [39].
-- **CHIQ** (Mo et al., 2024) first improves the conversational *history* with an LLM
-  (resolving ambiguity, for example) and only then rewrites the query. It was evaluated on
-  TREC iKAT datasets [40].
+- **CHIQ** (Mo et al., EMNLP 2024) first improves the conversational *history* with an LLM
+  (resolving ambiguity, for example) and only then rewrites the query. It uses open-source
+  LLMs where earlier work relied mostly on closed models, and reports state-of-the-art
+  results in most settings across five benchmarks, including TREC iKAT [40].
+- **ConvSearch-R1** (Zhu et al., Fudan / ByteDance, EMNLP 2025) brings the learned-rewriter
+  idea of Section 6 to conversation. It needs no human or LLM rewrite labels: a warm-up
+  stage uses retrieval-guided self-distillation to solve the cold start, and an RL stage
+  optimizes the rewriter with a rank-based reward from the downstream retriever, which
+  densifies the otherwise sparse retrieval-metric signal. The authors report more than 10%
+  improvement on TopiOCQA with a 3B model, and gains on QReCC [49]. It addresses the main
+  weakness of prompted condense-question rewriters: they are not aligned with the retriever
+  that actually consumes the rewrite.
 
 **Failure modes.** (1) *Over-carrying context*: the rewrite drags in entities from earlier
 turns after the user has changed topic. (2) *Under-carrying*: pronouns are left unresolved.
@@ -651,7 +715,7 @@ correctly and from dataset biases (single-hop vs multi-hop sources). It was eval
 single-hop (NQ, TriviaQA, SQuAD) and multi-hop (MuSiQue, HotpotQA, 2WikiMultiHopQA) QA with
 FLAN-T5 and GPT readers [33]. The design has been reproduced as LangGraph and LlamaIndex
 cookbooks [33]. The lesson for production: decomposition and iteration should be gated, not
-always on. Azure's `auto` effort level [26] and Anthropic's effort-scaling rules [44] are
+always on. Azure's `auto` effort level [26][50] and Anthropic's effort-scaling rules [44] are
 industrial versions of the same idea.
 
 ### 8.4 Model routing: RouteLLM
@@ -760,7 +824,9 @@ from one phrasing to the next.
 |---|---|---|---|---|---|
 | HyDE | 1 (long output; N samples in reference setup) | 1 (averaged vector) | Zero-shot, label-free corpora; question/passage asymmetry | Confident wrong hypothesis on private or new data | DL19 nDCG@10 0.445 -> 0.597 [2] |
 | Query2doc | 1 (long output) | 1 | BM25 / sparse stacks | Pseudo-doc outweighs query | +3-15% BM25 (abstract) [3] |
+| Corpus-steered expansion (CSQE) | 1-2 (relevance judging + expansion) | 2 | Queries outside the LLM's knowledge | Weak first-pass retrieval feeds weak sentences | Training-free gains (abstract) [46] |
 | Multi-query (union) | 1 (short output) | N | Vocabulary mismatch | Parser junk; drift without original | Framework default [12] |
+| Adaptive multi-query (DMQR-RAG) | 1-2 (strategy selection + rewrites) | Varies per query | Mixed traffic with noisy queries | Selector errors | Beats vanilla RAG-Fusion (authors) [48] |
 | RAG-Fusion (hybrid + RRF + rerank) | 1 | 2(N+1) | Recall-scarce, jargon-heavy domains | ~1.5 s added latency; little gain with vector-only variant | +0.015 to +0.050 NDCG@10 after rerank [6][7][8] |
 | Step-back | 1 (short) | 2 | Principle or background questions | Over-abstraction | MMLU, TimeQA, MuSiQue gains (abstract) [5] |
 | Decomposition (parallel) | 1 | k sub-queries | Multi-ask questions | Lost shared constraints; over-decomposition | Bedrock sample [27]; Azure planner [25] |
@@ -770,7 +836,7 @@ from one phrasing to the next.
 | Semantic router | 0 (embedding only) | 0 extra | Intents, guardrails, high QPS | Surface similarity; threshold drift | 34.85% -> 90.91% after fitting [30] |
 | Complexity router | 0 (small classifier) | 0, 1 or many | Mixed simple and multi-hop traffic | Mislabelled complexity | Adaptive-RAG [33] |
 | Self-query / implicit filters | 1 (structured) | 1 (filtered) | Catalogues, reports, dated corpora | Over-filtering to zero results | [14][15][23][28] |
-| Learned rewriter (RL) | 1 (small model) | 1+ | High-volume, domain-specific search | Training cost; reward hacking | DeepRetrieval recall 65.07% vs 24.68% [41] |
+| Learned rewriter (RL) | 1 (small model) | 1+ | High-volume, domain-specific search | Training cost; reward hacking | DeepRetrieval recall 65.07% vs 24.68% [41]; ConvSearch-R1 [49] |
 
 ### 10.2 Platform and framework comparison
 
@@ -825,7 +891,9 @@ from one phrasing to the next.
   multi-turn chat [13][22]. Self-query filter extraction is mandatory for corpora with
   meaningful metadata [14][28].
 - **Pick query expansion by diagnosis, not habit.** HyDE addresses question/passage
-  asymmetry in zero-shot settings [1][2]. Multi-query and RAG-Fusion address vocabulary
+  asymmetry in zero-shot settings [1][2], and generative expansion in general tends to help
+  weak retrievers and hurt strong ones [45]; steer it with the corpus when the LLM may not
+  know the domain [46]. Multi-query and RAG-Fusion address vocabulary
   mismatch in recall-scarce domains [6]. Step-back addresses over-specific questions [5].
   Decomposition addresses multi-ask and multi-hop questions [25][27][35].
 - **Budget latency explicitly.** One rewrite call is about 1-2 s with a small hosted model
@@ -840,7 +908,7 @@ from one phrasing to the next.
   nothing [2][12][17][24].
 - **Route by complexity.** Use no retrieval, single-shot or iterative retrieval as the query
   requires, with capped iterations (Azure allows one retry [26]) and explicit effort budgets
-  [33][44].
+  [33][44][50].
 - **Watch the learned-rewriter frontier.** RL-trained 3B-7B query writers have outperformed
   large prompted models on recall-oriented search [37][41], and RL now trains when and what
   to search during reasoning [42]. For high-volume vertical search, a trained rewriter is
@@ -871,10 +939,12 @@ from one phrasing to the next.
 8. A. Raudaschl. "Jev inside the RAG-Fusion pipeline" (rerankers, cost and latency per
    stage, routing experiment). GitHub, September-October 2026.
    https://github.com/Raudaschl/rag-fusion/blob/master/experiments/jev-in-the-pipeline/README.md
-9. "Scaling RAG Fusion: Lessons from an Industry Deployment." arXiv 2603.02153v1, March
-   2026 (read via its summary in [7]). https://arxiv.org/html/2603.02153v1
+9. L. Medrano, A. Verma, M. Chhabra (Dell Technologies). "Scaling Retrieval Augmented
+   Generation with RAG Fusion: Lessons from an Industry Deployment." arXiv 2603.02153,
+   March 2026. https://arxiv.org/abs/2603.02153
 10. Z. Rackauckas. "RAG-Fusion: a New Take on Retrieval-Augmented Generation." Infineon
-    Technologies, arXiv 2024 (not re-fetched for this edition). https://arxiv.org/abs/2402.03367
+    Technologies, arXiv 2024; International Journal on Natural Language Computing 13(1),
+    2024. https://arxiv.org/abs/2402.03367
 11. G. V. Cormack, C. L. A. Clarke, S. Büttcher. "Reciprocal Rank Fusion outperforms
     Condorcet and individual Rank Learning Methods." SIGIR 2009.
     https://dl.acm.org/doi/10.1145/1571941.1572114
@@ -908,13 +978,11 @@ from one phrasing to the next.
 23. LlamaIndex. `VectorIndexAutoRetriever` and auto-retriever prompts. GitHub, 2023-2026.
     https://github.com/run-llama/llama_index/blob/main/llama-index-core/llama_index/core/indices/vector_store/retrievers/auto_retriever/auto_retriever.py
 24. Microsoft. "Rewrite queries with semantic ranker in Azure AI Search (preview)." Azure AI
-    docs source, updated April 2026.
-    https://github.com/MicrosoftDocs/azure-ai-docs/blob/main/articles/search/semantic-how-to-query-rewrite.md
-25. Microsoft. "Agentic retrieval in Azure AI Search." Azure AI docs source, updated
-    September 2026.
-    https://github.com/MicrosoftDocs/azure-ai-docs/blob/main/articles/search/agentic-retrieval-overview.md
-26. Microsoft. "Set the retrieval reasoning effort (preview)." Azure AI docs source, 2026.
-    https://github.com/MicrosoftDocs/azure-ai-docs/blob/main/articles/search/agentic-retrieval-how-to-set-retrieval-reasoning-effort.md
+    docs, 2024-2026. https://learn.microsoft.com/azure/search/semantic-how-to-query-rewrite
+25. Microsoft. "Agentic retrieval in Azure AI Search." Azure AI docs, 2025-2026.
+    https://learn.microsoft.com/azure/search/agentic-retrieval-overview
+26. Microsoft. "Set the retrieval reasoning effort (preview)." Azure AI docs, 2026.
+    https://learn.microsoft.com/azure/search/agentic-retrieval-how-to-set-retrieval-reasoning-effort
 27. AWS. "Query Reformulation Supported by Amazon Bedrock Knowledge Bases" (sample notebook).
     aws-samples, GitHub, 2024-2026.
     https://github.com/aws-samples/amazon-bedrock-samples/blob/main/rag/knowledge-bases/features-examples/03-optimizing-accuracy-retrieved-results/query_reformulation.ipynb
@@ -950,7 +1018,8 @@ from one phrasing to the next.
 39. F. Mo et al. "ConvGQR: Generative Query Reformulation for Conversational Search." ACL
     2023. https://github.com/fengranMark/ConvGQR
 40. F. Mo et al. "CHIQ: Contextual History Enhancement for Improving Query Rewriting in
-    Conversational Search." 2024. https://github.com/fengranMark/CHIQ
+    Conversational Search." EMNLP 2024. https://aclanthology.org/2024.emnlp-main.135
+    (code: https://github.com/fengranMark/CHIQ)
 41. P. Jiang et al. "DeepRetrieval: Hacking Real Search Engines and Retrievers with Large
     Language Models via Reinforcement Learning." arXiv 2025.
     https://github.com/pat-jj/DeepRetrieval ; https://arxiv.org/abs/2503.00223
@@ -962,13 +1031,28 @@ from one phrasing to the next.
     https://www.microsoft.com/en-us/research/blog/lazygraphrag-setting-a-new-standard-for-quality-and-cost/
 44. Anthropic. "How we built our multi-agent research system." Anthropic Engineering, June
     2025. https://www.anthropic.com/engineering/multi-agent-research-system
+45. O. Weller, K. Lo, D. Wadden, D. Lawrie, B. Van Durme, A. Cohan, L. Soldaini. "When do
+    Generative Query and Document Expansions Fail? A Comprehensive Study Across Methods,
+    Retrievers, and Datasets." Findings of EACL 2024.
+    https://aclanthology.org/2024.findings-eacl.134 ; https://arxiv.org/abs/2309.08541
+46. Y. Lei, Y. Cao, T. Zhou, T. Shen, A. Yates. "Corpus-Steered Query Expansion with Large
+    Language Models." EACL 2024 (short papers). https://aclanthology.org/2024.eacl-short.34
+47. R. Jagerman, H. Zhuang, Z. Qin, X. Wang, M. Bendersky. "Query Expansion by Prompting
+    Large Language Models." Google, arXiv 2023. https://arxiv.org/abs/2305.03653
+48. Z. Li et al. "DMQR-RAG: Diverse Multi-Query Rewriting for Retrieval-Augmented
+    Generation." arXiv 2024. https://arxiv.org/abs/2411.13154
+49. C. Zhu et al. "ConvSearch-R1: Enhancing Query Reformulation for Conversational Search
+    with Reasoning via Reinforcement Learning." EMNLP 2025.
+    https://aclanthology.org/2025.emnlp-main.1349 ; https://arxiv.org/abs/2505.15776
+50. Microsoft Foundry Blog. "Let the query decide: introducing auto retrieval reasoning
+    effort." Microsoft Tech Community, 2026.
+    https://techcommunity.microsoft.com/blog/azure-ai-foundry-blog/let-the-query-decide-introducing-auto-retrieval-reasoning-effort/4558943
 
-Source note: arXiv, ACL Anthology and most vendor blogs could not be reached from the
-research environment for this edition, so web search was unavailable. Facts were taken
-from official code repositories (READMEs, source code, notebooks with saved outputs),
-framework source code, vendor documentation source repositories (Microsoft Learn on GitHub,
-aws-samples), and the Microsoft Research and Anthropic blogs. Figures marked as "abstract"
-or "approximate" for [3], [5] and [35], and the descriptions of [9] and [10], were not
-re-verified against the papers themselves and should be checked before reuse. The RAG-Fusion
-latency figures [8] were measured on a laptop by the technique's originator, who discloses
-his interest, and are indicative only.
+Source note: For this edition, the HyDE notebook outputs [2], the LangChain, LlamaIndex,
+aws-samples and semantic-router sources, and the RAG-Fusion write-ups [6][7][8] were
+re-fetched, and the abstract-level figures for [3], [5], [9], [10], [35] and [45]-[49] were
+checked against their published abstracts or listings. The Azure documentation references
+now point at Microsoft Learn rather than the docs source repository. The vendor-reported
+`auto` effort figures [50] and the DMQR-RAG and ConvSearch-R1 results are the authors' own
+and were not independently reproduced. The RAG-Fusion latency figures [8] were measured on
+a laptop by the technique's originator, who discloses his interest, and are indicative only.

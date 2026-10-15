@@ -1,10 +1,10 @@
 # 22. Master Index of RAG Engineering Blogs, Talks and Guides
 
-This chapter is the atlas's bibliography in working form. It lists the engineering blogs, conference talks, vendor guides, practitioner essays and papers that people building retrieval-augmented generation (RAG) systems actually cite, grouped by company and by topic. Each entry has a one-line summary and a numbered reference that carries the full URL. The second half is a flat annotated index of 170+ entries.
+This chapter is the atlas's bibliography in working form. It lists the engineering blogs, conference talks, vendor guides, practitioner essays and papers that people building retrieval-augmented generation (RAG) systems actually cite, grouped by company and by topic. Each entry has a one-line summary and a numbered reference that carries the full URL. The second half is a flat annotated index of 240+ entries.
 
 The first half reads the most informative primary sources as one body of evidence. It covers the problem each team set out to solve, the architecture they shipped, the numbers they published, and the failures they admitted. The pattern that emerges is consistent across companies. Production RAG wins came mostly from retrieval and data preparation, not from the generator. Systems moved from single-shot "embed, top-k, stuff" pipelines toward agentic retrieval and structured indexes (graphs, Merkle-synced code indexes, page images). Evaluation and guardrails became first-class components rather than afterthoughts.
 
-Method and caveats. The entries were collected through web searches and direct reads of primary sources in October 2026. Many company blogs could not be fetched directly from the research environment. For those posts the facts below come from search-result extracts of the primary page or from clearly labeled secondary summaries; the ZenML LLMOps database is the most common one. Numbers that come from secondary sources are marked "(secondary)". Numbers that could not be checked against the original are marked approximate. Coverage is broad but not complete. Several well-known company posts (for example from Instacart, Spotify, Notion and Shopify) did not show up in searches and are left out rather than cited from memory.
+Method and caveats. The entries were collected through web searches and direct reads of primary sources in October 2026. Many company blogs could not be fetched directly from the research environment. For those posts the facts below come from search-result extracts of the primary page or from clearly labeled secondary summaries; the ZenML LLMOps database is the most common one. Numbers that come from secondary sources are marked "(secondary)". Numbers that could not be checked against the original are marked approximate. Coverage is broad but not complete. A second research pass (October 2026) added text-to-SQL and data-agent posts (Uber, Swiggy), more DoorDash, LinkedIn, Dropbox, Instacart and Airbnb posts, Cursor's semantic-search study, Google's "sufficient context" work, and more vendor and framework guides (entries 172-235). A third editorial pass (October 2026) checked headline numbers against the Anthropic and Microsoft Research primary posts, corrected several of them, and added entries 236-242 on tool protocols, agent tool design, GraphRAG 1.0, HippoRAG 2 and reasoning-model search agents. Several well-known company posts (for example from Spotify, Netflix, Notion, Slack and Shopify) still did not show up in searches. They are left out rather than cited from memory.
 
 ---
 
@@ -114,6 +114,13 @@ Harvey runs two vector stores in parallel. Postgres with pgvector uses brute-for
 
 **Cursor.** Cursor hashes every file and builds folder hashes from their children's hashes, forming a Merkle tree. Client and server compare trees and sync only the branches that differ. Changed files are split into syntactic chunks and embedded in the background, with embeddings cached by chunk content [61]. Third-party write-ups add that a new teammate's index can be bootstrapped by copying a similar existing index from the team namespace, and that the vector store is reported to be Turbopuffer [62][63]. These details are unverified.
 
+**Cursor, semantic search for agents (November 2025) [192].** In an era of grep-capable agents, Cursor asked whether an embedding index still earns its keep. It trained a custom embedding model using agent sessions as training data, then compared agents that had grep only with agents that had grep plus semantic search. Search-result extracts of the post report:
+
+- Question-answering accuracy rose by an average of 12.5% (6.5% to 23.5%, depending on the model).
+- Code retention also rose, by a smaller 2.6% on large codebases (1,000+ files).
+
+Lesson: lexical tools and dense retrieval work well together for agents, and the gain grows with repository size [192][193].
+
 **Sourcegraph Cody.** Sourcegraph chose RAG over fine-tuning because code changes too quickly for a fine-tuned snapshot to stay current [64]. Context comes from three sources: keyword search with automatic query rewriting, the Sourcegraph search backend, and a code graph that follows structural relationships. Users can also pull context in explicitly with @-mentions [65].
 
 ```
@@ -132,7 +139,25 @@ Harvey runs two vector stores in parallel. Postgres with pgvector uses brute-for
 
 Glean's posts describe a knowledge graph built from three pillars: content, people and activity. It is assembled per customer from 100+ connectors through continuous crawling rather than federated search [69][70]. The RAG layer runs plan, retrieve, generate. The planner learns to query Glean's own hybrid engine (semantic search, lexical search and the graph) and to rewrite queries with knowledge of the enterprise. Retrieval enforces permissions, so the LLM never has blanket access to company data [69][71]. The "Scholastic" semantic model is fine-tuned on each customer's corpus and click data [71]. Newer posts move to agentic reasoning built on the same retrieval layer [72].
 
-Dropbox's engineering blog lists "How Dash uses context engineering for smarter AI" (November 2025), a December 2025 post on the feature store behind Dash, and a January 2026 post on knowledge graphs, MCP and DSPy in Dash [75]. A podcast with Dropbox's VP of Engineering covers the "context engine" in more depth [74]. The Dropbox posts themselves could not be fetched, so no numbers are reported here.
+Dropbox's engineering blog lists "How Dash uses context engineering for smarter AI" (November 2025), a December 2025 post on the feature store behind Dash, and a January 2026 post on knowledge graphs, MCP and DSPy in Dash [75]. A podcast with Dropbox's VP of Engineering covers the "context engine" in more depth [74]. The Dropbox posts themselves could not be fetched, so no numbers are reported here. The earlier "Building Dash" post [182] describes Dash as universal search plus knowledge management with content access control. A third-party summary describes its retrieval as a fast lexical candidate search followed by an embedding rerank, with documents sliced at query time rather than pre-chunked (secondary) [182].
+
+### 22.2.9 Text-to-SQL and data agents: Uber QueryGPT, Swiggy Hermes
+
+Text-to-SQL is RAG in which the "documents" are table schemas and example queries. The hard part is again the retrieval step, here choosing tables. Pinterest (22.2.4) and the two systems below converge on the same fix: scope retrieval to a business domain before searching.
+
+- **Uber QueryGPT [172].** Uber's data platform serves about 1.2 million queries a month, and Operations issues about 36% of them (secondary). QueryGPT groups SQL samples and table schemas into "workspaces" by business domain (Mobility, Ads, Core Services and others). It then retrieves similar samples and schemas from a vector index within the selected workspace. The later Finch post [173] turns the same idea into a conversational financial data agent.
+- **Swiggy Hermes [174][175][176].** V1 was a thin GPT-3.5 prompt. V2 moved to a RAG architecture on GPT-4o, partitioned into business-unit "charters", each with its own metadata and knowledge base. It answers several thousand queries for hundreds of users, with turnaround under 2 minutes. A V3 summary reports a conversational multi-turn analyst and query accuracy rising from 54% to 93% (secondary; approximate).
+
+```
+ question --> domain router --> [workspace / charter]
+                                    |  table summaries + example SQL (vector index)
+                                    v
+                         candidate tables (top-N) --> LLM re-select (top-K)
+                                    |                       |
+                                    +------> user confirms --+--> SQL gen --> run/validate
+```
+
+**Lesson.** A domain partition does three jobs at once. It shrinks the retrieval search space, raises precision, and gives each team ownership of its metadata quality.
 
 ---
 
@@ -142,17 +167,23 @@ Dropbox's engineering blog lists "How Dash uses context engineering for smarter 
 
 **Contextual Retrieval (September 2024) [91].**
 - Before indexing, Claude 3 Haiku reads the whole document and writes a 50-100 token context for each chunk. That context is prepended to the chunk before both embedding and BM25 indexing.
-- With top-20 retrieval, the baseline failure rate was 5.7%. Contextual embeddings alone cut failures by 35% (to 3.7%). Adding contextual BM25 brought the cut to 49% (2.9%). Adding a reranker brought it to 67% (1.9%).
+- Failure rate is measured as 1 minus recall@20. With the best embedding model tested (Gemini Text 004), the baseline failure rate was 5.7%. Contextual embeddings alone cut failures by 35% (to 3.7%). Adding contextual BM25 brought the cut to 49% (2.9%). Adding a reranker brought it to 67% (1.9%).
 - With reranking, the top 150 chunks are retrieved and reranked down to 20. Twenty chunks beat 5 or 10.
-- Prompt caching brings the one-time indexing cost to about $1.02 per million document tokens.
-- Cohere's reranker was used in the tests.
+- Prompt caching brings the one-time indexing cost to about $1.02 per million document tokens. The estimate assumes 8k-token documents, 800-token chunks, 50 tokens of instructions and 100 tokens of context per chunk.
+- Cohere's reranker was used in the tests (Voyage's was mentioned but not tested).
 - Secondary coverage [155][156], and a critique arguing that context is "not all you need" [157], are indexed below.
 
-**Citations (2025) [92].** The API splits PDF and text sources into sentences and returns grounded citations. Anthropic reports up to 15% better recall accuracy than most custom citation implementations. Endex reports that source hallucinations and formatting issues fell from 10% to 0%.
+**Citations (2025) [92].** The API splits PDF and text sources into sentences (developers can also pass their own chunks) and returns grounded citations. Anthropic's internal evaluations show up to 15% better recall accuracy than most custom citation implementations; this is a vendor claim, not an independent benchmark. Endex reports that source hallucinations and formatting issues fell from 10% to 0%, with 20% more references per response.
 
 **Building effective agents (December 2024) [95].** The post frames the "augmented LLM" (retrieval, tools, memory) as the basic building block of agentic systems. It notes that a single call with retrieval and in-context examples is often enough, so agentic complexity is not always needed.
 
-**Multi-agent research system (June 2025) [94].** A lead agent plans and spawns parallel subagents that search and compress what they find. A citation agent then attributes each claim to a source. This setup beat single-agent Claude Opus 4 by 90.2% on an internal research eval, but used about 15x the tokens of a chat interaction. Token usage alone explained about 80% of the variance on BrowseComp. The post explicitly contrasts its adaptive multi-step search with static top-k RAG.
+**Multi-agent research system (June 2025) [94].** A lead agent plans and spawns parallel subagents that search and compress what they find. A citation agent then attributes each claim to a source. With Claude Opus 4 as lead and Claude Sonnet 4 subagents, this setup beat single-agent Claude Opus 4 by 90.2% on an internal research eval. The cost is tokens: single agents use about 4x the tokens of a chat interaction and the multi-agent system about 15x. Token usage alone explained about 80% of the variance on BrowseComp; with tool-call count and model choice it explained about 95%. The lead agent runs 3-5 subagents in parallel, and each subagent runs 3+ tools in parallel, which cut research time by up to 90% on complex queries. Admitted failure modes include:
+
+- spawning 50 subagents for simple queries
+- duplicated work from vague delegation
+- a bias toward SEO-optimized content farms over authoritative sources such as academic PDFs, fixed by adding source-quality heuristics to the prompts
+
+The post explicitly contrasts its adaptive multi-step search with static top-k RAG.
 
 **Effective context engineering (September 2025) [93].** The post argues for "just-in-time" retrieval. The agent holds lightweight references (paths, queries, links) and loads content through tools such as glob and grep when it needs it. A hybrid approach preloads a little context (for example CLAUDE.md files) and explores the rest at runtime, which avoids stale indexes. The trade-off is that runtime exploration is slower than querying a pre-built index.
 
@@ -164,9 +195,10 @@ Dropbox's engineering blog lists "How Dash uses context engineering for smarter 
 | GraphRAG on GitHub [97] | Jul 2024 | Map-reduce over community summaries for global questions | ~70-80% win rate vs naive RAG; root summaries ~2-3% of tokens |
 | Auto-tuning [98] | Sep 2024 | Auto-generate domain extraction prompts | Larger graph on podcast data |
 | DRIFT search [99] | Oct 2024 | Primer -> follow-up local searches -> ranked hierarchy | Beats local search 78% (comprehensiveness), 81% (diversity) |
-| Dynamic community selection [100] | Nov 2024 | Cheap LLM prunes irrelevant communities top-down | ~77% average cost reduction for global search |
-| LazyGraphRAG [101] | Nov 2024 | NLP noun-phrase graph, no LLM summaries at index time | Indexing ~0.1% of GraphRAG cost; >700x cheaper global queries |
-| BenchmarkQED [102] | Jun 2025 | AutoQ / AutoE / AutoD benchmarking suite | LazyGraphRAG won 96/96 comparisons; beat 1M-token vector RAG |
+| Dynamic community selection [100] | Nov 2024 | Cheap LLM prunes irrelevant communities top-down | 77% average cost reduction vs static global search at level 1 (~470 vs ~1,500 reports); ~34% higher cost when searching to level 3 |
+| LazyGraphRAG [101] | Nov 2024 | NLP noun-phrase graph, no LLM summaries at index time | Indexing ~0.1% of GraphRAG cost (same as vector RAG); global-search-level quality at >700x lower query cost |
+| GraphRAG 1.0 [238] | Dec 2024 | Production release: incremental `update` indexing, default vector store | Parquet output -80%, total disk -43%, CLI startup 148 s to 2 s |
+| BenchmarkQED [102] | Jun 2025 | AutoQ / AutoE / AutoD benchmarking suite | LazyGraphRAG won all 96 same-model (GPT-4o) comparisons, all but one significant; higher win rates than 1M-token vector RAG (GPT-4.1) |
 
 ```
  GraphRAG (eager)                         LazyGraphRAG (deferred)
@@ -179,19 +211,34 @@ Dropbox's engineering blog lists "How Dash uses context engineering for smarter 
  cost paid at index time                  cost paid at query time, tunable
 ```
 
-The arc of this series is instructive. Microsoft first showed that global "sensemaking" questions need structure [17][96]. It then spent a year driving down the cost of that structure [98][100][101], and finally built a benchmark that measures it without hand-written test sets [102]. The BenchmarkQED result is relevant to the long-context debate: expanding vector RAG's context from 8k to 1M tokens did not close the gap on global queries [102].
+The arc of this series is instructive. Microsoft first showed that global "sensemaking" questions need structure [17][96]. It then spent a year driving down the cost of that structure [98][100][101], and finally built a benchmark that measures it without hand-written test sets [102]. The BenchmarkQED result is relevant to the long-context debate: even vector RAG with a 1M-token window (on GPT-4.1) lost to LazyGraphRAG across query classes, with only one comparison (answer relevance on local queries) short of statistical significance [102].
 
 ### 22.3.3 Databricks, AWS, Google, Microsoft Azure, OpenAI
 
 - **Databricks [77][24].** More than 2,000 experiments on 13 LLMs (20 in the paper). Llama-3.1-405B performance starts to fall after 32k tokens of retrieved context and GPT-4-0125-preview after 64k. Failure modes vary by model: some answer incorrectly, some fail to follow instructions, and some refuse.
 - **AWS Generative AI Innovation Center [78][79].** Part 1 covers text RAG: hybrid search, preprocessing that enriches context, query rewriting, and both quantitative and qualitative evaluation. Part 2 extends to tables, databases and images. AWS prescriptive guidance [80] and the Bedrock Knowledge Bases documentation [81] cover the managed path.
-- **Azure [82][83]** and **Google Cloud [84][85][86]** publish reference architectures and design guides. **OpenAI's** accuracy guide frames RAG, prompting and fine-tuning as separate levers to tune [87], and its file-search documentation describes the managed retrieval tool [88].
+- **Azure [82][83]** and **Google Cloud [84][85][86]** publish reference architectures and design guides. **OpenAI's** accuracy guide frames RAG, prompting and fine-tuning as separate levers to tune [87], and its file-search documentation describes the managed retrieval tool [88]. The current Responses API documentation describes file search as a hosted tool that combines semantic and keyword search over uploaded files [235].
+- **Google Research, "sufficient context" (ICLR 2025) [196][197].** This work separates RAG errors into two kinds: the retrieved context was insufficient, or the model failed despite sufficient context. Large models answer well when the context is sufficient, but they tend to guess rather than abstain when it is not. A selective-generation method that uses sufficiency signals improves the share of correct answers among the responses given by about 2-10% across Gemini, GPT and Gemma.
+- **AWS Bedrock GraphRAG GA (March 2025) [198].** Managed GraphRAG on Neptune Analytics. It extracts entities and relationships alongside embeddings, and offers semantic, hierarchical, fixed-size or Lambda-based custom chunking. AWS's worked example costs about $0.48 per hour for Neptune Analytics.
+- **Azure AI Search [200][201]** runs full-text and vector search in parallel and merges them with Reciprocal Rank Fusion. Microsoft's query-engine whitepaper adds generative query rewriting with a fine-tuned small language model and a new semantic ranker. **Vertex AI RAG Engine [199]** is Google's managed pipeline covering ingestion, chunking, embedding, indexing, retrieval and generation.
+
+### 22.3.4 Tools, protocols and memory: 2024-2026 developments
+
+The first two passes of this index concentrated on retrieval pipelines. Several 2024-2026 developments change where retrieval lives in a system, and they are cited often enough to belong in the core reading list.
+
+- **Model Context Protocol (Anthropic, November 2024) [236].** MCP is an open standard for connecting assistants to "the systems where data lives". It launched with prebuilt servers for Google Drive, Slack, GitHub, Git, Postgres and Puppeteer. For RAG it moves connectors out of each application into reusable servers, so a retriever becomes one tool among many that an agent can call. The Dropbox Dash posts on MCP [75] are an example.
+- **Writing effective tools for agents (Anthropic, September 2025) [237].** This is the tool-side companion to context engineering [93]. Its retrieval advice: prefer targeted `search_*` tools to `list_*` tools that dump everything into context; expose a `response_format` switch (in the post's Slack example, concise responses used about a third of the tokens of detailed ones); return readable fields instead of opaque IDs, which reduced hallucinations and improved retrieval precision; and paginate or truncate with sensible defaults. Claude Code caps tool responses at 25,000 tokens by default.
+- **GraphRAG 1.0 (Microsoft Research, December 2024) [238].** The production release of the library [103]. It adds an incremental `update` command so a changed corpus does not need full re-indexing, builds a default vector store (LanceDB, with Azure AI Search supported) during indexing, cuts Parquet output by 80% and total disk use by 43%, and drops CLI startup from about 148 s to 2 s. It is not backward compatible with pre-1.0 indexes. It answers the "stale graph" failure mode listed in the technique table below.
+- **HippoRAG 2 (OSU, ICML 2025) [239][240].** "From RAG to Memory" recasts graph retrieval as non-parametric continual learning. It extends the Personalized PageRank memory of HippoRAG [18] so that new knowledge can be added without retraining. It is the main research counterpoint to treating graph RAG only as a summarization device.
+- **Reasoning models that search (2025) [241][242].** Search-o1 [241] puts an agentic search step and a "reason-in-documents" condensation step inside a large reasoning model's chain of thought. OpenAI's deep research [242] productized the same pattern (multi-step browsing with citations) in February 2025. Together with Search-R1 [33] and Anthropic's research system [94], these mark the 2025 shift from "retrieve then generate" to retrieval as a tool that a reasoning loop calls repeatedly.
+
+**Lesson.** By 2026 the retriever is increasingly a tool behind a protocol, not a fixed pipeline stage. Tool ergonomics (response size, search granularity, readable identifiers) have become retrieval-quality levers in their own right.
 
 ---
 
 ## 22.4 Deep reads: infrastructure vendors and techniques
 
-- **Late chunking (Jina, August 2024) [117][21].** Run a long-context embedding model (8,192 tokens) over the whole document, then split into chunks after the transformer and just before mean pooling. Each chunk vector is then conditioned on the surrounding document. The paper is co-affiliated with Weaviate.
+- **Late chunking (Jina, August 2024) [117][21].** Run a long-context embedding model (8,192 tokens) over the whole document, then split into chunks after the transformer and just before mean pooling. Each chunk vector is then conditioned on the surrounding document.
 - **ColPali on Vespa [112]-[116][20].** Embed page screenshots as multi-vectors, which skips OCR and chunking. Vespa reports better ViDoRe results than BM25 and BGE-M3. For billions of pages, it adds a Hamming-distance MaxSim over binary-quantized vectors inside a phased ranking pipeline [112].
 - **Hybrid fusion (Weaviate) [109][110].** Run BM25 and vector search in parallel, normalize, and fuse. Weaviate offers rankedFusion and relativeScoreFusion; the latter has been the default since v1.24. AutoCut (v1.20) trims the tail of the result list.
 - **Two-stage retrieval (Pinecone) [105]-[108].** A bi-encoder retrieves candidates and a cross-encoder reranks them. Pinecone hosts rerankers such as bge-reranker-v2-m3 as a separate inference step.
@@ -211,6 +258,10 @@ The arc of this series is instructive. Microsoft first showed that global "sense
 | Agentic pre/post agents | Uber [45] | Query time | +27% acceptable, -60% incorrect (sec.) | Extra LLM calls | Latency; agent drift |
 | Two-tier guardrail | DoorDash [46] | Post-generation | ~90% fewer hallucinations (sec.) | Cheap first tier | Similarity false-positives |
 | Domain embedding model | GitHub [59] | Retrieval | +37.6% retrieval score | Training cost | Benchmark-to-product gap |
+| Semantic search beside grep | Cursor [192] | Agent tools | +12.5% avg QA accuracy | Index + custom embedder | Small repos gain little |
+| Dynamic community selection | MSR [100] | Query time | 77% lower global-search cost (level 1) | Cheap rater LLM | Rater misses relevant communities |
+| Domain-scoped schema RAG | Uber, Swiggy [172][174] | Query time | 54% to 93% accuracy (Hermes, sec.) | Metadata curation | Wrong domain routing |
+| Sufficiency-aware abstention | Google [196] | Post-retrieval | +2-10% correct among answered | Extra classifier call | Lower answer coverage |
 
 ---
 
@@ -282,13 +333,13 @@ Format: **Title** (Org/author, year) [n]: one-line summary. "n.d." marks an unda
 45. **Introducing Contextual Retrieval** (Anthropic, 2024) [91]: Chunk-context prepending; -49% failures, -67% with rerank.
 46. **Introducing Citations** (Anthropic, 2025) [92]: Sentence-level grounded citations; up to +15% recall.
 47. **Effective context engineering for AI agents** (Anthropic, 2025) [93]: Just-in-time vs pre-computed retrieval.
-48. **How we built our multi-agent research system** (Anthropic, 2024-2025) [94]: Parallel subagent search; +90.2%, about 15x tokens.
+48. **How we built our multi-agent research system** (Anthropic, June 2025) [94]: Parallel subagent search; +90.2%, about 15x chat tokens.
 49. **Building effective agents** (Anthropic, 2024) [95]: The augmented LLM, with retrieval as a core augmentation.
 50. **GraphRAG: unlocking LLM discovery on narrative private data** (Microsoft Research, 2024) [96]: Introduced GraphRAG on the VIINA dataset.
 51. **GraphRAG now on GitHub** (Microsoft Research, 2024) [97]: Global map-reduce; ~70-80% win rate.
 52. **GraphRAG auto-tuning** (Microsoft Research, 2024) [98]: Domain-adapted extraction prompts.
 53. **Introducing DRIFT search** (Microsoft Research, 2024) [99]: Hybrid of global and local search; 78%/81% wins.
-54. **Dynamic community selection** (Microsoft Research, 2024) [100]: ~77% cheaper global search.
+54. **Dynamic community selection** (Microsoft Research, 2024) [100]: 77% cheaper global search at community level 1.
 55. **LazyGraphRAG** (Microsoft Research, 2024) [101]: Deferred, budgeted graph RAG.
 56. **BenchmarkQED** (Microsoft Research, 2025) [102]: Automated RAG benchmarking (AutoQ/AutoE/AutoD).
 57. **microsoft/graphrag repository** (Microsoft, n.d.) [103]: Reference implementation.
@@ -419,6 +470,100 @@ Format: **Title** (Org/author, year) [n]: one-line summary. "n.d." marks an unda
 170. **RankGPT** (Sun et al., 2023) [42]: LLMs as rerankers.
 171. **FreshLLMs** (Vu et al., 2023) [43]: Search-augmented freshness.
 
+### 22.6.7 Additions from the October 2026 pass
+
+Company engineering blogs:
+
+172. **QueryGPT: natural language to SQL** (Uber, 2024) [172]: Domain "workspaces" of schemas and SQL samples narrow table retrieval.
+173. **Finch: conversational AI data agent** (Uber, 2025) [173]: Financial-data agent built on the same domain-scoped retrieval.
+174. **Hermes: a text-to-SQL solution** (Swiggy, 2024) [174]: Slack-based text-to-SQL with charter-scoped knowledge bases.
+175. **Swiggy Hermes V3 conversational analyst** (InfoQ, 2026) [175]: V3 moves from one-shot SQL to a multi-turn data analyst.
+176. **Evolution of Hermes V3 (summary)** (ZenML, n.d.) [176]: Reports 54% to 93% accuracy (secondary).
+177. **Enhancing chatbot knowledge with user-generated content** (DoorDash, 2025) [177]: Scales the support knowledge base beyond manual curation.
+178. **How DoorDash leverages LLMs for better search retrieval** (DoorDash, n.d.) [178]: LLM query understanding for search retrieval.
+179. **Building DoorDash's product knowledge graph with LLMs** (DoorDash, 2024) [179]: LLM attribute extraction feeding a product graph.
+180. **Building the next generation of job search** (LinkedIn, n.d.) [180]: LLM-era semantic job retrieval.
+181. **Automated GenAI-driven search quality evaluation** (LinkedIn, n.d.) [181]: LLM judges for search relevance at scale.
+182. **Building Dash: RAG and multi-step AI agents** (Dropbox, 2024) [182]: Universal search with access control, lexical then embedding rerank.
+183. **AI-powered answers and summaries in file previews** (Dropbox, n.d.) [183]: Per-file Q&A in the web previewer.
+184. **Improving Pinterest search relevance using LLMs** (Pinterest, n.d.) [184]: LLM relevance models distilled for search.
+185. **Supercharging discovery in search with LLMs** (Instacart, 2024) [185]: LLM-generated related and complementary results.
+186. **Revamping query understanding with LLMs (summary)** (ZenML, n.d.) [186]: Instacart RAG context engineering plus a fine-tuned Llama-3-8B.
+187. **Automation Platform v2: conversational AI** (Airbnb, 2024) [187]: Platform for LLM-powered support flows with retrieval.
+188. **LLM-friendly knowledge representation for customer support** (Airbnb, COLING 2025) [188]: Intent-Context-Action format for policy documents.
+189. **Video Q&A with RAG and speaker detection (summary)** (ZenML, n.d.) [189]: Vimeo's multi-granularity transcript index with timestamps.
+190. **Navigating fair housing guardrails in LLMs** (Zillow, 2024) [190]: Compliance guardrail for real-estate assistants.
+191. **Leveraging RAG-powered LLMs for analytical tasks** (Grab, 2024) [191]: Primary post behind entry 21.
+192. **Improving agent with semantic search** (Cursor, 2025) [192]: +12.5% average accuracy from embedding search beside grep.
+193. **Custom semantic search for coding agents (summary)** (ZenML, n.d.) [193]: Secondary account of the Cursor study.
+194. **Notion-based RAG Slackbot hackathon** (DataDome, n.d.) [194]: One-day internal RAG bot that cites Notion pages.
+195. **CoCounsel Knowledge Search launch** (Thomson Reuters, 2025) [195]: Retrieval across firm repositories for legal work.
+
+Labs, clouds and research:
+
+196. **Sufficient context** (Joren et al., Google, ICLR 2025) [196]: Taxonomy of RAG errors plus selective abstention.
+197. **Sufficient context publication page** (Google Research, 2025) [197]: Publication page with authors and venue.
+198. **Bedrock Knowledge Bases GraphRAG GA** (AWS, 2025) [198]: Managed graph and vector retrieval on Neptune Analytics.
+199. **Vertex AI RAG Engine overview** (Google Cloud, n.d.) [199]: Managed ingestion-to-generation pipeline.
+200. **Hybrid search overview** (Azure AI Search, n.d.) [200]: Parallel BM25 and vector search with RRF merge.
+201. **AI Search query engine performance whitepaper** (Microsoft, n.d.) [201]: Query rewriting with an SLM and a new semantic ranker.
+202. **Long-context RAG: OpenAI o1 and Gemini** (Databricks, 2024) [202]: o1 leads up to 128k tokens; Gemini stays stable to 2M.
+203. **Mosaic AI Agent Evaluation** (Databricks docs, n.d.) [203]: LLM judges for retrieval and response quality, latency and cost.
+204. **RAFT: teaching LLMs to be better at RAG** (Microsoft, 2024) [204]: Domain fine-tuning with distractor documents.
+
+Vendors and frameworks:
+
+205. **What is semantic reranking** (Elastic Search Labs, n.d.) [205]: Zero-shot reranking; it cannot fix low BM25 recall.
+206. **Qdrant BM42 hybrid search** (Blocks and Files, 2024) [206]: Attention-derived term weights that keep BM25's IDF.
+207. **Snippet selection and URL ranking in DeepSearch** (Jina AI, 2025) [207]: Retrieval inside deep-research agents.
+208. **Enhancing RAG pipelines with re-ranking** (NVIDIA, n.d.) [208]: Reranker stage in NVIDIA's RAG reference design.
+209. **Easy introduction to multimodal RAG** (NVIDIA, n.d.) [209]: Text, image and audio retrieval patterns.
+210. **The GraphRAG manifesto** (Neo4j, 2024) [210]: Argument for knowledge graphs inside RAG.
+211. **RAG is dead, long live agentic retrieval** (LlamaIndex, 2025) [211]: Auto-routed retrieval modes across indexes.
+212. **Query transformations** (LangChain, 2023) [212]: LLM rewriting of queries before embedding.
+213. **Self-reflective RAG with LangGraph** (LangChain, 2024) [213]: Self-RAG and CRAG as state machines with loops.
+214. **open_deep_research** (LangChain, n.d.) [214]: Open deep-research agent (archived August 2026).
+215. **Agentic RAG tutorial** (LangGraph docs, n.d.) [215]: Agent decides when to retrieve.
+216. **Self-RAG project page** (Asai et al., 2023) [216]: Code and models for reflection-token RAG.
+217. **Search-R1 code** (Jin et al., 2025) [217]: RL training of search-calling LLMs.
+218. **RAG_Techniques** (N. Diamant, n.d.) [218]: 30+ runnable notebooks of RAG techniques.
+219. **Awesome-RAG** (Danielskry, n.d.) [219]: Curated list of RAG papers, tools and posts.
+220. **LLMs in production** (primaprashant, n.d.) [220]: Curated index of company LLM engineering posts.
+
+Practitioners, talks and secondary analyses:
+
+221. **What we learned from a year of building with LLMs, Part I** (O'Reilly Radar, 2024) [221]: Tactical RAG lessons.
+222. **RAG evaluation is broken (and how to fix it)** (Belfer and Granot, AIEWF 2025) [222]: Talk on RAG benchmark flaws.
+223. **The state of AI-powered search and retrieval** (Frank Liu, AIEWF 2025) [223]: Talk surveying retrieval in 2025.
+224. **RAG is more than just embedding search** (Jason Liu, 2023) [224]: Critiques "dumb" single-vector RAG as demoware.
+225. **Hugging Face open deep research** (TechCrunch, 2025) [225]: 54% on GAIA vs 67.36% for OpenAI deep research.
+226. **RAG (deep dive)** (Pragmatic Engineer, n.d.) [226]: Newsletter explainer on how RAG is built.
+
+Papers:
+
+227. **RAG-Fusion** (2024) [227]: Multi-query generation with reciprocal rank fusion.
+228. **REFRAG** (2025) [228]: Compresses retrieved context into embeddings to cut decoding latency.
+229. **VideoRAG over video corpora** (2025) [229]: Retrieval and generation over video with LVLMs.
+230. **Don't do RAG: cache-augmented generation** (2024) [230]: Preloads small corpora into the KV cache.
+231. **A-RAG** (2026) [231]: Agentic RAG with keyword, semantic and chunk-level tools.
+232. **Embedding-based retrieval in Facebook search** (Facebook, 2020) [232]: Industrial two-tower retrieval baseline.
+233. **Embedding-based retrieval at Scribd** (Scribd, 2021) [233]: Production dense retrieval before LLMs.
+
+Managed-tool and framework documentation:
+
+234. **Query expansion cookbook** (Haystack, n.d.) [234]: Recall boost from LLM query expansion.
+235. **File search tool (Responses API)** (OpenAI, n.d.) [235]: Hosted semantic plus keyword retrieval.
+
+### 22.6.8 Additions from the editorial pass
+
+236. **Introducing the Model Context Protocol** (Anthropic, 2024) [236]: Open standard for connecting assistants to data systems; launch servers for Drive, Slack, GitHub, Postgres.
+237. **Writing effective tools for agents** (Anthropic, 2025) [237]: Search over list tools, concise/detailed response formats, pagination and truncation.
+238. **Moving to GraphRAG 1.0** (Microsoft Research, 2024) [238]: Incremental indexing, default vector store, 43% less disk.
+239. **HippoRAG repository (incl. HippoRAG 2)** (OSU NLP Group, n.d.) [239]: Code for PPR-based graph memory.
+240. **From RAG to Memory: non-parametric continual learning** (Gutiérrez et al., ICML 2025) [240]: HippoRAG 2 paper.
+241. **Search-o1** (Li et al., 2025) [241]: Agentic search inside a reasoning model's chain of thought.
+242. **Introducing deep research** (OpenAI, 2025) [242]: Productized multi-step browsing research agent with citations.
+
 ---
 
 ## 22.7 Cross-cutting lessons from the corpus
@@ -445,6 +590,9 @@ The same failure modes come up again and again across the sources:
 - **Tenancy is architecture.** Permission-aware retrieval (Glean) and per-customer storage (Harvey with LanceDB) must be designed in from the start [69][66].
 - **Code RAG is an indexing problem.** Incremental Merkle sync, syntactic chunking, content-hash caches and domain-trained embedders give the largest gains [59][61].
 - **Treat agentic RAG as a tier, not a default.** Route only complex or high-stakes queries through multi-step agents [94][95][37].
+- **Design retrieval tools for agents, not humans.** Targeted search tools, bounded and paginated responses, and readable identifiers behind a standard protocol such as MCP [236][237].
+- **Partition retrieval by domain before you search.** Uber's workspaces, Swiggy's charters and Pinterest's top-tier table index all shrink the candidate set and assign ownership of metadata quality [172][174][50].
+- **Let the system say "not enough context".** Sufficiency signals and abstention trade a little coverage for accuracy. DoorDash's guardrail does the same at the post-generation layer [196][46].
 - **Benchmark continuously and automatically.** Synthetic query generation and LLM-judge pairwise evaluation (BenchmarkQED, Ragas, ARES) make regression testing affordable [102][28][29].
 
 ---
@@ -471,7 +619,7 @@ The same failure modes come up again and again across the sources:
 18. HippoRAG: Neurobiologically Inspired Long-Term Memory for LLMs. Gutiérrez et al. (OSU). 2024. https://arxiv.org/abs/2405.14831
 19. LightRAG: Simple and Fast Retrieval-Augmented Generation. Guo et al. (HKU). 2024. https://arxiv.org/abs/2410.05779
 20. ColPali: Efficient Document Retrieval with Vision Language Models. Faysse et al. (Illuin Tech). 2024. https://arxiv.org/abs/2407.01449
-21. Late Chunking: Contextual Chunk Embeddings Using Long-Context Embedding Models. Günther et al. (Jina AI, Weaviate). 2024. https://arxiv.org/abs/2409.04701
+21. Late Chunking: Contextual Chunk Embeddings Using Long-Context Embedding Models. Günther et al. (Jina AI). 2024. https://arxiv.org/abs/2409.04701
 22. Lost in the Middle: How Language Models Use Long Contexts. Liu et al. (Stanford). 2023. https://arxiv.org/abs/2307.03172
 23. Retrieval Meets Long Context Large Language Models. Xu et al. (NVIDIA). 2023. https://arxiv.org/abs/2310.03025
 24. Long Context RAG Performance of Large Language Models. Leng et al. (Databricks Mosaic Research). 2024. https://arxiv.org/abs/2411.03538
@@ -622,3 +770,74 @@ The same failure modes come up again and again across the sources:
 169. Enterprise-Grade RAG Systems for Legal AI Platform (Harvey case). ZenML. n.d. https://zenml.io/llmops-database/enterprise-grade-rag-systems-for-legal-ai-platform
 170. Optimizing RAG Systems: Lessons from Production (AWS GenAIIC case). ZenML. n.d. https://www.zenml.io/llmops-database/optimizing-rag-systems-lessons-from-production
 171. RAG with Knowledge Graphs for Customer Service QA by LinkedIn (lesson). Activeloop. n.d. https://courses.activeloop.ai/advanced-rag-and-graphrag/retrieval-augmented-generation-with-knowledge-graphs-for-customer-service-question-answering-by-linkedin-corporation
+172. QueryGPT: Natural Language to SQL Using Generative AI. Uber Engineering. 2024. https://www.uber.com/en-JP/blog/query-gpt/
+173. Unlocking Financial Insights with Finch: Uber's Conversational AI Data Agent. Uber Engineering. 2025. https://www.uber.com/en-JP/blog/unlocking-financial-insights-with-finch/
+174. Hermes: A Text-to-SQL Solution at Swiggy. Swiggy Bytes. 2024. https://bytes.swiggy.com/hermes-a-text-to-sql-solution-at-swiggy-81573fb4fb6e
+175. Swiggy Hermes Conversational AI (news). InfoQ. 2026. https://www.infoq.com/news/2026/01/swiggy-hermes-conversational-ai
+176. Evolution of Hermes V3: Building a Conversational AI Data Analyst (Swiggy case). ZenML. n.d. https://www.zenml.io/llmops-database/evolution-of-hermes-v3-building-a-conversational-ai-data-analyst
+177. A Scalable LLM Approach to Enhancing Chatbot Knowledge with User-Generated Content. DoorDash Engineering. 2025. https://careersatdoordash.com/blog/doordash-llm-chatbot-knowledge-with-ugc/
+178. How DoorDash Leverages LLMs for Better Search Retrieval. DoorDash Engineering. n.d. https://careersatdoordash.com/blog/how-doordash-leverages-llms-for-better-search-retrieval/
+179. Building DoorDash's Product Knowledge Graph with Large Language Models. DoorDash Engineering. 2024. https://doordash.engineering/2024/04/23/building-doordashs-product-knowledge-graph-with-large-language-models/
+180. Building the Next Generation of Job Search at LinkedIn. LinkedIn Engineering. n.d. https://www.linkedin.com/blog/engineering/ai/building-the-next-generation-of-job-search-at-linkedin
+181. Automated GenAI-Driven Search Quality Evaluation. LinkedIn Engineering. n.d. https://www.linkedin.com/blog/engineering/ai/automated-genai-driven-search-quality-evaluation
+182. Building Dash: How RAG and AI Agents Help Us Meet the Needs of Businesses. Dropbox. 2024. https://dropbox.tech/machine-learning/building-dash-rag-multi-step-ai-agents-business-users
+183. Bringing AI-Powered Answers and Summaries to File Previews on the Web. Dropbox. n.d. https://dropbox.tech/machine-learning/bringing-ai-powered-answers-and-summaries-to-file-previews-on-the-web
+184. Improving Pinterest Search Relevance Using Large Language Models. Pinterest Engineering. n.d. https://medium.com/pinterest-engineering/improving-pinterest-search-relevance-using-large-language-models-4cd938d4e892
+185. Supercharging Discovery in Search with LLMs. Instacart Tech. 2024. https://tech.instacart.com/supercharging-discovery-in-search-with-llms-556c585d4720
+186. Revamping Query Understanding with LLMs in E-commerce Search (Instacart case). ZenML. n.d. https://www.zenml.io/llmops-database/revamping-query-understanding-with-llms-in-e-commerce-search
+187. Automation Platform v2: Improving Conversational AI at Airbnb. Airbnb Engineering. 2024. https://medium.com/airbnb-engineering/automation-platform-v2-improving-conversational-ai-at-airbnb-d86c9386e0cb
+188. LLM-Friendly Knowledge Representation for Customer Support. Airbnb authors (COLING 2025 Industry). 2025. https://arxiv.org/pdf/2510.10331
+189. Building a Video Q&A System with RAG and Speaker Detection (Vimeo case). ZenML. n.d. https://www.zenml.io/llmops-database/building-a-video-q-a-system-with-rag-and-speaker-detection
+190. Navigating Fair Housing Guardrails in LLMs. Zillow Tech. 2024. https://www.zillow.com/tech/navigating-fair-housing-guardrails-in-llms/
+191. Leveraging RAG-Powered LLMs for Analytical Tasks. Grab Engineering. 2024. https://engineering.grab.com/transforming-the-analytics-landscape-with-RAG-powered-LLM
+192. Improving Agent with Semantic Search. Cursor. 2025. https://cursor.com/blog/semsearch
+193. Enhancing AI Coding Agent Performance with Custom Semantic Search (Cursor case). ZenML. n.d. https://www.zenml.io/llmops-database/enhancing-ai-coding-agent-performance-with-custom-semantic-search
+194. Notion-Based RAG Slackbot Hackathon. DataDome Engineering. n.d. https://datadome.co/engineering/notion-based-rag-slackbot-hackathon/
+195. Thomson Reuters Launches CoCounsel Knowledge Search. Thomson Reuters. 2025. https://thomsonreuters.com/en/press-releases/2025/july/thomson-reuters-launches-cocounsel-knowledge-search-an-ai-powered-experience-to-manage-content-and-institutional-knowledge
+196. Sufficient Context: A New Lens on Retrieval Augmented Generation Systems. Joren, Zhang, Ferng, Juan, Taly, Rashtchian (Google). 2024/2025. https://arxiv.org/abs/2411.06037
+197. Sufficient Context (publication page). Google Research. 2025. https://research.google/pubs/sufficient-context-a-new-lens-on-retrieval-augmented-generation-systems/
+198. Announcing General Availability of Amazon Bedrock Knowledge Bases GraphRAG with Amazon Neptune Analytics. AWS. 2025. https://aws.amazon.com/blogs/machine-learning/announcing-general-availability-of-amazon-bedrock-knowledge-bases-graphrag-with-amazon-neptune-analytics/
+199. RAG Engine Overview (Vertex AI). Google Cloud. n.d. https://docs.cloud.google.com/vertex-ai/generative-ai/docs/rag-overview
+200. Hybrid Search Overview (Azure AI Search). Microsoft. n.d. https://learn.microsoft.com/en-us/azure/search/hybrid-search-overview
+201. AI Search Query Engine Performance (whitepaper). Microsoft. n.d. https://cdn-dynmedia-1.microsoft.com/is/content/microsoftcorp/microsoft/final/en-us/microsoft-brand/documents/ai-search-query-engine-performance-whitepaper.pdf
+202. Long Context RAG Capabilities of OpenAI o1 and Google Gemini. Databricks. 2024. https://www.databricks.com/blog/long-context-rag-capabilities-openai-o1-and-google-gemini
+203. What Is Mosaic AI Agent Evaluation? Databricks Docs. n.d. https://docs.databricks.com/generative-ai/agent-evaluation/index.html
+204. RAFT: A New Way to Teach LLMs to Be Better at RAG. Microsoft Tech Community. 2024. https://techcommunity.microsoft.com/t5/ai-ai-platform-blog/raft-a-new-way-to-teach-llms-to-be-better-at-rag/ba-p/4084674
+205. What Is Semantic Reranking and How to Use It? Elastic Search Labs. n.d. https://www.elastic.co/search-labs/blog/elastic-semantic-reranker-part-1
+206. Qdrant Launches Combined Vector and Keyword Search for RAG and AI Apps. Blocks and Files. 2024. https://blocksandfiles.com/2024/07/02/qdrant-launches-combined-vector-and-keyword-search-for-rag-and-ai-apps/
+207. Snippet Selection and URL Ranking in DeepSearch/DeepResearch. Jina AI. 2025. https://jina.ai/news/snippet-selection-and-url-ranking-in-deepsearch-deepresearch/
+208. Enhancing RAG Pipelines with Re-Ranking. NVIDIA Technical Blog. n.d. https://developer.nvidia.com/blog/enhancing-rag-pipelines-with-re-ranking/
+209. An Easy Introduction to Multimodal Retrieval-Augmented Generation. NVIDIA Technical Blog. n.d. https://developer.nvidia.com/blog/an-easy-introduction-to-multimodal-retrieval-augmented-generation/
+210. The GraphRAG Manifesto: Unlock Better GenAI Results with Knowledge Graphs. Philip Rathle (Neo4j). 2024. https://neo4j.com/?p=332054
+211. RAG Is Dead, Long Live Agentic Retrieval. LlamaIndex. 2025. https://www.llamaindex.ai/blog/rag-is-dead-long-live-agentic-retrieval
+212. Query Transformations. LangChain. 2023. https://www.langchain.com/blog/query-transformations
+213. Self-Reflective RAG with LangGraph. Ankush Gola (LangChain). 2024. https://blog.langchain.com/agentic-rag-with-langgraph
+214. open_deep_research (repository). LangChain. n.d. https://github.com/langchain-ai/open_deep_research
+215. Agentic RAG (LangGraph tutorial). LangChain. n.d. https://langchain-ai.github.io/langgraph/tutorials/rag/langgraph_agentic_rag/
+216. Self-RAG (project page). Asai et al. 2023. https://selfrag.github.io/
+217. Search-R1 (repository). Jin et al. 2025. https://github.com/PeterGriffinJin/Search-R1
+218. RAG_Techniques (repository). Nir Diamant. n.d. https://github.com/NirDiamant/RAG_Techniques
+219. Awesome-RAG (repository). Danielskry. n.d. https://github.com/Danielskry/Awesome-RAG
+220. LLMs in Production (repository). primaprashant. n.d. https://github.com/primaprashant/llms-in-production
+221. What We Learned from a Year of Building with LLMs (Part I). O'Reilly Radar. 2024. https://oreilly.com/radar/what-we-learned-from-a-year-of-building-with-llms-part-i/
+222. RAG Evaluation Is Broken! (And How to Fix It). Yuval Belfer, Niv Granot (AI Engineer World's Fair). 2025. https://ai.engineer/speakers/niv-granot
+223. The State of AI-Powered Search and Retrieval. Frank Liu (AI Engineer World's Fair). 2025. https://ai.engineer/speakers/frank-liu
+224. RAG Is More Than Just Embedding Search. Jason Liu (Instructor docs, mirror). 2023. https://git.kennethreitz.org/kennethreitz/instructor/src/commit/4054720004fa533b1e5531bbbb26ba0a23d9ea49/docs/blog/posts/rag-and-beyond.md
+225. Hugging Face Researchers Aim to Build an Open Version of OpenAI's Deep Research Tool. TechCrunch. 2025. https://techcrunch.com/2025/02/04/hugging-face-researchers-aim-to-build-an-open-version-of-openais-deep-research-tool
+226. RAG (deep dive). The Pragmatic Engineer. n.d. https://newsletter.pragmaticengineer.com/p/rag
+227. RAG-Fusion: A New Take on Retrieval-Augmented Generation. 2024. https://arxiv.org/abs/2402.03367
+228. REFRAG: Rethinking RAG-based Decoding. 2025. https://arxiv.org/pdf/2509.01092
+229. VideoRAG: Retrieval-Augmented Generation over Video Corpus. 2025. https://arxiv.org/abs/2501.05874
+230. Don't Do RAG: When Cache-Augmented Generation Is All You Need for Knowledge Tasks. 2024. https://arxiv.org/abs/2412.15605
+231. A-RAG (agentic RAG exposing keyword, semantic and chunk-level retrieval interfaces; title abbreviated). 2026. https://arxiv.org/abs/2602.03442
+232. Embedding-based Retrieval in Facebook Search. Huang et al. (Facebook). 2020. https://arxiv.org/abs/2006.11632
+233. Embedding-based Retrieval at Scribd. Scribd Tech. 2021. https://tech.scribd.com/blog/2021/embedding-based-retrieval-scribd.html
+234. Query Expansion (cookbook). Haystack (deepset). n.d. https://haystack.deepset.ai/cookbook/query-expansion
+235. File Search (tools guide, Responses API). OpenAI. n.d. https://developers.openai.com/api/docs/guides/tools-file-search
+236. Introducing the Model Context Protocol. Anthropic. 2024. https://www.anthropic.com/news/model-context-protocol
+237. Writing Effective Tools for AI Agents, Using AI Agents. Anthropic. 2025. https://www.anthropic.com/engineering/writing-tools-for-agents
+238. Moving to GraphRAG 1.0: Streamlining Ergonomics for Developers and Users. Microsoft Research. 2024. https://www.microsoft.com/en-us/research/blog/moving-to-graphrag-1-0-streamlining-ergonomics-for-developers-and-users/
+239. HippoRAG (repository, includes HippoRAG 2). OSU NLP Group. n.d. https://github.com/OSU-NLP-Group/HippoRAG
+240. From RAG to Memory: Non-Parametric Continual Learning for Large Language Models (HippoRAG 2). Gutiérrez et al. (OSU), ICML. 2025. https://arxiv.org/abs/2502.14802
+241. Search-o1: Agentic Search-Enhanced Large Reasoning Models. Li et al. 2025. https://arxiv.org/abs/2501.05366
+242. Introducing Deep Research. OpenAI. 2025. https://openai.com/index/introducing-deep-research/

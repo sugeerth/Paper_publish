@@ -24,7 +24,10 @@ This chapter surveys the publicly documented designs, from the research prototyp
   [29], A-Mem [32], MemOS [33] and MIRIX [34].
 - **Consumer assistant memory**: ChatGPT's saved memories and chat-history reference
   [18][19][21], and Claude's tool-based chat search, memory summaries and topics
-  [22][24].
+  [22][24], plus Gemini's personal context [44].
+- **Further designs** (Section 10): the LoCoMo benchmark [38], forgetting curves [39],
+  procedural memory distilled from experience [40][41] and RL-trained memory policies
+  [42][43].
 - **Developer-facing file memory**: Anthropic's client-side memory tool, context editing
   and Claude Code's CLAUDE.md and auto memory [25][26][27][28].
 
@@ -115,8 +118,9 @@ Whatever the substrate, every memory design answers the same questions:
 2. **When and who writes.** The agent can write *in the hot path*, via tool calls during
    the turn. A background process can write after the turn or during idle time.
    LangMem's guide calls these "conscious" and "subconscious" formation: hot-path writes
-   add latency and give the agent one more decision to make, while background writes
-   have "no latency impact" but update with a delay [17].
+   add "perceptible latency to user interactions" and give the agent one more decision
+   to make, while background writes are listed with a latency impact of "None" but
+   update with a delay [17].
 3. **How to reconcile.** Overwrite, UPDATE/DELETE via the LLM, append-only with links, or
    bi-temporal invalidation.
 4. **What and when to read.** Always inject a small profile, retrieve per query, or let
@@ -210,9 +214,10 @@ The MemGPT authors went on to found Letta, which describes itself as "formerly M
   so "grep" undersells the setup, and that LoCoMo barely tests knowledge updates. Letta
   itself called framework-to-framework comparison apples-to-oranges [7].
 - **Letta Code (2026).** The active codebase is now `letta-code`, and the V1 API server
-  has been retired to an archive branch [2]. Letta Code agents "rewrite their own memory,
-  skills, prompts, and even the harness itself". Memory blocks are now tracked in a
-  git-versioned **MemFS** that can sync to a GitHub repository. Periodic "dreaming" is
+  has been retired to an archive branch [2]. The README describes agents
+  "rewriting their own memory, skills, prompts, and even the harness itself". All context, including memory blocks, is
+  tracked in a git-versioned **MemFS** that can sync to a custom GitHub repository
+  (`/memory-repository`). Periodic "dreaming" is
   configured with `/sleeptime`, a recall subagent searches past messages, and
   agent-scoped skills live in MemFS [3].
 
@@ -264,9 +269,10 @@ analyses of the paper) [8]. For each candidate fact, the update phase fetches th
 most similar existing memories and asks the LLM to choose an operation. The library's
 `DEFAULT_UPDATE_MEMORY_PROMPT` names them directly: "ADD: Add it to the memory as a new
 element; UPDATE: Update an existing memory element; DELETE: Delete an existing memory
-element; NONE: Make no change" [10]. The graph variant, **Mem0g**, also stores entities
-and relations in a graph database. Neo4j, Memgraph, Neptune and Kuzu appear among its
-supported backends [8][9].
+element; NONE: Make no change (if the fact is already present or irrelevant)" [10]. The
+graph variant, **Mem0g**, also stores entities and relations in a graph database; the
+paper's implementation used Neo4j, and the library's documentation has listed several
+other graph backends over time [8].
 
 ### 3.3 Reported numbers (paper)
 
@@ -314,9 +320,9 @@ event, or continuation of a narrative"), the extractor records the old memory's 
 | BEAM (1M) | n/a | 64.1 | 6.7K | 1.00 s |
 | BEAM (10M) | n/a | 48.6 | 6.9K | 1.05 s |
 
-Source: Mem0 README [9]. These are self-reported figures for single-pass retrieval with a
-top-200 budget. Mem0 notes that the managed platform "includes proprietary optimizations
-not available in the open-source SDK". The evaluation harness is open-sourced.
+Source: Mem0 README [9]. These are self-reported figures for single-pass retrieval. The
+README says the scores "reflect Mem0's managed platform" and that "open-source users
+should expect directionally similar gains but not identical numbers".
 
 ### 3.5 Failure modes and lessons
 
@@ -340,8 +346,10 @@ not available in the open-source SDK". The evaluation harness is open-sourced.
 Zep (Rasmussen et al., January 2025) argues that enterprise agents need memory that
 combines conversation with business data and keeps track of *when* facts held. Static
 RAG and batch GraphRAG do neither well [12][13]. Graphiti is the open-source engine
-underneath. Zep's managed service runs Graphiti on a proprietary "Context Graph Engine"
-and advertises "sub-200ms" retrieval at scale [13].
+underneath. Zep's managed service runs on a proprietary database, the "Context Graph
+Engine", and advertises "sub-200ms performance at scale". Self-hosted Graphiti brings
+its own graph database (Neo4j, FalkorDB or Amazon Neptune; Kuzu support is marked
+deprecated), and its performance "depends on your setup" [13].
 
 ### 4.2 Architecture
 
@@ -403,8 +411,10 @@ Graphiti's search configuration defines these options [14]:
 - **Rerankers:** reciprocal rank fusion, MMR, `node_distance` (graph proximity to a focal
   node), `episode_mentions` (how often a fact recurs) and a cross-encoder.
 
-Recipes such as `COMBINED_HYBRID_SEARCH_RRF` and `EDGE_HYBRID_SEARCH_NODE_DISTANCE`
-package these choices [14]. The README stresses that retrieval does not depend on LLM
+Sixteen predefined recipes in `search_config_recipes.py`, such as
+`COMBINED_HYBRID_SEARCH_RRF` and `EDGE_HYBRID_SEARCH_NODE_DISTANCE`, package these
+choices [14]. (Episode reranking is limited to RRF and the cross-encoder, and community
+reranking to RRF, MMR and the cross-encoder.) The README stresses that retrieval does not depend on LLM
 summarization at query time. That is how it reaches "typically sub-second" latency,
 compared with "seconds to tens of seconds" for GraphRAG-style global search [13].
 
@@ -449,7 +459,8 @@ apply the policies from Section 1.3 [16][17]:
   - `create_manage_memory_tool` and `create_search_memory_tool` let an agent write and
     search memory in the hot path.
 - **Namespaces** segment memories hierarchically, for example by organization, user or
-  app. Templates such as `("memories", "{user_id}")` are filled from the run config.
+  app. Templates such as `("acme_corp", "{user_id}", "code_assistant")` are filled at run
+  time from the `configurable` fields of the `RunnableConfig`.
   Retrieval supports direct key lookup, semantic search and metadata filtering [17].
 
 ```
@@ -544,14 +555,22 @@ generations [24]:
 
 Several controls and scoping rules apply to both [24]:
 
-- **Projects.** Each project has its own memory space and summary, so memory does not
-  leak across workstreams.
-- **Sensitive topics.** Health, politics and similar topics are not saved by default.
-  Some data, such as government IDs and financial account numbers, is never saved.
+- **Projects.** Each project has its own memory. Inside a project, Claude uses that
+  project's memory plus the user's non-project memory, but never another project's;
+  turning off "Use account memory" isolates a project completely. Past-chat search
+  follows the same boundaries.
+- **Sensitive topics.** Health, politics, religion and similar topics are not saved
+  unless the user opts in, and Claude shows a notice when it saves one. Some data, such
+  as government ID numbers, financial account numbers, criminal history and
+  immigration status, is never saved.
 - **User controls.** Users can pause or reset memory, turn it off for a single chat, use
   incognito chats, and view and edit topics. Import and export are experimental.
-- **Deletion semantics.** In the new experience, deleting a conversation does *not*
-  delete the memory entries made from it.
+- **Deletion semantics.** In the new experience, deleting or expiring a conversation
+  does *not* delete the memory entries made from it; they must be deleted individually.
+  Reset deletes all memories, including project memories, irreversibly.
+- **Availability.** As of 2026 the help center lists memory as on by default for Free,
+  Pro and Max, and opt-in (owner-enabled) on Team and Enterprise; it is unavailable to
+  organizations with HIPAA, public-sector or custom data-retention agreements.
 
 Khemani reported that the later Claude profile is user-visible and about 1,000 tokens,
 against his estimate of about 4,000 for ChatGPT [23]. Chat search remains a separate,
@@ -642,24 +661,100 @@ table of contents with unbounded detail behind it.
   embedding and links to related notes. **Memory evolution** means a new note can update
   the descriptions and attributes of older linked notes. The authors report gains across
   six foundation models.
-- **MemOS** (2025) treats memory as a schedulable system resource [33]. It packages
-  memory in **MemCubes** whose payload is plaintext, activation (KV cache) or parametric
-  (for example, LoRA) memory, with metadata for governance. This extends "memory" beyond
-  retrieved text to cached activations and weights.
+- **MemOS** (2025) treats memory as a schedulable system resource [33]. The paper
+  packages memory in **MemCubes** whose payload is plaintext, activation (KV cache) or
+  parametric (for example, LoRA) memory, with metadata for governance. This extends
+  "memory" beyond retrieved text to cached activations and weights. By mid-2026 the
+  open-source project presented MemCubes mainly as composable, permissioned knowledge
+  bases and self-reported 88.83 on LoCoMo and 89.20 on LongMemEval [33][45].
 - **MIRIX** (2025) splits memory across six typed stores (Core, Episodic, Semantic,
   Procedural, Resource and Knowledge Vault), each run by its own manager agent under a
-  meta memory manager [34]. The authors report 85.4% on LoCoMo, plus 35% higher accuracy
-  than RAG on ScreenshotVQA with 99.9% less storage.
+  meta memory manager [34]. The paper reports 85.4% on LoCoMo, plus 35% higher accuracy
+  than a RAG baseline on ScreenshotVQA with 99.9% less storage (self-reported).
 - **LongMemEval** (Wu et al., ICLR 2025) is the benchmark most later systems cite [31].
   It has 500 questions over timestamped multi-session histories and tests five
   abilities: information extraction, multi-session reasoning, temporal reasoning,
   knowledge updates and abstention. The authors found that commercial assistants and
-  long-context LLMs lose about 30% accuracy over sustained interactions. They propose
-  session decomposition, fact-augmented key expansion and time-aware query expansion as
-  design fixes. They also note that LoCoMo does not test recall of assistant-provided
+  long-context LLMs show about a 30% accuracy drop when memorizing information across
+  sustained interactions. They propose session decomposition, fact-augmented key
+  expansion and time-aware query expansion as design fixes. They also note that LoCoMo does not test recall of assistant-provided
   information or reasoning over updated user information [31].
 
-## 10. Comparison
+## 10. Further Designs and 2024-2026 Developments
+
+### 10.1 LoCoMo: the other standard benchmark
+
+Most vendor numbers in this chapter are reported on **LoCoMo** ("Evaluating Very
+Long-Term Conversational Memory of LLM Agents"; Maharana, Lee, Tulyakov, Bansal,
+Barbieri, Fang; ACL 2024) [38]. It is small: ten very long, multi-session conversations,
+annotated for question answering and event summarization (its dialogs can also be used
+for multimodal dialog generation). Its size explains why scores saturate quickly and why
+harness details (speaker roles, timestamps, judge prompts) swing results by many points,
+as the Mem0/Zep dispute showed [15]. LongMemEval [31] and newer suites such as BEAM [9]
+were partly motivated by these limits. When comparing systems, prefer the benchmark whose
+question mix (knowledge updates, temporal reasoning, abstention) matches your workload.
+
+### 10.2 Forgetting as a policy: MemoryBank
+
+**MemoryBank** (Zhong et al., 2023; AAAI 2024) [39] made *forgetting* an explicit part of
+the write/consolidation policy. Inspired by the Ebbinghaus forgetting curve, it lets the
+system "selectively forget or reinforce memories based on their significance and the
+passage of time": memories that are recalled get reinforced, and unused ones decay. Most
+production systems in this chapter never forget on their own (Mem0's 2026 design is
+explicitly append-only; Zep invalidates but keeps edges). Decay-based pruning remains the
+main published alternative to unbounded growth, alongside the "expire files that have not
+been accessed" advice in Anthropic's memory-tool documentation [26].
+
+### 10.3 Procedural memory from experience: AWM and ReasoningBank
+
+The systems above mostly store *facts about the user*. A parallel line of work stores
+*how to do tasks*, which is CoALA's procedural memory [30]:
+
+- **Agent Workflow Memory (AWM)** (Wang, Mao, Fried, Neubig, 2024) [40] induces reusable
+  workflows (sub-routines with abstracted variables) from an agent's past trajectories,
+  offline or online, and injects them into later tasks. The project reports a 35.6%
+  success rate on WebArena, state-of-the-art at publication.
+- **ReasoningBank** (Ouyang et al., Google, 2025) [41] distills generalizable reasoning
+  strategies from both *successful and failed* trajectories, judged by the agent itself,
+  retrieves them for new tasks, and writes new lessons back after each task. This is
+  memory as a self-improvement loop, close in spirit to LangMem's prompt optimizer [17]
+  and Letta Code's self-rewriting skills [3].
+
+The design lesson: episodic logs become far more useful when a consolidation step
+abstracts them into strategies, and failures are worth recording as well as successes.
+
+### 10.4 Learned memory policies: MEM1 and Memory-R1
+
+Every write policy so far is hand-designed: a prompt tells the LLM what to extract and
+when to UPDATE or DELETE. In 2025 several papers trained the policy with reinforcement
+learning instead:
+
+- **MEM1** (Zhou et al., 2025) [42] trains an agent end to end to keep a *constant-size*
+  internal state. At each turn it merges prior memory with new observations and discards
+  irrelevant or redundant information, instead of appending to the context. On a
+  16-objective multi-hop QA task, MEM1-7B reports 3.5x better performance and 3.7x less
+  memory than Qwen2.5-14B-Instruct, and it generalizes beyond its training horizon.
+- **Memory-R1** (Yan et al., 2025) [43] fine-tunes a *memory manager* that chooses
+  ADD/UPDATE/DELETE/NOOP operations (the Mem0 operation set) and an *answer agent* that
+  filters retrieved memories, both with outcome-based RL from a small amount of training
+  data.
+
+Learned policies are still research systems, but they show that the operation set
+matters less than whether the policy is optimized for downstream answers rather than for
+an extraction prompt's notion of "important".
+
+### 10.5 Gemini: the third consumer design
+
+Google's Gemini app added a "Personal context" setting in August 2025 that lets Gemini
+learn from and reference past chats automatically, alongside **Temporary Chats** that are
+not used for personalization [44]. It sits between the two designs in Sections 6 and 7:
+automatic like ChatGPT's chat-history reference, with user controls to switch it off per
+chat. Google has not published its internals, so treat any architectural description as
+speculative. The broader point stands: by 2026 all three major consumer assistants ship
+automatic cross-chat memory with an incognito escape hatch, which makes the security
+lessons of Section 6.3 universal rather than vendor-specific.
+
+## 11. Comparison
 
 | System | Primary substrate | Write policy (who/when) | Reconciliation | Read policy | Public latency/cost signal |
 |---|---|---|---|---|---|
@@ -725,7 +820,7 @@ table of contents with unbounded detail behind it.
 11. Mem0. "Benchmarked OpenAI Memory vs LangMem vs MemGPT vs Mem0 for Long-Term Memory." Mem0 blog, 2025. https://mem0.ai/blog/benchmarked-openai-memory-vs-langmem-vs-memgpt-vs-mem0-for-long-term-memory-here-s-how-they-stacked-up
 12. P. Rasmussen, P. Paliychuk, T. Beauvais, J. Ryan, D. Chalef (Zep). "Zep: A Temporal Knowledge Graph Architecture for Agent Memory." arXiv, 2025. https://arxiv.org/abs/2501.13956
 13. Zep. "Graphiti: A Framework for Building Temporal Knowledge Graphs" README. GitHub, 2026. https://github.com/getzep/graphiti
-14. Zep. Graphiti source: `graphiti_core/search/search_config.py` and `graphiti_core/edges.py`. GitHub, 2026. https://github.com/getzep/graphiti/blob/main/graphiti_core/search/search_config.py
+14. Zep. Graphiti source: `graphiti_core/search/search_config.py`, `search_config_recipes.py` and `graphiti_core/edges.py`. GitHub, 2026. https://github.com/getzep/graphiti/blob/main/graphiti_core/search/search_config.py
 15. Zep. "Lies, Damn Lies, & Statistics: Is Mem0 Really SOTA in Agent Memory?" Zep blog, 2025. https://blog.getzep.com/lies-damn-lies-statistics-is-mem0-really-sota-in-agent-memory/
 16. LangChain. "LangMem" README. GitHub, 2025. https://github.com/langchain-ai/langmem
 17. LangChain. "LangMem Core Concepts: Long-term Memory in LLM Applications." 2025. https://github.com/langchain-ai/langmem/blob/main/docs/docs/concepts/conceptual_guide.md
@@ -749,3 +844,11 @@ table of contents with unbounded detail behind it.
 35. The Hacker News. "ChatGPT macOS Flaw Could've Enabled Long-Term Spyware via Memory Function" (J. Rehberger's SpAIware). September 2024. https://thehackernews.com/2024/09/chatgpt-macos-flaw-couldve-enabled-long.html
 36. A. Ghoshal. "Anthropic adds memory to Claude for Team and Enterprise plan users." Computerworld, September 2025. https://www.computerworld.com/article/4056366/anthropic-adds-memory-to-claude-for-team-and-enterprise-plan-users.html
 37. Zep. "State of the Art in Agent Memory" (LongMemEval results). Zep blog, 2025. https://blog.getzep.com/state-of-the-art-agent-memory/
+38. A. Maharana, D.-H. Lee, S. Tulyakov, M. Bansal, F. Barbieri, Y. Fang. "Evaluating Very Long-Term Conversational Memory of LLM Agents" (LoCoMo). ACL 2024. https://arxiv.org/abs/2402.17753 (data: https://github.com/snap-research/locomo)
+39. W. Zhong, L. Guo, Q. Gao, H. Ye, Y. Wang. "MemoryBank: Enhancing Large Language Models with Long-Term Memory." arXiv 2023 / AAAI 2024. https://arxiv.org/abs/2305.10250
+40. Z. Wang, J. Mao, D. Fried, G. Neubig. "Agent Workflow Memory." arXiv, 2024. https://arxiv.org/abs/2409.07429
+41. S. Ouyang et al. (Google). "ReasoningBank: Scaling Agent Self-Evolving with Reasoning Memory." arXiv, 2025. https://arxiv.org/abs/2509.25140
+42. Z. Zhou, A. Qu, Z. Wu, S. Kim, A. Prakash, D. Rus, J. Zhao, B. K. H. Low, P. P. Liang. "MEM1: Learning to Synergize Memory and Reasoning for Efficient Long-Horizon Agents." arXiv, 2025. https://arxiv.org/abs/2506.15841
+43. S. Yan et al. "Memory-R1: Enhancing Large Language Model Agents to Manage and Utilize Memories via Reinforcement Learning." arXiv, 2025. https://arxiv.org/abs/2508.19828
+44. Google. "Temporary Chats and new privacy controls in the Gemini app" (personal context). The Keyword, August 2025. https://blog.google/products/gemini/temporary-chats-privacy-controls/
+45. MemTensor. "MemOS" README (2026 news and benchmark table). GitHub, 2026. https://github.com/MemTensor/MemOS

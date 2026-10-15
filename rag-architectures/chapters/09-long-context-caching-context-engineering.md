@@ -32,15 +32,17 @@ The chapter is organized as follows:
 
 ```
    Section 1  Evidence: how models actually use long inputs
-              (NIAH -> lost-in-the-middle -> RULER/NoLiMa/HELMET -> context rot)
+              (NIAH -> lost-in-the-middle -> RULER/NoLiMa/HELMET -> context rot
+               -> Michelangelo/MRCR)
    Section 2  Long context vs RAG: head-to-head studies and hybrid routers
-              (Self-Route, OP-RAG, LongRAG, Databricks, "RAG meets LC")
+              (Self-Route, OP-RAG, LongRAG, Databricks, "RAG meets LC", LaRA,
+               sufficient context)
    Section 3  Cache-augmented generation (CAG): preload instead of retrieve
    Section 4  Prefix / prompt caching: providers and serving engines
    Section 5  Non-prefix KV reuse for RAG: Prompt Cache, RAGCache, CacheBlend,
-              TurboRAG, Block-Attention, EPIC, APE, KVLink
+              TurboRAG, Block-Attention, EPIC, APE, KVLink; KVzip compression
    Section 6  KV-cache infrastructure: LMCache, Mooncake, llm-d, Dynamo
-   Section 7  Context engineering for agents
+   Section 7  Context engineering for agents (incl. ACE playbooks)
    Section 8  Comparison table, decision guide, takeaways
 ```
 
@@ -119,10 +121,12 @@ length, and only about half handle 32K effectively [4].
 
 NoLiMa (Adobe Research and LMU Munich, ICML 2025) builds needle/question pairs with minimal
 lexical overlap. The model has to make a latent association, for example knowing that a
-character who lives next to a landmark lives in a particular city [5]. Of 12 models
-claiming at least 128K context, 10 fell below 50% of their short-context baseline at 32K.
-GPT-4o fell from 99.3% to 69.7% [5]. The repository's effective-length table, using an 85%
-of base score threshold, is striking [5]:
+character who lives next to a landmark lives in a particular city [5]. In the paper's
+original evaluation of 12 models claiming at least 128K context, 10 fell below 50% of their
+short-context baseline at 32K. GPT-4o fell from 99.3% to 69.7% [5]. The repository has
+since expanded the evaluation to 22 models, and in the expanded table most of them fall
+below 50% of base at 32K. Its effective-length table, using an 85% of base score
+threshold, is striking (selected rows) [5]:
 
 | Model | Claimed | Effective (NoLiMa) |
 |---|---|---|
@@ -144,7 +148,7 @@ and the evidence share no surface form, both the retriever and the reader suffer
 HELMET (Princeton and Intel, ICLR 2025) evaluates seven categories: synthetic recall, RAG,
 re-ranking, citation generation, long-document QA, summarization, and many-shot ICL [8].
 It was built because synthetic NIAH-style tasks were seen as poor predictors of downstream
-long-context ability [8]. LongBench v2 (Tsinghua/Zhipu) has 503 multiple-choice questions
+long-context ability [8]. LongBench v2 (Tsinghua/Zhipu, ACL 2025) has 503 multiple-choice questions
 over contexts of 8K to 2M words, most under 128K. Human experts with a 15-minute limit
 score 53.7%. The best model answering directly scores 50.1%, and o1-preview with extended
 reasoning scores 57.7% [7]. The takeaway is that long-context *reasoning*, as opposed to
@@ -158,7 +162,8 @@ robust *semantic* use of the context.
 ### 1.6 Context rot (Chroma, 2025)
 
 Chroma's technical report "Context Rot: How Increasing Input Tokens Impacts LLM
-Performance" (Hong, Troynikov, Huber, July 2025) [6] tested 18 frontier and open models.
+Performance" (Hong, Troynikov, Huber, 14 July 2025) [6] tested 18 frontier and open models,
+including GPT-4.1, Claude 4, Gemini 2.5, and Qwen3 variants.
 The design holds task difficulty constant while varying only input length. Experiments
 (code in [6]):
 
@@ -192,6 +197,19 @@ gradually as the window fills [37].
 **Lesson.** For RAG, context rot argues against sending "everything that might be
 relevant". Each irrelevant but similar chunk acts as a distractor. Precision of the
 retrieved set matters as much as recall.
+
+### 1.7 Michelangelo and MRCR: beyond haystacks
+
+Michelangelo (Vodrahalli et al., Google DeepMind, September 2024) proposes *Latent
+Structure Queries* (LSQ): the model must filter out irrelevant context to reconstruct a
+hidden structure, then answer questions about it [48]. It contributes three diagnostic
+tasks over code and natural language. One of them, Multi-Round Coreference Resolution
+(MRCR), asks the model to reproduce, say, "the second poem about tapirs" from a long
+synthetic conversation full of near-duplicate requests. MRCR-style tests have since become
+standard in vendor long-context reporting (for example OpenAI's MRCR release with
+GPT-4.1 in 2025), because they combine the distractor and coreference pressures that
+literal NIAH lacks [48]. For RAG builders, MRCR is a close proxy for "find the right one of
+many near-identical chunks", which is exactly the hard-negative problem of Section 2.3.
 
 ---
 
@@ -228,8 +246,10 @@ RAG was far cheaper. For a large share of queries the two produced the *same* pr
 
 The model judges answerability itself through a self-reflection prompt. Most queries are
 resolved in the cheap RAG step and only the remainder escalates [10]. The paper reports
-performance comparable to LC at much lower cost. The reported savings were roughly 65% of
-cost for Gemini-1.5-Pro and about 39% for GPT-4o (approximate figures from the paper) [10].
+performance comparable to LC at much lower cost. Reported savings are up to roughly 65% of
+cost for Gemini-1.5-Pro and about 39% for GPT-4o. Secondary summaries of the paper differ on
+whether these are token or cost reductions and on the exact setting, so treat them as
+approximate and check the paper's tables [10].
 The authors also analysed why RAG fails: multi-step reasoning, general or implicit
 queries, long and complex queries, and chunking breaking up the evidence [10].
 
@@ -287,7 +307,33 @@ prompt caching keeps the full document cached while each chunk is contextualized
 That is a clear example of caching enabling a RAG indexing technique rather than replacing
 RAG.
 
-### 2.7 Synthesis
+### 2.7 LaRA: "no silver bullet" (Alibaba and collaborators, ICML 2025)
+
+Li et al. argue that earlier RAG-versus-LC comparisons were inconclusive because of
+benchmark artifacts such as leaked answers and contexts that fit easily in the window
+[49]. LaRA has 2,326 test cases at 32K and 128K context lengths, spanning four QA task
+categories (including location, reasoning, and hallucination-detection questions) over
+three kinds of naturally occurring long text: books, academic papers, and financial
+documents. Across eleven LLMs, the better choice depended on model capability, context
+length, context type, and task type [49]. One consistent pattern is that weaker models
+gain more from retrieval, while stronger long-context models narrow or reverse the gap.
+The practical upshot matches Self-Route: build a router and calibrate it per model rather
+than adopting one paradigm.
+
+### 2.8 Sufficient context (Google Research, ICLR 2025)
+
+Joren et al. ask whether a RAG error comes from the model misusing the context or from the
+context lacking the answer [50]. They define *sufficient context*, build an LLM autorater
+that labels whether a query-context pair contains enough information, and find that
+strong models (Gemini 1.5 Pro, GPT-4o, Claude 3.5) answer well when context is sufficient
+but tend to answer wrongly instead of abstaining when it is not. Smaller open models
+hallucinate or abstain often even with sufficient context [50]. A selective-generation
+method that uses the sufficiency signal for guided abstention raised the share of correct
+answers among those the model chose to give by 2-10% [50]. This is the formal version of
+Self-Route's "is this answerable from these chunks?" step, and it gives a principled
+trigger for escalating to long context or further retrieval.
+
+### 2.9 Synthesis
 
 | Factor | Favors long context | Favors RAG |
 |---|---|---|
@@ -388,8 +434,9 @@ or use automatic caching, which moves the breakpoint forward as a conversation g
 Up to 4 breakpoints are allowed per request, each with a 20-block lookback window [18].
 The cache hierarchy is `tools -> system -> messages`. Changing tool definitions
 invalidates everything. Toggling features such as web search or citations invalidates
-system and messages. Changing `tool_choice`, images, or thinking settings invalidates
-messages [18]. The default TTL is 5 minutes, refreshed on each hit, with an optional 1-hour
+system and messages. Changing `tool_choice` or images invalidates
+messages; thinking-setting changes always invalidate messages and, on some models, earlier
+levels too [18]. The default TTL is 5 minutes, refreshed on each hit, with an optional 1-hour
 TTL. Writes cost 1.25x base input for 5 minutes or 2x for 1 hour. Reads cost 0.1x on
 standard models, with lower read multipliers on some newer models. There is a per-model
 minimum cacheable length of 512 to 4,096 tokens, and shorter prompts are silently not
@@ -517,10 +564,11 @@ cross-attention. The token set is chosen progressively across layers. *Pipelinin
 recomputation is overlapped with fetching KV from slower storage, so caches can live on
 CPU RAM or SSD without adding latency [26].
 
-**Numbers.** The paper reports TTFT reductions of roughly 2.2-3.3x and throughput gains of
-roughly 2.8-5x compared with full prefill, with generation quality comparable to full
-recompute on multi-hop QA and summarization benchmarks. Evaluation datasets include
-MuSiQue, 2WikiMQA, and SAMSum (approximate, from the abstract and repository) [26].
+**Numbers.** The abstract reports TTFT reductions of 2.2-3.3x and throughput gains of
+2.8-5x compared with full KV recompute, across three open-source LLMs and four benchmark
+datasets, without compromising generation quality. The repository's example scripts use
+MuSiQue, 2WikiMQA, and SAMSum [26]. The paper received a EuroSys 2025 Best Paper award
+[26].
 
 **Productization.** CacheBlend's maintained implementation lives in LMCache. It supports
 non-prefix reuse "even when the new prompt is not a prefix of the cached one, such as RAG
@@ -531,7 +579,7 @@ with swapped documents", running in-process with vLLM and offloading to CPU or d
 separators so boundaries can be found. Integration currently needs engine patches,
 marked experimental [33]. Quality guarantees are empirical, not exact.
 
-### 5.5 TurboRAG (Moore Threads, 2024)
+### 5.5 TurboRAG (Moore Threads, EMNLP 2025)
 
 **Design.** TurboRAG precomputes the KV cache of each document chunk offline (512-token
 chunks in the reference code) and stores it. At query time it retrieves chunk caches,
@@ -542,9 +590,11 @@ fine-tuning, so the model learns to answer from chunks that never attended to ea
 [27].
 
 **Numbers.** The repository's demo shows TTFT for 10 retrieved documents of about 0.65 s
-with cached KV compared with 4.13 s without, roughly 6x [27]. The paper reports larger
-average and peak TTFT reductions (approximately 8-9x) with accuracy comparable to standard
-RAG on the evaluated benchmarks [27].
+with cached KV compared with 4.13 s without, roughly 6x [27]. The paper reports TTFT
+reductions of up to 9.4x (8.6x on average) compared with conventional RAG, with accuracy
+comparable to standard RAG on the evaluated benchmarks [27]. The speedup depends heavily
+on where the cache lives: in the paper's A100 batch experiments, including the CPU-to-GPU
+transfer over PCIe cut the gain to roughly 4-5x [27].
 
 **Contrast with CacheBlend.** TurboRAG pays a one-time fine-tuning cost and gets
 near-zero query-time recomputation. CacheBlend needs no fine-tuning and pays a small,
@@ -576,7 +626,21 @@ input, TTFT was 45 ms, which is 98.7% lower TTFT and 99.8% fewer FLOPs than full
   *link/summary tokens* per segment, which reconnect cross-document context under a
   segment attention mask [31]. It is the "add tokens" fix in the taxonomy above.
 
-### 5.8 Lessons across the KV-reuse line
+### 5.8 KVzip: query-agnostic compression for reusable caches (NeurIPS 2025)
+
+Most KV-eviction methods (SnapKV-style) score entries by attention from the *current*
+query, so a compressed cache is only good for that query. That defeats the purpose of CAG
+and chunk-cache stores, where one cache must serve many future queries. KVzip (Kim et al.,
+Seoul National University and NAVER AI Lab, NeurIPS 2025 oral) scores each KV pair by how
+much the model needs it to *reconstruct the original context* from the cache, and evicts
+the least important pairs [51]. The resulting cache is query-agnostic. The authors report
+a 3-4x smaller KV cache and about 2x lower FlashAttention decoding latency with negligible
+loss on QA, retrieval, reasoning, and code tasks, on LLaMA 3.1, Qwen2.5, and Gemma 3 at up
+to 170K tokens. Query-aware baselines degraded even at a 90% cache budget in multi-query
+settings [51]. For CAG and LMCache-style stores, query-agnostic compression directly
+reduces the storage bottleneck discussed below.
+
+### 5.9 Lessons across the KV-reuse line
 
 1. **There is no free lunch on cross-chunk attention.** Each system either recomputes some
    tokens (CacheBlend, EPIC), adds tokens (KVLink), or trains the model to need less of it
@@ -603,19 +667,23 @@ and the vLLM Production Stack [33].
 **Mooncake** (Moonshot AI, FAST 2025 Best Paper) is the serving platform behind Kimi. It
 is KV-cache-centric and disaggregated, "trading more storage for less computation". A
 distributed KV store over DRAM and SSD feeds prefill and decode pools through a Transfer
-Engine that reaches up to 190 GB/s on 8x400 Gbps RoCE [34]. The project says it let Kimi
-handle 75% more requests while meeting SLOs [34]. For long-context and RAG-heavy traffic,
+Engine that reaches up to 87 GB/s on 4x200 Gbps and 190 GB/s on 8x400 Gbps RoCE, by the
+project's own measurements [34]. The project says it let Kimi handle 75% more requests
+under real workloads while meeting SLOs; no baseline or methodology is given in the
+repository [34]. For long-context and RAG-heavy traffic,
 this architecture turns prefix reuse into a cluster-wide resource rather than a per-GPU
 accident.
 
 **Cache-aware routing.** A cache hit requires the request to land on a worker holding the
-prefix. llm-d (a CNCF sandbox project founded by Red Hat, Google Cloud, IBM Research,
-CoreWeave, and NVIDIA) reports that prefix-cache-aware routing gave about 3x output
-throughput and 2x faster TTFT compared with round-robin for Llama 3.1 70B, and that
-hierarchical KV offloading gave about 13.9x throughput at 250 concurrent users compared
-with GPU-only [35]. NVIDIA Dynamo routes on "worker load and KV cache overlap" and reports
-about 2x faster TTFT from KV-aware routing in a partner benchmark. Its KV Block Manager
-tiers caches across GPU, CPU, SSD, and remote storage [36].
+prefix. llm-d (founded by Red Hat, Google Cloud, IBM Research, CoreWeave, and NVIDIA; a
+CNCF sandbox project since March 2026) reports that prefix-cache-aware routing gave about
+3x output throughput and 2x faster TTFT compared with round-robin for Llama 3.1 70B on four
+AMD MI300X accelerators, and that hierarchical KV offloading gave about 13.9x throughput at
+250 concurrent users compared with GPU-only on four H100s [35]. These are project-reported
+benchmarks. NVIDIA Dynamo routes on "worker load and KV cache overlap" and reports about 2x
+faster TTFT from KV-aware routing in a single third-party (Baseten) benchmark on
+Qwen3-Coder 480B. Its KV Block Manager tiers caches across GPU, CPU, SSD, and remote
+storage, including S3 and Azure Blob in version 1.0 [36].
 
 ```
                   +-------------------------------+
@@ -729,6 +797,24 @@ cache-aware agent design [43]:
   +------------------+   +--------------------+   +-----------------------------+
 ```
 
+### 7.5 ACE: contexts as evolving playbooks (ICLR 2026)
+
+Agentic Context Engineering (Zhang et al., Stanford, SambaNova, and UC Berkeley; ICLR
+2026) treats the context itself as the thing being optimized [52]. Instead of rewriting a
+prompt or summary wholesale, ACE maintains a structured *playbook* of itemized strategies
+and lessons, updated by a loop of Generator, Reflector, and Curator roles. It applies
+small incremental "delta" edits rather than full rewrites. The authors identify two
+failure modes of earlier prompt-optimization and memory methods: *brevity bias*, where
+summaries drop domain detail, and *context collapse*, where repeated rewriting erodes
+accumulated knowledge [52]. Building on Dynamic Cheatsheet, ACE reports gains of about
+10.6% on agent benchmarks and 8.6% on finance tasks, with lower adaptation latency and
+rollout cost, and can adapt from execution feedback without labels. On the AppWorld
+leaderboard it matched the top production agent on average and beat it on the harder
+test-challenge split while using a smaller open model [52]. It is a counterpoint to
+aggressive compaction: for knowledge that should accumulate, grow and curate the context
+instead of summarizing it away. Delta updates are also friendlier to prefix caching than
+full rewrites.
+
 ---
 
 ## 8. Comparison and decision guide
@@ -748,6 +834,7 @@ cache-aware agent design [43]:
 | TurboRAG [27] | any chunk position | approximate | fine-tune | ~6-9x TTFT | checkpoint lock-in |
 | Block-Attention [28] | any block position | approximate | fine-tune | ~99% TTFT cut at 32K | training required |
 | EPIC / APE / KVLink [29]-[31] | any position | approximate | none / none / train | lighter-weight fixes | newer, less proven |
+| KVzip [51] | compressed reusable cache | lossy | none | 3-4x smaller KV, multi-query | one-time reconstruction scoring cost |
 | Context editing / compaction [39]-[41] | n/a (shrinks window) | lossy | none | long agent runs | cache invalidation, info loss |
 
 ### 8.2 Decision guide
@@ -826,7 +913,7 @@ cache-aware agent design [43]:
    Impacts LLM Performance." 2025. https://research.trychroma.com/context-rot (code:
    https://github.com/chroma-core/context-rot)
 7. Bai, Y., et al. (Tsinghua University, Zhipu AI). "LongBench v2: Towards Deeper
-   Understanding and Reasoning on Realistic Long-context Multitasks." 2024.
+   Understanding and Reasoning on Realistic Long-context Multitasks." ACL, 2025 (arXiv 2024).
    https://arxiv.org/abs/2412.15204 (repository: https://github.com/THUDM/LongBench)
 8. Yen, H., Gao, T., Hou, M., Ding, K., Fleischer, D., Izsak, P., Wasserblat, M., Chen, D.
    "HELMET: How to Evaluate Long-Context Language Models Effectively and Thoroughly."
@@ -874,11 +961,12 @@ cache-aware agent design [43]:
     for Retrieval-Augmented Generation." 2024. https://arxiv.org/abs/2404.12457
 26. Yao, J., Li, H., Liu, Y., Ray, S., Cheng, Y., Zhang, Q., Du, K., Lu, S., Jiang, J.
     (University of Chicago). "CacheBlend: Fast Large Language Model Serving for RAG with
-    Cached Knowledge Fusion." EuroSys, 2025. https://arxiv.org/abs/2405.16444 (code:
-    https://github.com/YaoJiayi/CacheBlend)
+    Cached Knowledge Fusion." EuroSys, 2025 (Best Paper). https://arxiv.org/abs/2405.16444
+    (code: https://github.com/YaoJiayi/CacheBlend; award note:
+    https://blog.lmcache.ai/2025-03-31-eurosys)
 27. Lu, S., Wang, H., Rong, Y., Chen, Z., Tang, Y. (Moore Threads). "TurboRAG:
     Accelerating Retrieval-Augmented Generation with Precomputed KV Caches for Chunked
-    Text." 2024. https://arxiv.org/abs/2410.07590 (code:
+    Text." EMNLP, 2025 (arXiv 2024). https://arxiv.org/abs/2410.07590 (code:
     https://github.com/MooreThreads/TurboRAG)
 28. Ma, D., Wang, Y., Lan, T. "Block-Attention for Efficient Prefilling." ICLR, 2025.
     https://arxiv.org/abs/2409.15355 (code: https://github.com/TemporaryLoRA/Block-Attention)
@@ -929,3 +1017,19 @@ cache-aware agent design [43]:
     https://aclanthology.org/2024.acl-long.91/ (code: https://github.com/microsoft/LLMLingua)
 47. Wu, D., et al. "LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive
     Memory." ICLR, 2025. https://arxiv.org/abs/2410.10813
+48. Vodrahalli, K., et al. (Google DeepMind). "Michelangelo: Long Context Evaluations
+    Beyond Haystacks via Latent Structure Queries." 2024. https://arxiv.org/abs/2409.12640
+    (see also OpenAI MRCR dataset: https://huggingface.co/datasets/openai/mrcr)
+49. Li, K., Zhang, L., Jiang, Y., Xie, P., Huang, F., Wang, S., Cheng, M. "LaRA:
+    Benchmarking Retrieval-Augmented Generation and Long-Context LLMs - No Silver Bullet
+    for LC or RAG Routing." ICML, 2025. https://proceedings.mlr.press/v267/li25dv.html
+    (arXiv: https://arxiv.org/abs/2502.09977; code: https://github.com/Alibaba-NLP/LaRA)
+50. Joren, H., Zhang, J., Ferng, C.-S., Juan, D.-C., Taly, A., Rashtchian, C. (Google).
+    "Sufficient Context: A New Lens on Retrieval Augmented Generation Systems." ICLR, 2025.
+    https://arxiv.org/abs/2411.06037
+51. Kim, J.-H., Kim, J., Kwon, S., Lee, J. W., Yun, S., Song, H. O. "KVzip: Query-Agnostic
+    KV Cache Compression with Context Reconstruction." NeurIPS, 2025 (oral).
+    https://neurips.cc/virtual/2025/poster/118741
+52. Zhang, Q., et al. (Stanford, SambaNova, UC Berkeley). "Agentic Context Engineering:
+    Evolving Contexts for Self-Improving Language Models." ICLR, 2026.
+    https://arxiv.org/abs/2510.04618

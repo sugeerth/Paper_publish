@@ -6,12 +6,12 @@ A RAG system is a pipeline of at least two learned components: a retriever (ofte
 
 Between 2021 and 2026 the field built a layered evaluation stack:
 
-1. **Retrieval-level IR metrics** (Recall@k, Precision@k, MRR, MAP, nDCG) and benchmarks (BEIR, MTEB/MMTEB, BRIGHT) [6][23][24][25].
+1. **Retrieval-level IR metrics** (Recall@k, Precision@k, MRR, MAP, nDCG), utility-based retrieval labels (eRAG) and benchmarks (BEIR, MTEB/MMTEB, BRIGHT) [6][23][24][25][37].
 2. **Component-level RAG metrics** scored by LLM judges or NLI models. Examples are the RAGAS metrics (faithfulness, context precision, context recall, answer relevancy) [1][2], the TruLens "RAG triad" [5], ARES's fine-tuned judges with statistical confidence intervals [3][4], and RAGChecker's claim-level diagnostics [8].
-3. **Specialised groundedness and hallucination detectors**: small NLI-style models such as Vectara HHEM and MiniCheck, plus annotated corpora such as RAGTruth and LLM-AggreFact [9][10][11][12].
+3. **Specialised groundedness and hallucination detectors**: small NLI-style models such as Vectara HHEM and MiniCheck, open LLM judges such as Lynx, plus annotated corpora such as RAGTruth, HaluBench and LLM-AggreFact [9][10][11][12][38].
 4. **Citation evaluation** (ALCE's citation recall and precision) [7].
 5. **Nugget-based evaluation** in the TREC style (UMBRELA, AutoNuggetizer, Ragnarok, open-rag-eval) [18][19][20][21].
-6. **End-to-end RAG benchmarks** (CRAG, RGB, MultiHop-RAG, FlashRAG, BERGEN, BenchmarkQED, RAGBench) [15][16][17][31][32][22][26].
+6. **End-to-end RAG benchmarks and challenges** (CRAG, RGB, MultiHop-RAG, FlashRAG, BERGEN, BenchmarkQED, RAGBench, LiveRAG) [15][16][17][31][32][22][26][40], and context-sufficiency analysis [39].
 7. **Methodology for LLM-as-a-judge** (agreement studies, bias, open evaluator models) [13][14][30].
 8. **Production observability**: OpenTelemetry tracing, online evaluators and feedback loops (TruLens, Arize Phoenix, Langfuse, Azure AI Evaluation, DeepEval) [5][27][28][29][33].
 
@@ -54,6 +54,14 @@ Before looking at specific frameworks, it helps to list what can go wrong and wh
 
 The RGB benchmark (Chen et al.) frames the generator-side abilities as four tests: noise robustness, negative rejection, information integration, and counterfactual robustness. Its repository runs them through a `noise_rate` sweep, a rejection rate at `noise_rate=1`, `*_int` integration sets, and `*_fact` counterfactual sets with error-detection and error-correction rates, in English and Chinese [16]. CRAG's scoring encodes the abstention trade-off directly. In automatic evaluation a correct answer scores +1, a "missing" answer ("I don't know") scores 0, and an incorrect answer scores -1, so a system that hallucinates is ranked below one that abstains [15].
 
+### 1.1 Sufficient context: is the failure retrieval's or the generator's?
+
+**Problem.** Relevance labels say whether a chunk is *on topic*, not whether the context as a whole *contains enough information* to answer. Joren et al. (Google, UC San Diego, Duke; ICLR 2025) define **sufficient context** as context from which a plausible answer can be derived, and build an LLM autorater that classifies (query, context) pairs as sufficient or insufficient without needing a reference answer [39].
+
+**Findings.** Stratifying errors by sufficiency separates the two root causes in the table above. Strong proprietary models (Gemini 1.5 Pro, GPT-4o, Claude 3.5) answer well when context is sufficient, but often answer *incorrectly instead of abstaining* when it is not. Smaller open models (Llama 3.1, Mistral 3, Gemma 2) hallucinate or abstain often even with sufficient context. A selective-generation method that combines the sufficiency signal with model confidence raised the fraction of correct answers among those given by 2% to 10% [39].
+
+**Lesson.** Add a sufficiency label to every golden item and every sampled production trace. "Insufficient context, wrong answer" is a retrieval or abstention bug; "sufficient context, wrong answer" is a generation bug. Neither the RAG triad nor faithfulness alone makes that split.
+
 ## 2. Retrieval metrics and IR benchmarks
 
 ### 2.1 Classical rank metrics
@@ -92,6 +100,16 @@ MTEB (Muennighoff et al., 2022) widened embedding evaluation beyond retrieval to
 ### 2.4 BRIGHT: reasoning-intensive retrieval
 
 BRIGHT (Su, Yen, Xia et al., ICLR 2025) targets queries for which keyword or semantic overlap is not enough. Its 12 datasets span biology, economics, robotics, math, code and more, with long StackExchange-style posts and math/code questions as queries. The repository evaluates 13 retrievers, including BM25, E5, BGE and the OpenAI, Cohere and Voyage embeddings [25]. The paper reports that models scoring well on BEIR-style benchmarks drop sharply on BRIGHT (see the paper for exact nDCG@10 values). This motivates query rewriting and reasoning-augmented retrieval (Chapters 6 and 8), and it means retrieval evals should include "hard" queries that need inference to connect to the evidence.
+
+### 2.5 eRAG: judging retrieval by downstream utility
+
+**Problem.** Query-document relevance labels correlate only weakly with how a RAG system actually performs, and end-to-end evaluation for every retriever variant is expensive.
+
+**Design.** eRAG (Salemi and Zamani, SIGIR 2024) feeds *each retrieved document on its own* to the generator, scores the resulting output against the task's ground truth, and uses that score as the document's relevance label. Standard set or rank metrics (Precision, Recall, MAP, nDCG) are then computed over these utility labels [37].
+
+**Numbers.** Across the KILT-based tasks studied, eRAG's retrieval scores correlated better with end-to-end RAG performance than baseline methods, with Kendall's tau improvements of 0.168 to 0.494, and it used up to 50 times less GPU memory than end-to-end evaluation. It is distributed as the `erag` Python package [37].
+
+**Lesson.** "Relevant to a human" and "useful to this generator" differ. When choosing a retriever or reranker for a fixed generator, utility labels are a cheap middle ground between qrels and full end-to-end runs.
 
 ## 3. RAGAS: reference-free component metrics
 
@@ -165,9 +183,9 @@ This is average precision over the retrieved list. An irrelevant chunk at rank 1
 
 The documented claim is that if all three pass, the application is free of hallucination "up to the limit of its knowledge base" [5b]. This is a useful framing, and it states its own blind spot: a correct-looking answer drawn faithfully from an outdated or wrong document passes all three checks.
 
-**Architecture (2025-2026).** TruLens (MIT licence, repository under the `truera` org, with Snowflake-hosted community and a Snowflake Cortex provider) now instruments applications with OpenTelemetry spans. Each step records inputs, outputs, latency, tokens and cost, and traces can be exported to OTLP backends such as Jaeger, Grafana Tempo or Datadog. A "Metric" pairs a judge implementation with *selectors* that pull the right span fields (for example, the query and retrieved context). Metrics can run inline as the app executes or in batch over a dataset. Judges can be OpenAI, Azure OpenAI, LiteLLM, Gemini, Bedrock, Snowflake Cortex or Hugging Face models [5]. The project has extended the triad to agents with evaluators such as LogicalConsistency, ExecutionEfficiency, PlanAdherence, ToolSelection and ToolQuality [5].
+**Architecture (2025-2026).** TruLens (MIT licence, repository under the `truera` org, with Snowflake-hosted community and a Snowflake Cortex provider) now instruments applications with OpenTelemetry spans. Each step records inputs, outputs, latency, tokens and cost, and traces can be exported to OTLP backends such as Jaeger, Grafana Tempo, Datadog or New Relic. A "Metric" pairs a judge implementation with *selectors* that pull the right span fields (for example, the query and retrieved context). Metrics can run inline as the app executes or in batch over a dataset. Judges can be OpenAI, Azure OpenAI, LiteLLM, Gemini, Bedrock, Snowflake Cortex or Hugging Face models [5]. The project has extended the triad to agents with seven evaluators: LogicalConsistency, ExecutionEfficiency, PlanAdherence, PlanQuality, ToolSelection, ToolCalling and ToolQuality [5]. These derive from the Goal-Plan-Action ("Agent GPA") framework of Jia et al. (Snowflake AI Research and Stanford, 2025) [34].
 
-**Published numbers (project claims, treat as vendor-reported).** The TruLens README reports a groundedness F1 of 0.81 on LLM-AggreFact, which it says is ahead of Bespoke-MiniCheck-7B on F1. It also reports a context-relevance nDCG@5 of 0.93 and a 4.2:1 win-loss rate on adversarial near-duplicate passages in a third-party comparison dated March 2026. Its Agent GPA evaluator is reported to catch 267 of 281 (about 95%) human-annotated agent errors on TRAIL/GAIA, against 55% for a baseline trace judge [5][34].
+**Published numbers (project claims, treat as vendor-reported).** The TruLens README reports a groundedness F1 of 0.81 on an 11,000-example LLM-AggreFact holdout, which it says is ahead of Bespoke-MiniCheck-7B on F1, precision and recall. Citing a third-party (AIMultiple) comparison dated March 2026, it also reports a context-relevance nDCG@5 of 0.93 against WandB Weave, RAGAS, DeepEval and UpTrain, and a 4.2:1 win-loss rate (next best 3.3:1) on adversarial near-duplicate passages with one fact swapped. The README states that Agent GPA judges catch 267 of 281 (about 95%) human-annotated agent errors on TRAIL/GAIA, against 55% for a baseline trace judge; the paper's own abstract gives a range of 80% to over 95% across error types and 86% agreement with humans on error localisation [5][34]. None of these figures has been independently replicated.
 
 ## 5. ARES: trained judges plus prediction-powered inference
 
@@ -193,12 +211,12 @@ The documented claim is that if all three pass, the application is free of hallu
 **Key techniques.**
 
 - **Synthetic training data.** Queries and answers are generated from the target corpus with few-shot prompts. The example configuration samples 6,189 documents.
-- **Per-dimension classifier judges.** The quick-start trains for 10 epochs, patience 3, learning rate 5e-6. The paper uses small encoder models as judges.
+- **Per-dimension classifier judges.** The quick-start trains for 10 epochs, patience 3, learning rate 5e-6, batch size 1 with 32-step gradient accumulation. The paper uses small encoder models as judges.
 - **PPI.** A small human-labelled set calibrates the judge's error rate, so the final estimate is unbiased with a valid confidence interval [4].
 
 The repository says at least 50 labelled examples are required and "several hundred" is ideal. Its PPI example uses 300 [4].
 
-**Numbers.** The repository's worked example for context relevance reports an ARES estimate of 0.606 with a 95% CI of [0.547, 0.664], against ground truth of 0.600. The judge's raw accuracy was 0.789, over an evaluation set of 4,421 examples [4]. The example shows the main point of PPI: a judge that is only about 79% accurate still yields an interval that brackets the true value. The paper evaluates on KILT and SuperGLUE-derived tasks and reports that ARES ranks RAG configurations more accurately than RAGAS (see [3] for Kendall's tau values).
+**Numbers.** The repository's worked example for context relevance reports an ARES estimate of 0.606 with a confidence interval of [0.547, 0.664], against ground truth of 0.600. The judge's raw accuracy was 0.789, over an evaluation set of 4,421 examples [4]. The example shows the main point of PPI: a judge that is only about 79% accurate still yields an interval that brackets the true value. The paper evaluates on KILT and SuperGLUE-derived tasks and reports that ARES ranks RAG configurations more accurately than RAGAS (see [3] for Kendall's tau values).
 
 **Failure modes.** Fine-tuned judges are domain-specific: a judge trained on one corpus's synthetic data must be retrained for another. Synthetic queries may not match real user phrasing. Only the context-relevance checkpoint is distributed pre-trained [4].
 
@@ -219,7 +237,7 @@ The repository says at least 50 labelled examples are required and "several hund
   - self-knowledge: correct claims supported by no chunk, i.e. drawn from parametric memory
   - faithfulness
 
-The only required annotation per query is a ground-truth answer. The default extractor and checker is Llama 3 70B on AWS Bedrock [8].
+The only required annotation per query is a ground-truth answer. The README's examples use Llama 3.1 70B Instruct on AWS Bedrock (`bedrock/meta.llama3-1-70b-instruct-v1:0`) as both extractor and checker; any LiteLLM-compatible model can be substituted [8].
 
 **Meta-evaluation.** RAGChecker was validated against 280 human-annotated instances, each labelled by two annotators, with baseline outputs from TruLens, ARES, RAGAS and CRUD-RAG. The paper reports better correlation with human judgments than these baselines (Tables 2 and 5 of [8]).
 
@@ -237,7 +255,7 @@ HHEM-2.1-Open is a T5-based classifier trained to detect hallucinations relative
 - hallucination rate (100 minus consistency)
 - answer rate (refusals are excluded and scores are computed on documents every model summarised)
 
-As of the September 22, 2026 update, the leading entries showed hallucination rates of about 1.8% to 3.3% [11]. Note the scope: this measures *consistency with the source* in summarisation, not open-domain factuality or answer quality [11].
+As of the September 22, 2026 update, the three leading entries showed hallucination rates of 1.8% to 3.3%, and the fifth-ranked model 4.1% [11]. Note the scope: this measures *consistency with the source* in summarisation, not open-domain factuality or answer quality [11].
 
 ### 7.2 MiniCheck and LLM-AggreFact
 
@@ -245,11 +263,15 @@ MiniCheck (Tang, Laban, Durrett; EMNLP 2024) trains small fact-checkers on synth
 
 ### 7.3 RAGTruth: span-level hallucination labels
 
-RAGTruth (Wu et al., arXiv 2401.00396) provides 17,790 naturally generated responses over 2,965 instances across QA, data-to-text (Yelp) and summarisation (CNN/DM and news). 7,664 of the responses contain hallucinations. Labels are *word-level spans* with type labels (for example, "Evident Baseless Info") and flags such as `implicit_true`, for correct information not in the context [12]. Span-level labels make it possible to train and evaluate detectors that *highlight* unsupported text, which is a better UX than a single score.
+RAGTruth (Niu, Wu et al., ACL 2024; arXiv 2401.00396) provides nearly 18,000 (17,790) naturally generated responses over 2,965 instances across QA, data-to-text (Yelp) and summarisation (CNN/DM and news). 7,664 of the responses contain hallucinations. Labels are *word-level spans* with type labels (for example, "Evident Baseless Info") and flags such as `implicit_true`, for correct information not in the context [12]. Span-level labels make it possible to train and evaluate detectors that *highlight* unsupported text, which is a better UX than a single score.
 
 ### 7.4 RAGBench / TRACe
 
 Galileo's RAGBench packages component datasets (HotpotQA, MS MARCO, HAGRID, ExpertQA and others) with scripts that reproduce baseline judge scores for GPT-3.5, RAGAS and TruLens [26]. The accompanying TRACe framework defines utilization, relevance, adherence and completeness. Its paper reports that a fine-tuned small encoder can be competitive with prompted LLM judges on these labels; consult [26] for numbers.
+
+### 7.5 Lynx and HaluBench
+
+Lynx (Patronus AI with Contextual AI and Stanford, arXiv 2407.08488, 2024) is an open-weight hallucination judge fine-tuned from Llama 3 in 8B and 70B sizes. Unlike sentence-level NLI classifiers, it takes (question, context, answer) and emits a pass/fail verdict with chain-of-thought reasoning. It was released with **HaluBench**, about 15k samples drawn from sources including CovidQA, PubMedQA, DROP and FinanceBench, where hallucinated answers are produced by perturbing correct ones so that they are hard to spot [38]. The authors report that Lynx-70B beats GPT-4o and Claude 3 Sonnet as a judge on HaluBench. These are vendor results on a vendor benchmark, and the licence of the weights should be checked before commercial use [38]. Lynx sits between MiniCheck-class classifiers and frontier LLM judges in cost, and is a common choice when groundedness must be judged on-premises.
 
 **Design pattern.** Use a small NLI-style checker such as HHEM or MiniCheck for **100% online coverage** (it is cheap and runs on CPU or a small GPU). Escalate low-confidence or flagged samples to an LLM judge or a human. This tiering appears repeatedly across vendor documentation and is the main cost lever in production evaluation.
 
@@ -313,13 +335,14 @@ Long-form RAG answers have no single gold string. The IR community's answer, rev
 | RGB [16] | 2023/24 | EN + ZH | noise, rejection, integration, counterfactual | accuracy, rejection rate, error detection/correction |
 | MultiHop-RAG [17] | 2024, COLM | 2,556 queries, 2-4 docs each | cross-document reasoning, metadata | retrieval + QA scripts |
 | CRAG [15] | 2024, Meta | 5 domains, 8 question types, mock web + KG APIs | dynamism, long-tail, false premise | +1 / 0 / -1 (correct / missing / incorrect) |
-| RAGTruth [12] | 2024 | 17,790 responses, 3 tasks | span hallucinations | word-level labels |
+| RAGTruth [12] | 2024, ACL | 17,790 responses, 3 tasks | span hallucinations | word-level labels |
 | RAGChecker [8] | 2024, NeurIPS D&B | 280 meta-eval instances x 2 annotators | diagnostic decomposition | claim-level P/R/F1 + 7 sub-metrics |
-| FlashRAG [31] | WWW 2025 Companion | 36 datasets, 23 methods | method comparison | EM, F1, doc recall/precision |
+| FlashRAG [31] | WWW 2025 Resource Track | 36 datasets, 23 methods (incl. 7 reasoning-based) | method comparison | EM, F1, doc recall/precision |
 | BERGEN [32] | 2024, Naver | 20+ retrievers, 4 rerankers, 20+ LLMs | reproducible ablations | Match, EM, LLMEval |
 | BenchmarkQED [22] | 2025, Microsoft | AutoQ/AutoE/AutoD; 2 released corpora | local vs global queries (GraphRAG) | pairwise LLM judge, assertions |
 | TREC RAG 2024 [19][20] | 2024-25 | MS MARCO v2.1 segments | long-form, citations | nuggets (vital/okay), UMBRELA qrels |
 | BRIGHT [25] | ICLR 2025 | 12 datasets | reasoning-intensive retrieval | nDCG@10 |
+| LiveRAG [40] | SIGIR 2025 | FineWeb-10BT corpus, fixed Falcon3-10B generator, 500 unseen live questions | retrieval design under fixed generator | LLM judge (correctness, faithfulness) + manual review |
 
 Notes on individual benchmarks:
 
@@ -327,6 +350,7 @@ Notes on individual benchmarks:
 - **MultiHop-RAG** spreads evidence over 2 to 4 news documents per query and depends on metadata, which exposes chunk-level retrievers that cannot gather complementary evidence [17].
 - **BERGEN** exists because RAG papers were hard to compare: different retrievers, prompts and metrics. Its baseline tables use a lenient *Match* metric (for example, Solar-10.7B scores 76.2 on ASQA and 70.2 on NQ) alongside LLM-based evaluation [32].
 - **BenchmarkQED** reflects the GraphRAG lineage (Chapter 7). AutoQ synthesises queries along a *local to global* scope axis, including data-linked multi-hop local queries. AutoE runs side-by-side LLM judging on relevance, comprehensiveness, diversity and empowerment, plus correctness and assertion-based scoring when ground truth exists. It ships a podcast-transcript corpus (70 episodes) and 1,397 AP health news articles [22]. Global "sensemaking" questions have no gold answer, so pairwise preference is the only practical signal.
+- **LiveRAG** (SIGIR 2025 LiveRAG Challenge, run by TII with Pinecone and AI71) fixed both the corpus (FineWeb-10BT) and the generator (Falcon3-10B-Instruct), so teams competed only on retrieval, reranking and prompting. 70 teams from 27 countries answered 500 unseen questions in a two-hour live window. Questions were generated with TII's **DataMorgana**, which produces diverse synthetic Q&A pairs from configurable user and question categorisations. Scoring used an LLM judge for correctness and faithfulness, followed by manual review of the top entries [40]. The design is a useful template for internal bake-offs: freeze the generator, hold back an unseen test set, and use a synthetic generator with explicit diversity controls for the development set.
 
 ## 11. LLM-as-a-judge for RAG: methodology
 
@@ -334,7 +358,7 @@ Almost every metric above relies on an LLM or NLI judge. What is known about jud
 
 - **Agreement.** Zheng et al. (MT-Bench / Chatbot Arena, 2023) found that a GPT-4 judge and humans agree over 80% of the time, the same level at which humans agree with each other. This was based on 3.3K expert votes over 80 questions [13]. This result is the usual justification for judge-based evaluation. It was measured on general chat, not on RAG groundedness.
 - **Position bias.** Wang et al. ("Large Language Models are not Fair Evaluators", 2023) showed severe position bias in pairwise judging. They proposed Multiple Evidence Calibration (sample k rationales) and Balanced Position Calibration (score both orders) [14]. Any pairwise RAG comparison (RAGElo, BenchmarkQED AutoE, Arena-style) should evaluate both orders.
-- **Open evaluator models.** Prometheus 2 (7B and 8x7B) supports absolute 1 to 5 rubric grading and pairwise ranking. It reports about 0.6 to 0.7 Pearson correlation with GPT-4 on Likert benchmarks and 72% to 85% agreement with humans on pairwise sets. The 7B model runs in about 16 GB of VRAM [36]. This makes local, privacy-preserving judging possible for regulated RAG data.
+- **Open evaluator models.** Prometheus 2 (7B and 8x7B, built by merging Mistral-based models trained for direct assessment and for pairwise ranking) supports absolute 1 to 5 rubric grading and pairwise ranking. The paper reports Pearson correlations above 0.5 with humans, GPT-4 and Claude 3 Opus across its direct-assessment benchmarks (for example 0.555 with humans on FLASK for the 8x7B model, against 0.679 for GPT-4), and high pairwise agreement with human preferences; see [36] for per-benchmark values. The 7B model fits on a single consumer or workstation GPU [36]. This makes local, privacy-preserving judging possible for regulated RAG data.
 - **Tournament ranking.** RAGElo ranks RAG agents with pairwise LLM games and Elo ratings with confidence intervals. It can place a new agent after a few games, and it has separate retrieval evaluators that grade documents independently of answers [35].
 
 **Practices that the sources converge on:**
@@ -370,7 +394,7 @@ Every reference-based metric depends on a golden set. The public frameworks sugg
 - relationship builders link nodes (for example, `JaccardSimilarityBuilder` on entity overlap)
 - query synthesizers sample node sets into *scenarios* (nodes, query length, style, persona) and emit a query, reference contexts and a reference answer
 
-Ragas targets four query types: single-hop specific, single-hop abstract, multi-hop specific and multi-hop abstract [2g]. ARES generates synthetic queries and answers per document with few-shot prompts [4]. BenchmarkQED's AutoQ varies scope from local to global [22].
+Ragas targets four query types: single-hop specific, single-hop abstract, multi-hop specific and multi-hop abstract [2g]. ARES generates synthetic queries and answers per document with few-shot prompts [4]. BenchmarkQED's AutoQ varies scope from local to global [22]. TII's DataMorgana, used for the LiveRAG Challenge, lets the builder define weighted categorisations (for example, question phrasing, factoid vs open-ended, expert vs novice user) and samples combinations to force diversity [40].
 
 **Why synthetic alone is not enough.**
 
@@ -410,7 +434,7 @@ Offline evaluation tells you whether a change is better. Production monitoring t
 
 **Tooling (2025-2026):**
 
-- **TruLens**: OTel-native tracing; inline or batch feedback functions; the RAG triad plus agent evaluators; export to Jaeger, Tempo or Datadog [5].
+- **TruLens**: OTel-native tracing; inline or batch feedback functions; the RAG triad plus agent evaluators; export to Jaeger, Tempo, Datadog, New Relic or any OTLP backend [5].
 - **Arize Phoenix**: open-source, self-hosted. It traces with OpenTelemetry and OpenInference instrumentation for OpenAI, Anthropic, LangChain, LlamaIndex and others. It offers `arize-phoenix-evals` for RAG relevance and answer relevance, versioned datasets and experiments, and an MCP server so coding agents can query traces. Arize positions its commercial AX product for managed production monitoring [27].
 - **Langfuse**: tracing of LLM, retrieval and embedding calls; evaluation via LLM-as-a-judge, code evaluators, user feedback and manual labelling; datasets for pre-deployment experiments; a jump from a bad trace into the prompt playground; and self-hosting via Docker or Kubernetes [28].
 - **Azure AI Evaluation SDK**: built-in AI-assisted `GroundednessEvaluator`, `RelevanceEvaluator` and `RetrievalEvaluator`, run over `query`, `context` and `response` columns [29].
@@ -432,7 +456,7 @@ Offline evaluation tells you whether a change is better. Production monitoring t
 | RAGAS [1][2] | Exploding Gradients / academic, 2023 | Prompted LLM (+ HHEM option) + embeddings | optional | faithfulness, ctx precision/recall, answer relevancy, noise sensitivity, factual correctness | none built in | fast offline iteration, synthetic test sets |
 | TruLens triad [5] | TruEra / Snowflake | Prompted LLM, many providers | no | context relevance, groundedness, answer relevance (+ agent evals) | none built in | tracing + online feedback |
 | ARES [3][4] | Stanford, 2023 | Fine-tuned classifiers | small labelled set | ctx relevance, faithfulness, answer relevance | PPI confidence intervals | comparing configs with rigor |
-| RAGChecker [8] | Amazon, 2024 | LLM claim extractor + checker (Llama 3 70B) | ground-truth answer | overall P/R/F1, claim recall, ctx precision, utilization, noise sens., hallucination, self-knowledge, faithfulness | meta-evaluated vs humans | root-cause diagnosis |
+| RAGChecker [8] | Amazon, 2024 | LLM claim extractor + checker (Llama 3.1 70B in examples) | ground-truth answer | overall P/R/F1, claim recall, ctx precision, utilization, noise sens., hallucination, self-knowledge, faithfulness | meta-evaluated vs humans | root-cause diagnosis |
 | ALCE [7] | Princeton, 2023 | NLI model | for correctness | citation recall/precision, correctness, MAUVE | n/a | citation quality |
 | AutoNuggetizer + UMBRELA [18][19] | Waterloo / TREC, 2024 | LLM | no (auto nuggets) | nugget vital/all scores, graded qrels | validated vs TREC assessors | long-form answer completeness |
 | open-rag-eval [21] | Vectara, 2025 | LLM + HHEM | no | UMBRELA, AutoNuggetizer, hallucination, citations | n/a | label-free pipeline eval |
@@ -474,14 +498,14 @@ Offline evaluation tells you whether a change is better. Production monitoring t
 9. Vectara. "HHEM-2.1-Open: Hallucination Evaluation Model" (model card), 2024. https://huggingface.co/vectara/hallucination_evaluation_model
 10. Tang, L., Laban, P., Durrett, G. "MiniCheck: Efficient Fact-Checking of LLMs on Grounding Documents." EMNLP 2024. https://github.com/Liyan06/MiniCheck
 11. Vectara. "Hallucination Leaderboard" (GitHub repository, updated September 22, 2026). https://github.com/vectara/hallucination-leaderboard
-12. Wu, Y. et al. "RAGTruth: A Hallucination Corpus for Developing Trustworthy Retrieval-Augmented Language Models." arXiv 2401.00396, 2023. https://arxiv.org/abs/2401.00396 ; data: https://github.com/ParticleMedia/RAGTruth
+12. Niu, C., Wu, Y., Zhu, J. et al. "RAGTruth: A Hallucination Corpus for Developing Trustworthy Retrieval-Augmented Language Models." ACL 2024 (arXiv 2401.00396). https://arxiv.org/abs/2401.00396 ; data: https://github.com/ParticleMedia/RAGTruth
 13. Zheng, L. et al. "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena." 2023. https://arxiv.org/abs/2306.05685 ; code: https://github.com/lm-sys/FastChat/tree/main/fastchat/llm_judge
 14. Wang, P. et al. "Large Language Models are not Fair Evaluators." 2023. https://arxiv.org/abs/2305.17926 ; code: https://github.com/i-Eval/FairEval
 15. Yang, X. et al. (Meta). "CRAG: Comprehensive RAG Benchmark." 2024. https://arxiv.org/abs/2406.04744 ; data: https://github.com/facebookresearch/CRAG
 16. Chen, J., Lin, H., Han, X., Sun, L. "Benchmarking Large Language Models in Retrieval-Augmented Generation" (RGB). 2023. https://arxiv.org/abs/2309.01431 ; code: https://github.com/chen700564/RGB
 17. Tang, Y., Yang, Y. "MultiHop-RAG: Benchmarking Retrieval-Augmented Generation for Multi-Hop Queries." COLM 2024. https://arxiv.org/abs/2401.15391 ; data: https://github.com/yixuantt/MultiHop-RAG
 18. Upadhyay, S., Pradeep, R., Thakur, N., Craswell, N., Lin, J. "UMBRELA: UMbrela is the (Open-Source Reproduction of the) Bing RELevance Assessor." 2024. https://arxiv.org/abs/2406.06519 ; code: https://github.com/castorini/umbrela
-19. Pradeep, R. et al. "Initial Nugget Evaluation Results for the TREC 2024 RAG Track with the AutoNuggetizer Framework." 2024. https://arxiv.org/abs/2411.09607 ; "The Great Nugget Recall" (SIGIR 2025); code: https://github.com/castorini/nuggetizer
+19. Pradeep, R. et al. "Initial Nugget Evaluation Results for the TREC 2024 RAG Track with the AutoNuggetizer Framework." 2024. https://arxiv.org/abs/2411.09607 ; Pradeep, R., Thakur, N., Upadhyay, S., Campos, D., Craswell, N., Lin, J. "The Great Nugget Recall: Automating Fact Extraction and RAG Evaluation with Large Language Models." SIGIR 2025. https://arxiv.org/abs/2504.15068 ; code: https://github.com/castorini/nuggetizer
 20. Pradeep, R. et al. "Ragnarök: A Reusable RAG Framework and Baselines for TREC 2024 Retrieval-Augmented Generation Track." ECIR 2025. https://arxiv.org/abs/2406.16828 ; code: https://github.com/castorini/ragnarok
 21. Vectara. "open-rag-eval" (GitHub repository), 2025. https://github.com/vectara/open-rag-eval
 22. Microsoft. "BenchmarkQED: Automated benchmarking of RAG systems" (GitHub repository), 2025. https://github.com/microsoft/benchmark-qed
@@ -493,9 +517,13 @@ Offline evaluation tells you whether a change is better. Production monitoring t
 28. Langfuse. "Langfuse: Open Source LLM Engineering Platform" (GitHub repository). https://github.com/langfuse/langfuse
 29. Microsoft. "Azure AI Evaluation client library for Python" (README). https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/evaluation/azure-ai-evaluation/README.md
 30. Bassani, E. "ranx: A Blazing-Fast Python Library for Ranking Evaluation, Comparison, and Fusion" (ECIR 2022; CIKM 2022). https://github.com/AmenRa/ranx
-31. Jin, J., Zhu, Y., Dou, Z. et al. "FlashRAG: A Modular Toolkit for Efficient Retrieval-Augmented Generation Research." WWW 2025 Companion. https://arxiv.org/abs/2405.13576 ; code: https://github.com/RUC-NLPIR/FlashRAG
+31. Jin, J., Zhu, Y., Dou, Z. et al. "FlashRAG: A Modular Toolkit for Efficient Retrieval-Augmented Generation Research." WWW 2025 Resource Track. https://arxiv.org/abs/2405.13576 ; code: https://github.com/RUC-NLPIR/FlashRAG
 32. Rau, D. et al. (Naver Labs Europe). "BERGEN: A Benchmarking Library for Retrieval-Augmented Generation." 2024. https://arxiv.org/abs/2407.01102 ; code: https://github.com/naver/bergen
 33. Confident AI. "DeepEval: The LLM Evaluation Framework" (GitHub repository). https://github.com/confident-ai/deepeval
-34. "Agent GPA" evaluation of agent traces, cited by TruLens. arXiv 2510.08847, 2025. https://arxiv.org/abs/2510.08847
+34. Jia, A. S. et al. (Snowflake AI Research / Stanford). "What Is Your Agent's GPA? A Framework for Evaluating Agent Goal-Plan-Action Alignment." arXiv 2510.08847, 2025. https://arxiv.org/abs/2510.08847
 35. Zeta Alpha. "RAGElo: Elo-based evaluation of RAG agents" (GitHub repository). https://github.com/zetaalphavector/RAGElo
 36. Kim, S. et al. "Prometheus 2: An Open Source Language Model Specialized in Evaluating Other Language Models." 2024. https://arxiv.org/abs/2405.01535 ; code: https://github.com/prometheus-eval/prometheus-eval
+37. Salemi, A., Zamani, H. "Evaluating Retrieval Quality in Retrieval-Augmented Generation" (eRAG). SIGIR 2024. https://arxiv.org/abs/2404.13781 ; code: https://github.com/alirezasalemi7/eRAG
+38. Ravi, S. S. et al. (Patronus AI). "Lynx: An Open Source Hallucination Evaluation Model." 2024. https://arxiv.org/abs/2407.08488 ; blog: https://patronus.ai/blog/lynx-state-of-the-art-open-source-hallucination-detection-model
+39. Joren, H. et al. "Sufficient Context: A New Lens on Retrieval Augmented Generation Systems." ICLR 2025. https://arxiv.org/abs/2411.06037 ; blog: https://research.google/blog/deeper-insights-into-retrieval-augmented-generation-the-role-of-sufficient-context/
+40. Carmel, D. et al. "SIGIR 2025 - LiveRAG Challenge Report." 2025. https://arxiv.org/abs/2507.04942

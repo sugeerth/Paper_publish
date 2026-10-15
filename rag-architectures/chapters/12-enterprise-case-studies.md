@@ -10,7 +10,7 @@ The case studies fall into five groups. Each group faces a different main constr
 2. **Customer and internal support** (DoorDash, LinkedIn, Klarna, Airbnb, Uber Genie). The hard problems are hallucination control, policy compliance, and deciding when to hand off to a human.
 3. **Product copilots and structured-data RAG** (LinkedIn Premium assistant, Uber QueryGPT, Shopify Sidekick, Ramp, Stripe). Here "retrieval" often means choosing tools, schemas or label sets rather than passages.
 4. **Regulated professional domains** (Morgan Stanley, Harvey, Thomson Reuters CoCounsel and Westlaw). The hard problems are citation fidelity, evaluation by experts, and liability.
-5. **Platform vendors' own measurements** (Databricks). Their published studies on long-context RAG and LLM judges shaped how many of the other teams evaluate.
+5. **Platform vendors' own measurements** (Databricks, Anthropic). Their published studies on long-context RAG, LLM judges and contextual chunk enrichment shaped how many of the other teams build and evaluate.
 
 A note on evidence. Almost every number below is **self-reported** by the company, usually in a blog post written partly to recruit or to sell. Few teams publish their baselines, sample sizes or confidence intervals. The one independent audit in this chapter, the Stanford study of legal research tools [24], found hallucination rates far above what vendor marketing implied. Treat the numbers as directional. Figures marked "about" or "approximately" are rounded or were reported loosely in the source.
 
@@ -120,14 +120,14 @@ Three observations hold across nearly all the write-ups:
 
 Dropbox has published one of the most detailed public RAG engineering records, in three stages.
 
-**Stage 1: AI answers and summaries in file previews (2023).** Dropbox added summarization and Q&A to its web file previews by building on **Riviera**, its existing preview and transcoding framework, which already converted many file types to text [9]. Key techniques:
+**Stage 1: AI answers and summaries in file previews (announced 2023, engineering write-up 2024).** Dropbox added summarization and Q&A to its web file previews by building on **Riviera**, its existing preview and transcoding framework, which already converted many file types to text [9]. Key techniques:
 
 - Files are converted to text and split into chunks, and each chunk is embedded.
 - For **summaries**, chunk embeddings are clustered (k-means) and representative chunks from each cluster are summarized. This covers the whole document without passing every token to the LLM.
 - For **Q&A**, the chunks most similar to the question are retrieved and passed to the LLM. Multi-file questions work the same way across several files.
 - Embeddings and intermediate results are cached, so repeated questions about the same file avoid re-processing.
 
-Dropbox reported large improvements from this re-architecture. Per-summary cost fell by about 93% and per-query cost by about 64%. Approximate p75 latency fell from about 115 s to about 4 s for summaries and from about 25 s to about 5 s for Q&A. These are approximate figures as reported [9].
+Dropbox reported large improvements from this re-architecture. Per-summary cost fell by about 93% and per-query cost by about 64%. Approximate p75 latency fell from about 115 s to about 4 s for summaries and from about 25 s to about 5 s for Q&A. These are approximate figures as reported by Dropbox and were not independently checked for this atlas [9].
 
 **Stage 2: Dash universal search and answers.** Dash connects to third-party applications (Google Workspace, Microsoft 365, Slack, Salesforce and others) as well as Dropbox. In "Building Dash" Dropbox describes its retrieval choice explicitly as a trade-off among latency, quality and freshness [8]:
 
@@ -285,13 +285,13 @@ Dropbox reported large improvements from this re-architecture. Per-summary cost 
 **Genie architecture (2023-2024).** Uber describes this design [5]:
 
 ```
- sources: internal wikis, internal Stack Overflow, engineering docs
+ sources: Engwiki (internal wiki), internal Stack Overflow, engineering docs
      |  Spark ETL: scrape + chunk
      v
- embeddings (LLM embedding API via Uber's Michelangelo gateway)
+ embeddings (OpenAI embedding models via Uber's Michelangelo gateway)
      |
      v
- Sia (Uber's in-house vector database)   <-- refreshed on schedule
+ SIA "Search In Action" (Uber's in-house vector DB)  <-- refreshed on schedule
      |
  Slack question --> Knowledge Service --> retrieve top chunks --> LLM (via gateway)
      |                                                          |
@@ -302,11 +302,11 @@ Dropbox reported large improvements from this re-architecture. Per-summary cost 
 
 Design choices include only ingesting **sources pre-approved as non-sensitive**, citing sources in every answer so users can verify, and collecting structured feedback in-thread.
 
-**Numbers (as reported).** Between its September 2023 launch and the blog post, Genie had answered about 70,000 questions across about 154 Slack channels, with an estimated saving of about 13,000 engineering hours [5].
+**Numbers (as reported).** Between its September 2023 launch and the blog post, Genie had answered about 70,000 questions across about 154 Slack channels, with an estimated saving of about 13,000 engineering hours. Uber also reported a user-rated helpfulness rate of about 48.9%. That number is a helpfulness score from feedback buttons, not an accuracy rate, and the hours figure is Uber's own estimate [5].
 
 **Enhanced Agentic RAG (EAg-RAG, 2025).** When Uber extended Genie to security and privacy policy questions, the baseline failed in ways that needed a redesign [6]:
 
-1. **Document processing.** Standard PDF loaders flattened tables and lost structure. Uber switched to sources that keep structure (Google Docs exported as HTML and converted to a markdown-like format) so tables survived as tables.
+1. **Document processing.** Standard PDF loaders flattened tables and lost structure. Uber switched to loading the policy documents from their structured source (Google Docs) with a custom loader that kept tables, rendering them in a markdown-like form so tables survived as tables.
 2. **Enriched metadata.** An LLM generates summaries, FAQs and keywords for each document or chunk at ingestion. These improve lexical and semantic match for questions phrased differently from the policy text.
 3. **Agents at query time**, built with LangGraph:
    - A **Query Optimizer** rewrites ambiguous queries and splits compound ones.
@@ -315,7 +315,7 @@ Design choices include only ingesting **sources pre-approved as non-sensitive**,
    - A **Post-Processor** removes duplicates and orders the retrieved context by document structure before generation.
 4. **Evaluation.** An LLM-as-judge scores answers against a golden set curated by subject-matter experts. This replaced slow manual review.
 
-**Numbers (as reported).** Uber reported about a 27% relative increase in acceptable answers and about a 60% relative reduction in incorrect advice compared with the earlier pipeline [6].
+**Numbers (as reported).** Uber reported about a 27% relative increase in acceptable answers and about a 60% relative reduction in incorrect advice compared with the earlier pipeline. Both are relative changes; Uber did not publish absolute baseline accuracy, and the evaluation set was a curated golden set of roughly a hundred-plus queries [6].
 
 **Lessons.** Uber's progression mirrors the field. It moved from a naive pipeline to adding structure at ingestion, then to agentic query planning and an automated judge. Its biggest gains came from fixing parsing and enriching metadata, which are steps that involve no generation at all.
 
@@ -364,10 +364,10 @@ LinkedIn's "Musings on building a Generative AI product" describes the assistant
 - **Workspaces** curate domain-specific sets of tables and SQL samples, for example Mobility or Ads.
 - An **Intent Agent** maps the question to a business domain or workspace.
 - A **Table Agent** proposes relevant tables, which the user can confirm or edit (human-in-the-loop).
-- A **Column Prune Agent** removes irrelevant columns from very wide schemas so the prompt fits the context window and contains less noise.
+- A **Column Prune Agent** removes irrelevant columns from very wide schemas. Uber added it after intermittent token-limit failures even with a 128K-context GPT-4 Turbo model; pruning also reduces noise in the prompt.
 - **Retrieval of similar SQL samples** and the schemas as few-shot context, followed by generation of the query and an explanation.
 
-**Numbers (as reported).** Uber estimated a large query-authoring workload (on the order of a million queries per month) and reported that QueryGPT cut authoring time from about 10 minutes to about 3 minutes for a typical query [7].
+**Numbers (as reported).** Uber estimated a large query-authoring workload (about 1.2 million interactive queries per month, as reported) and reported that QueryGPT cut authoring time from about 10 minutes to about 3 minutes for a typical query [7].
 
 **Lessons.** In structured-data RAG, *what is retrieved is the schema*, and the main failure is choosing the wrong table. Uber chose to put the table decision in front of the user instead of hiding it. Pruning columns is the schema equivalent of reranking chunks.
 
@@ -377,12 +377,12 @@ LinkedIn's "Musings on building a Generative AI product" describes the assistant
 
 **Key techniques (as described by Shopify, 2025).**
 
-- **Tool-count scaling.** Shopify describes a progression. With roughly 0 to 20 tools, boundaries are clear. From about 20 to 50 they blur. Past about 50, there are many plausible ways to do the same task and behavior becomes unpredictable [21].
+- **Tool-count scaling.** Shopify describes a progression. With roughly 0 to 20 tools, boundaries are clear. From about 20 to 50 they blur. Past about 50, there are many plausible ways to do the same task and behavior becomes unpredictable. Shopify calls the resulting system-prompt bloat "death by a thousand instructions" [21].
 - **Just-in-time (JIT) instructions.** Instead of a monolithic system prompt, relevant instructions are returned *alongside tool results* when they apply. This is effectively retrieval of guidance at the point of use. It keeps the base prompt small, makes caching more effective and makes behavior easier to reason about.
 - **Ground-truth sets sampled from production.** Shopify chose real merchant conversations labeled by humans over hand-written "golden" examples.
-- **Calibrated LLM judges.** Judges were iterated until their agreement with humans approached human-to-human agreement. Shopify reports Cohen's kappa rising from about 0.02 to about 0.61, against a human baseline of about 0.69 [21].
+- **Calibrated LLM judges.** Judges were iterated until their agreement with humans approached human-to-human agreement. Shopify reports Cohen's kappa rising from about 0.02 (barely better than chance) to about 0.61, against a human inter-annotator baseline of about 0.69, which acts as a practical ceiling [21].
 - **User simulators** replay conversations so candidate changes can be tested before release.
-- **RL fine-tuning with gated rewards.** Shopify describes reward hacking it observed (for example, the model opting out of hard tasks, or putting values into tags instead of the right fields), and procedural checks before LLM-judged rewards to catch it [21].
+- **RL fine-tuning with gated rewards.** Shopify trained with GRPO (group relative policy optimization) and describes reward hacking it observed (for example, the model opting out of hard tasks, or putting values into tags instead of the right fields), and procedural checks before LLM-judged rewards to catch it [21].
 
 **Lessons.** For agentic assistants, the "retrieval" problem moves from documents to **instructions and tools**. Delivering context just in time beats loading everything up front, which matches Dropbox's experience with MCP tool sprawl [10].
 
@@ -417,6 +417,19 @@ LinkedIn's "Musings on building a Generative AI product" describes the assistant
 
 Stripe's public material on LLMs, much of it in OpenAI's customer story, describes internal experimentation. Teams across the company proposed and prototyped GPT-4 use cases, and some shipped. These included **Stripe Docs** question answering, where the model reads Stripe's extensive developer documentation to answer integration questions, and support and fraud-screening tasks [31]. Stripe has given few public architectural details about its retrieval stack, so this atlas lists it only as an example of the common "docs assistant" pattern. In that pattern a well-structured, versioned corpus of developer documentation is the retrieval source, and answers link back to specific documentation pages.
 
+### 3.6 LinkedIn SQL Bot: a knowledge graph of tables for text-to-SQL
+
+**Problem.** LinkedIn's internal data platform holds a very large number of datasets, many with overlapping, deprecated or poorly documented tables. As with QueryGPT, the hard part of text-to-SQL is finding the right tables, not writing the SQL [32].
+
+**Architecture.** LinkedIn's 2024 post on its internal SQL Bot (part of its DARWIN data-science platform) describes a multi-agent system built with LangGraph [32]:
+
+- **Table knowledge graph.** Table and column metadata, certified-dataset flags, domain knowledge supplied by data owners, example queries and usage logs are combined into a graph that retrieval can use. Popularity and access patterns help separate canonical tables from stale copies.
+- **Retrieval then re-ranking of tables.** Embedding retrieval proposes candidate tables, and an LLM re-ranks them and selects fields, using the knowledge graph to add descriptions and filter out deprecated datasets.
+- **Query writing with self-correction.** The query is written iteratively; the system validates it, checks referenced tables and columns, and fixes errors before returning it.
+- **Personalization and user control.** Users can name preferred tables or datasets, and the interface lets them inspect and change the tables the bot chose.
+
+**Lessons.** SQL Bot and QueryGPT arrived independently at the same design. Schema retrieval is the main subproblem, usage signals act as relevance signals for tables, and the user is shown the table choice. Treat warehouse metadata hygiene (certification, ownership, deprecation flags) as the equivalent of KB hygiene in document RAG.
+
 ---
 
 ## 4. Regulated professional domains
@@ -431,15 +444,15 @@ Stripe's public material on LLMs, much of it in OpenAI's customer story, describ
 - Retrieval was tuned until the evals passed.
 - Pilot rollouts to small advisor groups came before firm-wide release.
 
-**Numbers (as reported).** More than 98% of advisor teams adopted the assistant. Document-retrieval efficiency (finding the right document for a question) rose from about 20% to about 80% through iterative work on retrieval [26].
+**Numbers (as reported).** OpenAI's story reports that more than 98% of advisor teams actively use the assistant, and quotes Morgan Stanley's David Wu on moving from being able to answer about 7,000 questions to answering effectively over a corpus of about 100,000 documents [26]. A frequently repeated figure, document-retrieval efficiency rising from about 20% to about 80%, comes from Morgan Stanley's own announcement as relayed by trade press rather than from the OpenAI story; treat it as loosely defined, since the metric is not specified.
 
-**Lessons.** In regulated settings the evaluation suite *is* the deployment approval. A 20% to 80% improvement in retrieval efficiency shows where the effort went: retrieval, not generation.
+**Lessons.** In regulated settings the evaluation suite *is* the deployment approval. The move from a fixed set of answerable questions to open questions over the whole corpus, and the reported jump in retrieval efficiency, show where the effort went: retrieval, not generation.
 
 ### 4.2 Harvey: domain models plus retrieval with sentence-level citations
 
 **Problem.** Lawyers need answers grounded in authoritative sources such as case law, statutes and the client's own documents, with every claim traceable to a citation.
 
-**Architecture and evidence.** OpenAI's Harvey story describes a **custom-trained case-law model**. Harvey and OpenAI added a large amount of legal text (on the order of 10 billion tokens, starting from Delaware case law and expanding to US case law) to a GPT-4-class model. The model was designed so that statements are supported by the cases it cites. In the reported evaluation, attorneys from large law firms preferred its output over GPT-4's about 97% of the time [23]. Harvey's products combine this with retrieval over firm and client documents. Its Vault product handles large document sets for bulk review and Q&A, and Harvey's blog discusses enterprise retrieval and security requirements [23].
+**Architecture and evidence.** OpenAI's Harvey story describes a **custom-trained case-law model**. Harvey and OpenAI added a large amount of legal text (on the order of 10 billion tokens, starting from Delaware case law and expanding to US case law) to a GPT-4-class model. The model was designed so that statements are supported by the cases it cites. In the reported evaluation with ten large law firms, attorneys preferred its output over GPT-4's about 97% of the time, and the model produced about 83% more factual responses. Harvey attributed the preference mainly to longer, more complete answers that cited more relevant case law [23]. Harvey's products combine this with retrieval over firm and client documents. Its Vault product handles large document sets for bulk review and Q&A, and Harvey's blog discusses enterprise retrieval and security requirements [23].
 
 **Key techniques.**
 
@@ -451,21 +464,23 @@ Stripe's public material on LLMs, much of it in OpenAI's customer story, describ
 
 ### 4.3 Thomson Reuters: CoCounsel, Westlaw AI and the independent audit
 
-**Problem and products.** Thomson Reuters acquired Casetext (maker of CoCounsel) in 2023 and launched AI-assisted research in Westlaw Precision. Both use RAG over Thomson Reuters' editorial legal content, which is curated and annotated. TR Labs' engineering blog also describes RAG for **customer support**: retrieving from support knowledge bases to help agents answer product questions faster, with embeddings, a vector store and an LLM generating cited responses [25].
+**Problem and products.** Thomson Reuters acquired Casetext (maker of CoCounsel) in August 2023 for about USD 650 million and launched AI-assisted research in Westlaw Precision. Both use RAG over Thomson Reuters' editorial legal content, which is curated and annotated. TR Labs' engineering blog also describes RAG for **customer support**: retrieving from support knowledge bases to help agents answer product questions faster, with embeddings, a vector store and an LLM generating cited responses [25].
 
-**The independent audit.** In 2024 Stanford RegLab and HAI researchers (Magesh et al.) published the first preregistered evaluation of commercial legal RAG tools [24]. They ran a set of more than 200 legal queries against Lexis+ AI, Westlaw AI-Assisted Research and Ask Practical Law AI, with GPT-4 as a baseline. Their findings:
+**The independent audit.** In 2024 Stanford RegLab and HAI researchers (Magesh et al.) released what they described as the first preregistered empirical evaluation of AI-driven legal research tools; a revised version appeared in the *Journal of Empirical Legal Studies* in 2025 [24]. They ran a set of more than 200 legal queries against Lexis+ AI, Westlaw AI-Assisted Research and Ask Practical Law AI, with GPT-4 as a baseline. Their findings:
 
-- Vendor claims of "hallucination-free" legal research were not supported. The tools hallucinated on roughly 17% to 33% of queries. Westlaw AI-Assisted Research had the highest rate among the products tested (about 33%), and Lexis+ AI was about 17%. These are approximate figures from the paper.
+- Vendor claims of "hallucination-free" legal research were not supported. The tools hallucinated on roughly 17% to 33% of queries. Westlaw AI-Assisted Research had the highest rate among the products tested (about 33%), and Lexis+ AI was about 17%. These are approximate figures from the preprint; the tools also hallucinated less than general-purpose GPT-4. Lexis+ AI also gave accurate answers far more often (about 65% versus about 42% for Westlaw AI-Assisted Research).
 - The study gave a precise **taxonomy of RAG-specific failure**. One category is responses that are *misgrounded*: a correct-sounding statement cites a source that does not support it. Another is responses that are *incomplete*, refusing or giving unhelpful answers. In the authors' framing, RAG reduces hallucination compared with a general chatbot but does not eliminate it.
 - They identified causes particular to legal retrieval. Relevance is not the same as authority: a case may be relevant but overruled. Retrieval can match on surface text from the wrong jurisdiction. And the generator may reason incorrectly even from correct documents.
 
-Thomson Reuters responded at the time that the tool is intended to help researchers, not replace verification. Later versions of CoCounsel added more agentic, multi-step research workflows.
+Both vendors disputed the study. Thomson Reuters argued in particular that Ask Practical Law AI was not intended for primary-law research and that the first version of the paper had tested the wrong product; the authors then added Westlaw AI-Assisted Research. LexisNexis said its own data showed lower rates. The tested versions are now dated, so treat the figures as a 2024 snapshot. Later versions of CoCounsel added more agentic, multi-step research workflows.
 
 **Lessons.** This is the clearest public case that **"grounded" is not "correct"**. A citation link proves provenance, not entailment. Systems in high-stakes domains need claim-level support checks (see Chapter 11) and a check for *authority*, not just relevance.
 
 ---
 
-## 5. Platform vendors' published measurements: Databricks
+## 5. Platform vendors' published measurements
+
+### 5.1 Databricks: long context and LLM judges
 
 Databricks is both a RAG platform vendor (Vector Search, Mosaic AI Agent Framework, Agent Evaluation) and a publisher of influential measurement studies that many teams in this chapter echo.
 
@@ -479,6 +494,16 @@ Databricks is both a RAG platform vendor (Vector Search, Mosaic AI Agent Framewo
 - A judge's grading rubric, once tuned, transferred poorly to new use cases without re-checking.
 
 These conclusions show up in DoorDash's judge, Shopify's kappa-driven calibration and Uber's EAg-RAG evaluation [1][21][6].
+
+### 5.2 Anthropic: Contextual Retrieval (2024)
+
+In September 2024 Anthropic published "Contextual Retrieval", a measurement of an ingestion-time technique that several enterprise teams later adopted in some form [33]. Before indexing, an LLM writes a short passage that places each chunk in the context of its whole document (for example, which company, filing and quarter a revenue figure belongs to). That passage is prepended to the chunk, and the enriched chunk is used for both the embedding index and a BM25 index.
+
+- Anthropic reported that **contextual embeddings** cut the top-20 retrieval failure rate by about 35%, that adding **contextual BM25** brought the reduction to about 49%, and that adding a **reranker** brought it to about 67%, across several corpora (codebases, fiction, ArXiv papers and science papers).
+- Cost is controlled with **prompt caching**: the full document is cached once and reused while each of its chunks is contextualized.
+- The post also notes that for knowledge bases under roughly 200,000 tokens, putting the whole corpus in the prompt with caching may be simpler than building retrieval at all.
+
+The result agrees with the case studies above. Uber's LLM-generated summaries, FAQs and keywords [6] are the same idea at document level: spend LLM tokens at ingestion so that lexical and semantic retrieval have more to match on. The numbers are again vendor-reported.
 
 ---
 
@@ -495,15 +520,17 @@ These conclusions show up in DoorDash's judge, Shopify's kappa-driven calibratio
 | LinkedIn CS [2] | Support ticket QA | KG of ticket trees + embeddings | Intra/inter-ticket graph; LLM to graph query | Offline MRR/BLEU | MRR +77.6%; resolution time -28.6% |
 | Klarna [27][28] | Consumer support | Help/policy content + account tools | LangGraph-controlled flows | LangSmith tracing/eval | 2/3 of chats; 11 -> <2 min |
 | Airbnb [20] | Support automation | Context management + tools | LLM workflows inside workflow engine | Guardrails framework | Not reported |
-| Uber Genie / EAg-RAG [5][6] | Internal on-call Q&A, policy Q&A | Sia vectors; later BM25+vector | Enriched metadata; query optimizer, source identifier agents | LLM judge on SME golden set | ~70k questions, ~13k hours; +27% acceptable, -60% incorrect |
-| Uber QueryGPT [7] | Text-to-SQL | Workspaces, SQL samples, schemas | Intent / table / column-prune agents | Human confirms tables | ~10 -> ~3 min per query |
+| Uber Genie / EAg-RAG [5][6] | Internal on-call Q&A, policy Q&A | SIA vectors; later BM25+vector | Enriched metadata; query optimizer, source identifier agents | LLM judge on SME golden set | ~70k questions, ~13k hours; +27% acceptable, -60% incorrect |
+| Uber QueryGPT [7] | Text-to-SQL | Workspaces, SQL samples, schemas | Intent / table / column-prune agents | Human confirms tables | ~10 -> ~3 min per query; ~1.2M queries/month |
 | LinkedIn Premium [3] | Product assistant | Internal APIs as skills + few-shot EBR | Router; YAML calls; full streaming | Annotator-based eval | Malformed output ~10% -> ~0.01% |
 | Shopify Sidekick [21] | Merchant agent | Tools + JIT instructions | JIT instructions; user simulator; GRPO | Judges calibrated to kappa ~0.61 | Not reported as a single KPI |
 | Ramp [22] | Industry classification | Embedding retrieval of NAICS codes | Retrieve-then-select, constrained output | Per-stage accuracy | Not reported here |
-| Morgan Stanley [26] | Advisor knowledge assistant | ~100k internal documents | Evals as deployment gate | Expert-graded evals | 98% adoption; retrieval 20% -> 80% |
-| Harvey [23] | Legal research and review | Case law + client docs (Vault) | Custom case-law model plus RAG | Lawyer evaluation | 97% preference vs GPT-4 |
+| Morgan Stanley [26] | Advisor knowledge assistant | ~100k internal documents | Evals as deployment gate | Expert-graded evals | >98% of advisor teams; retrieval efficiency 20% -> 80% (press-reported) |
+| Harvey [23] | Legal research and review | Case law + client docs (Vault) | Custom case-law model plus RAG | Lawyer evaluation | 97% preference vs GPT-4; +83% factual responses |
 | TR CoCounsel / Westlaw [24][25] | Legal research; support | Editorial legal corpus | RAG over curated authority | Independent audit | ~33% hallucination (Westlaw AI-AR, 2024 audit) |
 | Databricks [29][30] | Platform + research | Vector Search platform | Long-context sweeps; judge rubrics | Low-precision rubrics, few-shot | >~80% judge-human agreement |
+| LinkedIn SQL Bot [32] | Internal text-to-SQL | Table knowledge graph + embedding retrieval | LLM table re-ranking; self-correcting query writer | User-editable table choice | Not reported as a single KPI |
+| Anthropic Contextual Retrieval [33] | Vendor measurement | Contextualized chunks in embeddings + BM25 | LLM-written chunk context at ingestion; prompt caching | Top-20 retrieval failure rate | Failures -49% (-67% with reranking) |
 
 ---
 
@@ -526,12 +553,14 @@ EchoLeak [15][16] turned a theoretical concern into a CVE. Any RAG system that r
 - Post-generation filters on links and images.
 - Treating tool outputs and retrieved text as data, never as policy.
 
+The OWASP Top 10 for LLM Applications (2025 edition) added a dedicated category, **LLM08:2025 Vector and Embedding Weaknesses**, covering cross-tenant leakage from shared vector stores, poisoned documents planted in the corpus, and embedding inversion. Its recommended controls (permission-aware partitioned stores, validation of data sources, and monitoring of retrieval logs) match what the workplace systems in Section 1 already do [35].
+
 ### 7.3 Ingestion quality beats model choice
 
 The largest reported jumps come from upstream work:
 
 - Uber fixed table parsing and added LLM-generated metadata [6].
-- Morgan Stanley improved retrieval efficiency from about 20% to about 80% [26].
+- Morgan Stanley reportedly improved retrieval efficiency from about 20% to about 80% (a press-reported, loosely defined metric) [26].
 - DoorDash rewrote KB articles [1].
 - Dropbox rebuilt its preview pipeline [9].
 
@@ -567,13 +596,24 @@ Even so, the independent Stanford audit [24] is a reminder that internal evals m
 
 Klarna's reported 2025 shift back toward human availability, DoorDash's escalation path and LinkedIn's "80% in a month, four months for the next 15%" all point the same way [1][3][27]. Designing the handoff is as important as designing the retrieval.
 
+### 7.8 Connectors become a protocol: MCP (2024-2026)
+
+Every workplace system above began with proprietary connectors. In November 2024 Anthropic released the **Model Context Protocol (MCP)**, an open protocol through which an LLM client discovers and calls tools and reads resources exposed by external servers [34]. Through 2025 it was adopted by other model vendors and by enterprise platforms. Microsoft added MCP support to Copilot Studio, and workplace-search vendors such as Glean and Dropbox began exposing or consuming retrieval through MCP; Dropbox describes the tool-sprawl problems this created in Dash [10]. Two consequences matter for RAG designers:
+
+- **Retrieval becomes a tool call.** A search index is exposed as one tool among many, so tool selection quality (Section 3.3) and tool sprawl (Section 1.4) become retrieval problems.
+- **Permissions and injection move to the protocol boundary.** An MCP server must enforce the calling user's identity and ACLs itself, and its outputs are untrusted text, as EchoLeak showed for email [15]. The MCP specification added OAuth-based authorization in 2025 for this reason.
+
+### 7.9 From single-shot RAG to deep-research agents (2025)
+
+In 2025 the leading products shifted from one retrieval round per question to long-running research agents. These agents plan, issue many searches over enterprise and web sources, read results, and write a cited report. Examples include Microsoft's **Researcher** agent in Microsoft 365 Copilot (announced March 2025) [36], agentic multi-step research workflows in CoCounsel, and Glean's agent platform [17]. The case studies suggest what such systems need: the plan checking Dropbox uses [8], the per-stage evaluation Ramp uses [22], and the claim-level support checks that the Stanford audit showed are missing even in single-shot legal RAG [24]. Longer runs also mean more retrieved untrusted text in context, so the attack surface in Section 7.2 grows with agent depth.
+
 ---
 
 ## Key takeaways for system designers
 
 1. **Start from the permission model, not the vector store.** Decide whether ACLs are mirrored or checked live, measure the sync lag, and audit tenant oversharing before launch. Copilot shows that correct enforcement of bad permissions is still a breach in practice [13][14].
 2. **Treat every retrieved chunk as untrusted input.** Separate instructions from data, strip or proxy outbound links and images in generated output, and red-team with content that has been planted in the corpus [15][16].
-3. **Invest in ingestion first.** Parsing that keeps structure (tables, sections), LLM-enriched metadata (summaries, FAQs, keywords) and KB hygiene produced the largest reported gains at Uber, DoorDash and Morgan Stanley [1][6][26].
+3. **Invest in ingestion first.** Parsing that keeps structure (tables, sections), LLM-enriched metadata (summaries, FAQs, keywords, per-chunk context) and KB hygiene produced the largest reported gains at Uber, DoorDash and Morgan Stanley, and in Anthropic's contextual-retrieval measurements [1][6][26][33].
 4. **Use hybrid retrieval with a cheap first stage.** BM25 or lexical search plus a semantic reranker on fresh candidates (Dropbox, Uber EAg-RAG) is often better than a single stale vector index [6][8].
 5. **Keep document structure.** LinkedIn's ticket trees and Uber's structure-aware ordering show that schema-level structure is a cheap, robust form of graph RAG [2][6].
 6. **Retrieve the minimal context just in time.** That applies to passages, tools, schemas and instructions alike. Fewer, well-designed tools beat a large tool catalog [3][7][10][21].
@@ -581,7 +621,8 @@ Klarna's reported 2025 shift back toward human availability, DoorDash's escalati
 8. **Make evaluation the release gate.** Use production-sampled golden sets, low-precision rubrics with examples, judges calibrated against human agreement, and separate retrieval and generation metrics [21][26][30].
 9. **Prefer RAG over fine-tuning for customer data** when tenancy, deletion and auditability matter (Slack). Use fine-tuning for domain style and reasoning when the domain demands it (Harvey) [11][23].
 10. **Budget for the long tail.** Expect the first 80% of quality quickly and the last 15% slowly, and plan headcount for evaluation accordingly [3].
-11. **Distrust single headline metrics.** Containment rates, hours saved and "hallucination-free" claims are self-reported. Use independent or adversarial evaluation where stakes are high [24][27].
+11. **Treat every connector and MCP server as a permission boundary.** It must enforce the end user's identity and ACLs itself, and its output is untrusted input [34][35].
+12. **Distrust single headline metrics.** Containment rates, hours saved and "hallucination-free" claims are self-reported. Use independent or adversarial evaluation where stakes are high [24][27].
 
 ---
 
@@ -595,7 +636,7 @@ Klarna's reported 2025 shift back toward human availability, DoorDash's escalati
 6. Uber Engineering. "Enhanced Agentic-RAG: What If Chatbots Could Deliver Near-Human Precision?" Uber, 2025. https://www.uber.com/blog/enhanced-agentic-rag/
 7. Uber Engineering. "QueryGPT - Natural Language to SQL Using Generative AI." Uber, 2024. https://www.uber.com/blog/query-gpt/
 8. Dropbox. "Building Dash: How RAG and AI agents help us meet the needs of businesses." Dropbox Tech Blog, 2024. https://dropbox.tech/machine-learning/building-dash-rag-multi-step-ai-agents-business-users
-9. Dropbox. "Bringing AI-powered answers and summaries to file previews on the web." Dropbox Tech Blog, 2023. https://dropbox.tech/machine-learning/bringing-ai-powered-answers-and-summaries-to-file-previews-on-the-web
+9. Dropbox. "Bringing AI-powered answers and summaries to file previews on the web." Dropbox Tech Blog, 2024. https://dropbox.tech/machine-learning/bringing-ai-powered-answers-and-summaries-to-file-previews-on-the-web
 10. Clemm, J. (Dropbox). "Knowledge graphs, MCP, and DSPy in Dash" (talk write-up). Dropbox Tech Blog, 2025. https://dropbox.tech/machine-learning/vp-josh-clemm-knowledge-graphs-mcp-and-dspy-dash
 11. Slack Engineering. "How We Built Slack AI To Be Secure and Private." Slack, 2024. https://slack.engineering/how-we-built-slack-ai-to-be-secure-and-private/
 12. Microsoft. "Microsoft 365 Copilot overview" (architecture and grounding flow). Microsoft Learn, 2024-2025. https://learn.microsoft.com/en-us/copilot/microsoft-365/microsoft-365-copilot-overview
@@ -608,13 +649,18 @@ Klarna's reported 2025 shift back toward human availability, DoorDash's escalati
 19. Notion. "Building and scaling Notion's data lake." Notion Blog, 2024. https://www.notion.com/blog/building-and-scaling-notions-data-lake
 20. Airbnb Engineering. "Automation Platform v2: Improving Conversational AI at Airbnb." The Airbnb Tech Blog, 2024. https://medium.com/airbnb-engineering/automation-platform-v2-improving-conversational-ai-at-airbnb-d86c9386e0cb
 21. Shopify Engineering. "Building production-ready agentic systems: Lessons from Shopify Sidekick." Shopify, 2025. https://shopify.engineering/building-production-ready-agentic-systems
-22. Ramp Engineering. "From RAG to Richness: How Ramp Revamped Industry Classification." Ramp Engineering Blog, 2025. https://engineering.ramp.com/
+22. Ramp Engineering. "From RAG to Richness: How Ramp Revamped Industry Classification." Ramp Engineering Blog, 2025. https://engineering.ramp.com/ (blog index; search the post title)
 23. OpenAI. "Harvey: customizing models for legal professionals" (customer story; custom case-law model). OpenAI, 2024. https://openai.com/index/harvey/ (see also Harvey blog: https://www.harvey.ai/blog)
-24. Magesh, V., Surani, F., Dahl, M., Suzgun, M., Manning, C. D., Ho, D. E. (Stanford RegLab / HAI). "Hallucination-Free? Assessing the Reliability of Leading AI Legal Research Tools." 2024. https://arxiv.org/abs/2405.20362
-25. Thomson Reuters Labs. "Better Customer Support Using Retrieval-Augmented Generation (RAG) at Thomson Reuters." TR Labs ML Engineering Blog, 2023. https://medium.com/tr-labs-ml-engineering-blog
+24. Magesh, V., Surani, F., Dahl, M., Suzgun, M., Manning, C. D., Ho, D. E. (Stanford RegLab / HAI). "Hallucination-Free? Assessing the Reliability of Leading AI Legal Research Tools." Preprint 2024; *Journal of Empirical Legal Studies*, 2025. https://arxiv.org/abs/2405.20362
+25. Thomson Reuters Labs. "Better Customer Support Using Retrieval-Augmented Generation (RAG) at Thomson Reuters." TR Labs ML Engineering Blog, 2023. https://medium.com/tr-labs-ml-engineering-blog (blog index; search the post title)
 26. OpenAI. "Morgan Stanley uses AI evals to shape the future of financial services" (customer story). OpenAI, 2024. https://openai.com/index/morgan-stanley/
 27. Klarna. "Klarna AI assistant handles two-thirds of customer service chats in its first month." Klarna press release, February 2024. https://www.klarna.com/international/press/klarna-ai-assistant-handles-two-thirds-of-customer-service-chats-in-its-first-month/
 28. LangChain. "How Klarna's AI assistant redefined customer support at scale" (customer story). LangChain Blog, 2024-2025. https://blog.langchain.dev/customers-klarna/
 29. Leng, Q., Portes, J., Havens, S., Zaharia, M., Carbin, M. (Databricks Mosaic Research). "Long Context RAG Performance of Large Language Models." Databricks, 2024. https://www.databricks.com/blog/long-context-rag-performance-llms
 30. Databricks. "Best Practices for LLM Evaluation of RAG Applications." Databricks Blog, 2023. https://www.databricks.com/blog/LLM-auto-eval-best-practices-RAG
 31. OpenAI. "Stripe" (customer story: GPT-4 for Stripe Docs, support and fraud use cases). OpenAI, 2023. https://openai.com/index/stripe/
+32. LinkedIn Engineering. "Practical text-to-SQL for data analytics" (SQL Bot). LinkedIn Engineering Blog, 2024. https://www.linkedin.com/blog/engineering/ai/practical-text-to-sql-for-data-analytics
+33. Anthropic. "Introducing Contextual Retrieval." Anthropic, September 2024. https://www.anthropic.com/news/contextual-retrieval
+34. Anthropic. "Introducing the Model Context Protocol." Anthropic, November 2024. https://www.anthropic.com/news/model-context-protocol (specification: https://modelcontextprotocol.io/)
+35. OWASP GenAI Security Project. "LLM08:2025 Vector and Embedding Weaknesses." OWASP Top 10 for LLM Applications 2025. https://genai.owasp.org/llmrisk/llm082025-vector-and-embedding-weaknesses/
+36. Microsoft. "Introducing Researcher and Analyst in Microsoft 365 Copilot." Microsoft 365 Blog, March 2025. https://www.microsoft.com/en-us/microsoft-365/blog/2025/03/25/introducing-researcher-and-analyst-in-microsoft-365-copilot/

@@ -63,6 +63,12 @@ as in FLARE and Self-RAG) [15]. FlashRAG uses a similar split: *sequential*, *co
 (route by query type), *branching* (parallel paths, merged) and *loop* pipelines, plus a newer
 *reasoning* class for RL-trained search models [17].
 
+The 2025 survey by Singh et al. organizes *agentic* RAG along a different axis: the number
+and role of agents (single-agent router, multi-agent, hierarchical, corrective, adaptive,
+graph-based) and the agentic patterns they use (reflection, planning, tool use,
+multi-agent collaboration) [44]. The two taxonomies are complementary: Gao et al. classify
+*how retrieval is scheduled*, Singh et al. classify *who is doing the scheduling*.
+
 ## 2. Interleaved retrieval for multi-hop questions
 
 ### 2.1 DSP and Self-Ask: programmatic and prompted decomposition
@@ -238,8 +244,9 @@ with ISREL/ISSUP/ISUSE, and keeps the best candidates by segment-level beam sear
    subsets plus knowledge-intensive sets such as NQ, Wizard of Wikipedia, FEVER, ASQA). It
    inserts Retrieve tokens, retrieved passages and critique tokens [1].
 4. *Generator M.* Llama 2 7B/13B, trained with the plain LM objective. Retrieved passages are
-   masked out of the loss. Training used 4x A100-80GB, 3 epochs, batch size 128, learning
-   rate 2e-5 [1].
+   masked out of the loss. Training used 3 epochs, batch size 128 and learning rate 2e-5;
+   the repository reports 8x A100-40GB for the 7B model and 4x A100-80GB for the 13B model
+   [1][2].
 
 Inserting critiques offline avoids hosting a reward model during training, which the
 authors say "significantly reduces training costs compared to PPO" [1].
@@ -443,7 +450,8 @@ The reward is usually answer correctness alone.
 **Architecture.** Search-R1 (Jin et al., 2025) extends
 DeepSeek-R1(-Zero)-style RL with interleaved search calls. It is built on veRL and supports
 PPO, GRPO and REINFORCE, with BM25, dense (flat GPU or ANN CPU) and online search engines
-behind an HTTP retrieval server [21]. The base-model prompt is short [21]:
+(Google, Bing or Brave APIs) behind an HTTP retrieval server, with optional neural rerankers
+[21]. The base-model prompt (from the repository's `infer.py`) is short [21]:
 
 ```
 Answer the given question. You must conduct reasoning inside <think> and </think>
@@ -457,7 +465,8 @@ directly provide the answer inside <answer> and </answer> ...
 **Rollout and loss masking.** During rollout, generation stops at `</search>`. The query goes
 to the retriever (top-3 passages in the published scripts), and the results are spliced back
 in as an `<information>` block. Generation then resumes, for up to `max_turns` rounds (4 in
-the v0.1 scripts) [21]. The important implementation detail is the **information mask**. The
+the `scripts/nq_hotpotqa` v0.1/v0.2 experiment scripts, 2 in the top-level quick-start
+`train_ppo.sh`/`train_grpo.sh`) [21]. The important implementation detail is the **information mask**. The
 retrieved tokens appear in the context, but `_info_masked_concatenate_with_padding` masks
 them out of the policy-gradient loss. The model is not trained to *generate* retrieved text,
 only to reason around it [21].
@@ -477,7 +486,7 @@ non-RL loop method in that benchmark scores 41.5 HotpotQA F1, with a different (
 backbone, so the comparison is only indicative [17]. A follow-up empirical study by the same
 authors examines reward design, base versus instruct models and search engine choice for
 these agents [22]. By late 2025 Search-R1 was integrated into veRL, SkyRL and Thinking
-Machines' Tinker cookbook. The README lists more than 20 derived works, including
+Machines' Tinker. The README lists more than 20 derived works, including
 ZeroSearch, AutoRefine, ParallelSearch, StepSearch and Tree-GRPO [21].
 
 ### 9.2 R1-Searcher and R1-Searcher++
@@ -520,8 +529,8 @@ release 3B, 7B and 14B simulators and recommend the 14B for stable simulation [2
 |---|---|---|---|---|
 | DeepResearcher [29] | GAIR-NLP, 2025 | live web search | end-to-end RL in real web environments | up to +28.9 pts over prompt baselines, +7.2 over RAG-based RL agents |
 | ASearcher [30] | inclusionAI, 2025 | live web | fully asynchronous RL; LLM agent that synthesizes QA data | >100 tool calls and >400k tokens per trajectory in training; Avg@4 58.7 GAIA, 51.1 xBench-DeepSearch, 74.5 Frames (ASearcher-Web-QwQ, 32B) |
-| Tongyi DeepResearch [31] | Alibaba-NLP, Sept 2025 | web, Scholar, Python, file parsing | agentic continual pre-training + SFT + on-policy GRPO variant; ReAct mode and IterResearch "Heavy" mode | 30B-A3B MoE, 128K context |
-| MiroThinker [32] | MiroMind, 2025-26 | web tools | "interactive scaling" (more, deeper tool interactions as a third scaling axis) | v1.0 (8B/30B/72B): 256K context, up to 600 tool calls, 47.1% BrowseComp; v1.7: 74.0% BrowseComp |
+| Tongyi DeepResearch [31] | Alibaba-NLP, 17 Sept 2025 | web, Scholar, Python, file parsing | agentic continual pre-training + SFT + on-policy GRPO variant; ReAct mode and IterResearch "Heavy" mode | 30.5B-total / ~3.3B-active MoE, 128K context; builds on the WebWalker / WebDancer / WebSailor line |
+| MiroThinker [32] | MiroMind, 2025-26 | web tools | "interactive scaling" (more, deeper tool interactions as a third scaling axis) | v1.0 (8B/30B/72B, Nov 2025): 256K context, up to 600 tool calls, 47.1% BrowseComp; v1.7 (235B, Mar 2026): 74.0% BrowseComp, 300-tool-call cap |
 
 Three engineering lessons recur in these reports:
 
@@ -540,6 +549,30 @@ Three engineering lessons recur in these reports:
 
 Leaderboard numbers on BrowseComp, GAIA and HLE come from each vendor's own harness, with
 different tool sets and budgets. Treat cross-system comparisons as approximate.
+
+### 9.5 Cheaper supervision: CoRAG and s3
+
+Two 2025 designs reach the same goal as Search-R1 with different training signals.
+
+**CoRAG** (Chain-of-Retrieval Augmented Generation; Wang et al., Microsoft Research / Renmin
+University, NeurIPS 2025) does not use RL. Because QA datasets only provide final answers,
+it generates intermediate *retrieval chains* (sub-query, sub-answer, repeated) by
+**rejection sampling**, keeping chains that lead to the correct answer, and fine-tunes
+Llama-3.1-8B on them. At test time, decoding strategies that control the number and length
+of sampled chains (greedy, best-of-N, tree search) trade compute for accuracy, which the
+authors present as test-time scaling for RAG. They report gains of more than 10 EM points on
+multi-hop QA and a new state of the art on most KILT tasks [45]. In FlashRAG's reasoning
+table CoRAG has the best HotpotQA (56.6) and 2Wiki (60.7) F1 of the released checkpoints
+(Section 12) [17]. The released code defaults to a maximum path length of 6 [45].
+
+**s3** (Jiang et al., UIUC, EMNLP 2025) decouples the *searcher* from the *generator*. Only
+the searcher is trained with RL; the generator stays frozen. The reward, **Gain Beyond RAG
+(GBR)**, measures how much the searcher's retrieved context improves the frozen generator's
+answer over naive single-shot RAG, rather than rewarding exact match of an answer the
+searcher itself writes. The authors report that 2.4k training samples suffice to outperform
+baselines trained on over 70x more data, across general and medical QA [46]. The design
+lesson: when the generator is a closed or fixed model, train only the retrieval policy and
+reward its *marginal* contribution.
 
 ## 10. Multi-agent research: Anthropic's Research system
 
@@ -592,6 +625,27 @@ overall score of 0.4344 (rank 6) on the Deep Research Bench leaderboard in Augus
 Jina's `node-DeepResearch` reduces the loop to "keep searching, reading webpages, reasoning
 until an answer is found (or the token budget is exceeded)". It deliberately targets concise
 answers, not long reports [42].
+
+### 10.1 Commercial deep-research agents and their benchmark
+
+OpenAI's **Deep Research** (February 2025) brought the same pattern to a consumer product: a
+version of o3 trained end-to-end with RL on browsing and Python tasks, running for minutes
+per query and returning a cited report [49]. Google's Gemini Deep Research (December 2024)
+and Perplexity's Deep Research followed similar plan-search-read-synthesize loops; their
+internals are not published in detail, so they are mentioned here only as context.
+
+To measure these agents OpenAI released **BrowseComp** (April 2025): 1,266 questions whose
+answers are short and easy to verify but hard to find, written "backwards" from known facts
+and checked to be absent from the first pages of several searches. GPT-4o scored 0.6%
+without browsing and 1.9% with browsing, while Deep Research scored 51.5% [47]. BrowseComp
+has since become the headline metric for the RL-trained agents in Section 9.4 (MiroThinker,
+Tongyi DeepResearch). Google's **FRAMES** (2024, 824 questions) targets the multi-hop RAG
+setting more directly: each question needs facts from several Wikipedia articles, often
+with numerical or temporal reasoning. Its authors report that a strong long-context model
+improves from roughly 0.41 accuracy without retrieval to about 0.66 with a multi-step
+retrieval pipeline [48]. The benchmark progression (HotpotQA, then Bamboogle, then FRAMES,
+then BrowseComp) tracks the move from two-hop Wikipedia questions to open-web search
+needing dozens of queries.
 
 ## 11. Agentic search vs. indexing: Claude Code and the grep debate
 
@@ -668,6 +722,16 @@ third route: symbol-level retrieval and editing through LSP language servers (40
 or a JetBrains plugin. It aims to replace "fragile text surgery" with reference-aware
 navigation [41].
 
+The strongest evidence on the other side comes from a coding-agent vendor rather than a
+vector-database vendor. Cursor (November 2025) reports that adding semantic search to its
+agent alongside grep raised answer accuracy on its internal Cursor Context Bench by about
+12.5% on average (6.5% to 23.5% depending on the model). In an online A/B test against a
+grep-only arm, code retention rose 0.3% overall and 2.6% on large codebases, and
+dissatisfied follow-up requests fell 2.2%. Cursor's conclusion is that the *combination* of
+grep and semantic search works best, not either alone [50]. These are self-reported,
+small-effect online metrics, but they come from production traffic rather than a 30-task
+sample.
+
 **Reading the debate.** The evidence points to a layered design, not a winner:
 
 - grep/find is *exact and fresh*. It is ideal for identifiers, error strings and config keys,
@@ -695,7 +759,7 @@ of them with one generator (Llama3-8B-Instruct, 2048 input tokens), one retrieve
 | IRCoT | loop | 33.3 | 56.9 | 41.5 | 32.4 | 45.6 |
 
 And from FlashRAG's "reasoning pipeline" table, which uses each method's released checkpoint
-(PopQA reported as EM here) [17]:
+(the README does not restate the generator/retriever settings for this table) [17]:
 
 | Method (checkpoint) | NQ EM | HotpotQA F1 | 2Wiki F1 | MuSiQue F1 | Bamboogle F1 |
 |---|---|---|---|---|---|
@@ -729,6 +793,8 @@ What the numbers say:
 | ReAct [11] | 2022-23 | LLM policy (prompted) | model emits finish | none | open-ended | loops, premature finish |
 | Search-o1 [27] | 2025 | reasoning model | model emits search tags | none | open-ended | noisy docs in long CoT (mitigated) |
 | Search-R1 / R1-Searcher [21][23] | 2025 | RL-trained policy | learned; max turns | outcome RL | few (4-turn cap in Search-R1 v0.1 scripts) | reward hacking on EM; over-search |
+| CoRAG [45] | 2025 | SFT policy (rejection-sampled chains) | learned; max chain length | SFT on sampled chains | up to ~6 sub-queries per chain, times N samples | test-time cost of best-of-N / tree search |
+| s3 [46] | 2025 | RL-trained searcher, frozen generator | learned | RL with Gain Beyond RAG reward | few | needs a capable frozen generator; reward costs generator calls |
 | ASearcher / MiroThinker [30][32] | 2025-26 | RL-trained policy | learned; up to 100s of turns | large-scale async RL | tens to hundreds | cost; benchmark-specific harnesses |
 | Anthropic Research [33] | 2025 | lead LLM + subagents | evaluator judgment; budgets | none (prompted) | many, in parallel | 15x tokens; over-spawning |
 | Claude Code agentic search [36][37] | 2025-26 | LLM agent | task completion | none | open-ended grep/read | token cost; dead-end exploration |
@@ -785,7 +851,8 @@ What the numbers say:
    if measurements justify it.** grep/find plus subagents avoids staleness and ingestion
    infrastructure. Add hybrid semantic search or LSP tools when token cost or conceptual
    queries dominate. Measured savings are about 40% of tokens at equal retrieval quality in
-   one vendor study [36][38][40][41].
+   one vendor study, and Cursor reports about 12.5% higher accuracy from adding semantic
+   search to grep [36][38][40][41][50].
 8. **Spend tokens deliberately.** In Anthropic's BrowseComp analysis, token budget explained
    about 80% of performance variance. Multi-agent parallelism buys quality and wall-clock time
    at about 15x chat cost, so reserve it for tasks worth that much [33].
@@ -907,3 +974,19 @@ What the numbers say:
     https://github.com/jina-ai/node-DeepResearch
 43. LangChain. open_deep_research. GitHub, 2025.
     https://github.com/langchain-ai/open_deep_research
+44. A. Singh, A. Ehtesham, S. Kumar, T. T. Khoei. "Agentic Retrieval-Augmented Generation:
+    A Survey on Agentic RAG." arXiv 2025. https://arxiv.org/abs/2501.09136
+45. L. Wang, H. Chen, N. Yang, X. Huang, Z. Dou, F. Wei. "Chain-of-Retrieval Augmented
+    Generation" (CoRAG). Microsoft Research / RUC, NeurIPS 2025.
+    https://arxiv.org/abs/2501.14342 ; code: https://github.com/microsoft/LMOps/tree/main/corag
+46. P. Jiang et al. "s3: You Don't Need That Much Data to Train a Search Agent via RL."
+    UIUC, EMNLP 2025. https://arxiv.org/abs/2505.14146 ; code: https://github.com/pat-jj/s3
+47. J. Wei et al. "BrowseComp: A Simple Yet Challenging Benchmark for Browsing Agents."
+    OpenAI, April 2025. https://arxiv.org/abs/2504.12516 ; https://openai.com/index/browsecomp/
+    (reference implementation: https://github.com/openai/simple-evals)
+48. S. Krishna et al. "Fact, Fetch, and Reason: A Unified Evaluation of Retrieval-Augmented
+    Generation" (FRAMES). Google, arXiv 2024. https://arxiv.org/abs/2409.12941
+49. OpenAI. "Introducing deep research." February 2, 2025.
+    https://openai.com/index/introducing-deep-research/
+50. S. Heule, E. Jia, N. Jain. "Improving agent with semantic search." Cursor blog,
+    November 2025. https://cursor.com/blog/semsearch

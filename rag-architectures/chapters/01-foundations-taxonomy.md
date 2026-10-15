@@ -6,8 +6,8 @@ Retrieval-augmented generation (RAG) is the family of designs in which a languag
 output depends on two things: what is stored in its weights (*parametric memory*) and text
 fetched at run time from an external store (*non-parametric memory*). Lewis et al. gave the
 idea its name in 2020 [1]. The lineage is older, though. Open-domain QA systems paired a
-retriever with a reader, kNN-LM interpolated a nearest-neighbour datastore into token
-probabilities [4], and REALM backpropagated through a learned retriever during pre-training
+retriever with a reader (ORQA [37]), kNN-LM interpolated a nearest-neighbour datastore into
+token probabilities [36], and REALM backpropagated through a learned retriever during pre-training
 a few months before RAG appeared [2].
 
 This chapter covers three things:
@@ -24,6 +24,10 @@ This chapter covers three things:
    cite) with public numbers on cost, latency and quality, and a catalogue of failure modes
    [14][15][16].
 
+4. **Developments the 2020-2022 canon does not cover** (Section 12): graph-structured
+   indexes (GraphRAG [38]), hierarchical summary trees (RAPTOR [39]), retrieval over page
+   images (ColPali [40]) and reinforcement-learned search agents (Search-R1 [41]).
+
 The other chapters of this atlas take the individual stages further. This chapter sets the
 vocabulary they use.
 
@@ -35,7 +39,7 @@ A useful frame from the start: every RAG design answers four questions.
   (REALM), a 64-token chunk (RETRO), or a section-aligned passage of up to 200 words (Atlas).
 - **Where are retrieved items fused with the query?** In the input sequence (RAG, REPLUG),
   in the decoder's cross-attention (FiD, Atlas), in chunked cross-attention inside the
-  decoder stack (RETRO), or in the output distribution (kNN-LM, continuous cache) [4].
+  decoder stack (RETRO), or in the output distribution (kNN-LM, continuous cache) [36].
 - **Is the retriever trained, and with what signal?** It may be frozen (RETRO), trained
   query-side only (RAG, Atlas few-shot), trained end to end with a refreshed index (REALM,
   Atlas pre-training), or trained from the LM's own preferences (REPLUG-LSR, RA-DIT).
@@ -48,11 +52,22 @@ A useful frame from the start: every RAG design answers four questions.
 
 Before 2020, open-domain QA meant two stages. A sparse retriever (TF-IDF/BM25) selected
 Wikipedia passages, and an extractive reader picked out an answer span. ORQA (Lee et al.,
-2019) made retrieval a latent variable trained by marginal likelihood. REALM extended this
+2019) [37] made retrieval a latent variable trained by marginal likelihood. REALM extended this
 directly [2]. The weakness of an extractive reader is structural: it can only return
 strings that appear verbatim in a retrieved passage.
 
-### 1.2 Dense Passage Retrieval (DPR)
+### 1.2 Nearest-neighbour language models (kNN-LM)
+
+kNN-LM (Khandelwal et al., ICLR 2020) is the clearest pre-RAG example of output-level
+fusion. A trained LM's context vectors are stored as keys in a datastore whose values are
+the next tokens. At inference the model's next-token distribution is linearly interpolated
+with a distribution built from the k nearest stored contexts, with no extra training [36].
+It showed that a frozen model can gain from a non-parametric memory, and that the
+datastore can be swapped for domain adaptation, at the cost of one nearest-neighbour search
+per generated token. RETRO's per-chunk retrieval is in part a response to that per-token
+cost [4].
+
+### 1.3 Dense Passage Retrieval (DPR)
 
 DPR [11] is the retriever that RAG and FiD used. It is a bi-encoder: two independent
 BERT-base encoders, with the [CLS] vector (d = 768) as the representation and dot-product
@@ -317,8 +332,10 @@ matches models 25x larger by consulting a database bigger than its training set 
   sampling, a cost amortized over a 64-token chunk [4].
 - **Chunked cross-attention (CCA).** Cost is linear in the amount of retrieved data.
   Causality is kept by letting chunk u+1 attend only to neighbours of chunk u, and by
-  filtering neighbours from the same source document during training [4]. Per Alammar's
-  walkthrough, RETRO blocks sit at every third layer from layer 9 in the large models [6].
+  filtering neighbours from the same source document during training [4]. RETRO blocks are
+  interleaved with standard blocks at a fixed stride (roughly every third layer, starting
+  later in larger models); see the paper's architecture appendix and Alammar's walkthrough
+  for the exact layer sets [4][6].
 - **Data.** Multilingual MassiveText (over 5T tokens). The training-time retrieval DB holds
   600B tokens and the evaluation DB **1.75T tokens**. Training documents with 13-gram
   Jaccard similarity of 0.8 or more to test documents were removed (MinHash) [4].
@@ -410,15 +427,17 @@ Crawl mix for its final models [9].
 
 ### Results
 
-- **64-shot NQ: 42.4% EM** (paper Table 8), ahead of PaLM-540B with about 50x fewer
-  parameters [9]. The repository README reports over 45% with a 2018 index, in line with
+- **64-shot NQ: 42.4% EM**, ahead of PaLM-540B (39.6%) with about 50x fewer parameters
+  [9]. The repository README reports over 45% with a 2018 index, in line with
   the paper's **+3.6%** gain from a temporally matched index [10][9].
 - **Full NQ: 60.4% EM**, the state of the art at the time. TriviaQA 74.5 [9]. The README
   quotes 64% for full NQ; the figures differ by setup and version [10].
-- **MMLU 5-shot (multi-task): 56.6%**, and 66.0% with full/transfer fine-tuning, for an 11B
-  model [9].
-- **Leakage control.** Filtering possibly leaked passages reduced MMLU from 56.4 to 55.8%
-  [9].
+- **MMLU (11B, with the paper's de-biased inference):** 47.9% 5-shot, **56.6%** 5-shot
+  multi-task, and 66.0% with full/transfer fine-tuning. Note that Atlas *fine-tunes* in its
+  "5-shot" setting, unlike in-context baselines, and that appendix tables without
+  de-biasing report lower figures (for example 43.5 multi-task, 54.0 full/transfer) [9].
+- **Leakage control.** Filtering possibly leaked passages from the index lowered MMLU
+  accuracy by less than one point, indicating that leakage did not drive the result [9].
 
 ### Lessons
 
@@ -531,10 +550,13 @@ and looping** [13].
 ### 9.4 Beyond modular: agentic RAG (2025-2026)
 
 Agentic RAG puts an LLM agent in charge of the loop. The agent plans, chooses tools and
-indexes, reflects on evidence, and decides when to stop. Singh et al. (Jan 2025, revised
-through 2026) classify systems as single-agent ("router"), multi-agent and hierarchical
-[31]. A 2026 systematization-of-knowledge paper classifies by *agent topology* and adds an
-explicit planner-executor class [32]. Later chapters of this atlas cover these designs. In
+indexes, reflects on evidence, and decides when to stop. Singh et al. (Jan 2025; v4 April
+2026) organize systems around four agentic patterns (reflection, planning, tool use,
+multi-agent collaboration) and catalogue seven architectures: single-agent (router),
+multi-agent, hierarchical, corrective, adaptive, graph-based, and agentic document
+workflows [31]. Mishra et al.'s March 2026 systematization-of-knowledge paper models
+agentic RAG as a finite-horizon POMDP and classifies systems along four dimensions:
+planning, memory, tool orchestration and retrieval strategy [32]. Later chapters of this atlas cover these designs. In
 the taxonomy here, agentic RAG is Modular RAG whose looping and branching operators are
 chosen at run time by a model rather than fixed by an engineer.
 
@@ -770,6 +792,69 @@ answers from evaluation data, which inflates scores [4][9].
 
 ---
 
+## 12. Developments beyond the canon (2024-2026)
+
+The five canonical systems all retrieve flat text passages from one corpus and answer
+local, fact-seeking questions. Four lines of work since 2024 relax those assumptions and
+now count as standard options in the reference architecture.
+
+### 12.1 GraphRAG: graph-structured indexes for global questions
+
+Microsoft's GraphRAG (Edge et al., 2024) targets *query-focused summarization* questions
+such as "what are the main themes of this corpus?", which top-K chunk retrieval answers
+poorly because no single chunk holds the answer [38]. At ingest an LLM extracts entities
+and relationships into a knowledge graph, the graph is partitioned into a hierarchy of
+communities (Leiden clustering), and the LLM writes a summary for every community. At query
+time "global search" maps the question over community summaries and reduces the partial
+answers. "Local search" starts from entities matched to the query. The paper reports gains
+in comprehensiveness and diversity over vector RAG on global sensemaking questions, judged
+by an LLM [38]. **Cost.** Indexing calls the LLM over the whole corpus, and the project's
+own README warns that indexing "can be an expensive operation" and advises starting small
+[38]. In this chapter's terms GraphRAG moves work into the ingest and index stages and adds
+a second, non-vector access path.
+
+### 12.2 RAPTOR: hierarchical summary trees
+
+RAPTOR (Sarthi et al., ICLR 2024) recursively embeds, clusters and summarizes chunks,
+building a tree whose upper levels hold progressively more abstract summaries [39].
+Retrieval can search the collapsed tree, so a query can match a leaf chunk or a high-level
+summary, whichever fits its granularity. The authors report that pairing RAPTOR with GPT-4
+improved the best published QuALITY accuracy by 20 points absolute [39]. Like GraphRAG it
+trades a one-time LLM cost at ingest for better recall on questions that span many
+passages.
+
+### 12.3 Visual document retrieval: ColPali
+
+ColPali (Faysse et al., 2024; ICLR 2025) skips the parse-OCR-chunk pipeline of Section 10.1
+for visually rich documents [40]. It embeds each *page image* with a vision-language model
+(PaliGemma-3B), projecting the ViT patch outputs into a multi-vector representation, and
+scores queries with ColBERT-style late interaction [19][40]. The authors released the ViDoRe
+benchmark with it; the reference repository lists `vidore/colpali` at 81.3 and
+`colpali-v1.3` at 84.8 on the ViDoRe leaderboard [40]. The design matters for tables,
+charts and slides, where text extraction is a major source of FP1/FP2 failures. The cost is
+a multi-vector index that is larger than a single-vector one.
+
+### 12.4 Reinforcement-learned search agents
+
+Following DeepSeek-R1-style reinforcement learning for reasoning, Search-R1 (Jin et al.,
+2025) trains an LLM with outcome rewards to interleave reasoning tokens with search-engine
+calls, masking retrieved tokens out of the loss so the policy is optimized only on its own
+outputs [41]. Base models such as Qwen2.5 and Llama-3.2 learn when and what to search
+without supervised trajectories. This is the training-based counterpart of the agentic
+paradigm in Section 9.4: where Self-RAG [26] learned retrieval decisions from
+critic-labelled data, Search-R1 learns them from task reward. It also echoes the canon:
+like REALM and RAG it trains the *use* of retrieval end to end, now against a fixed
+external search engine instead of a differentiable retriever.
+
+| Development | Stage it changes | What it adds | Main cost |
+|---|---|---|---|
+| GraphRAG [38] | Ingest, index, retrieve | entity graph + community summaries; global search | LLM calls over whole corpus at ingest |
+| RAPTOR [39] | Ingest, index | recursive summary tree; multi-granularity retrieval | clustering and summarization at ingest |
+| ColPali [40] | Ingest, index, retrieve | page-image embeddings; no OCR or parsing | larger multi-vector index |
+| Search-R1 [41] | Retrieve, generate (control) | RL-learned when/what to search | RL training; variable query-time cost |
+
+---
+
 ## Key takeaways for system designers
 
 - **Start from the six-stage reference pipeline** (ingest, index, retrieve, rerank,
@@ -797,6 +882,10 @@ answers from evaluation data, which inflates scores [4][9].
 - **Fine-tuning and RAG are complements.** RA-DIT [23], RETROfitting [4] and InstructRetro
   [25] all show that lightweight training to *use* retrieved evidence adds gains on top of
   retrieval itself.
+- **Match the index structure to the question type.** Flat chunk retrieval suits local,
+  fact-seeking questions. Corpus-wide "sensemaking" questions favour graph or summary-tree
+  indexes [38][39], and visually rich documents favour page-image retrieval [40], each at a
+  higher ingest cost.
 - **Guard evaluations against leakage.** Measure n-gram overlap between corpus and test
   set, as RETRO and Atlas did [4][9]. Otherwise retrieval quietly memorizes the benchmark.
 
@@ -843,9 +932,9 @@ answers from evaluation data, which inflates scores [4][9].
 16. Anthropic. "Introducing Contextual Retrieval." 2024.
     https://www.anthropic.com/news/contextual-retrieval
 17. Anthropic. "Citations" (Claude Platform documentation). Accessed 2026.
-    https://docs.claude.com/en/docs/build-with-claude/citations
+    https://platform.claude.com/docs/en/build-with-claude/citations
 18. Anthropic. "Search results" (Claude Platform documentation). Accessed 2026.
-    https://docs.claude.com/en/docs/build-with-claude/search-results
+    https://platform.claude.com/docs/en/build-with-claude/search-results
 19. O. Khattab, M. Zaharia. "ColBERT: Efficient and Effective Passage Search via
     Contextualized Late Interaction over BERT." Stanford, SIGIR 2020.
     https://arxiv.org/abs/2004.12832
@@ -877,11 +966,13 @@ answers from evaluation data, which inflates scores [4][9].
 30. Z. Li, C. Li, M. Zhang, Q. Mei, M. Bendersky. "Retrieval Augmented Generation or
     Long-Context LLMs? A Comprehensive Study and Hybrid Approach" (Self-Route). Google
     DeepMind / U. Michigan, EMNLP 2024 Industry. https://arxiv.org/abs/2407.16833
-31. A. Singh, A. Ehtesham, S. Kumar, T. Talaei Khoei. "Agentic Retrieval-Augmented
-    Generation: A Survey on Agentic RAG." 2025 (revised 2026).
-    https://arxiv.org/abs/2501.09136
-32. "SoK: Agentic Retrieval-Augmented Generation (RAG): Taxonomy, Architectures, Evaluation,
-    and Research Directions." 2026. https://arxiv.org/abs/2603.07379
+31. A. Singh, A. Ehtesham, S. Kumar, T. Talaei Khoei, A. V. Vasilakos. "Agentic
+    Retrieval-Augmented Generation: A Survey on Agentic RAG." 2025 (v4 April 2026).
+    https://arxiv.org/abs/2501.09136 (companion repository:
+    https://github.com/asinghcsu/AgenticRAG-Survey)
+32. S. Mishra, S. Niroula, U. Yadav, D. Thakur, S. Gyawali, S. Gaire. "SoK: Agentic
+    Retrieval-Augmented Generation (RAG): Taxonomy, Architectures, Evaluation, and Research
+    Directions." March 2026. https://arxiv.org/abs/2603.07379
 33. Hugging Face. "RAG" model documentation (Transformers). 2020-2026.
     https://huggingface.co/docs/transformers/model_doc/rag
 34. O. Khattab, K. Santhanam, X. L. Li, et al. "Demonstrate-Search-Predict: Composing
@@ -889,3 +980,20 @@ answers from evaluation data, which inflates scores [4][9].
     https://arxiv.org/abs/2212.14024
 35. X. Ma, Y. Gong, P. He, H. Zhao, N. Duan. "Query Rewriting for Retrieval-Augmented Large
     Language Models" (Rewrite-Retrieve-Read). EMNLP 2023. https://arxiv.org/abs/2305.14283
+36. U. Khandelwal, O. Levy, D. Jurafsky, L. Zettlemoyer, M. Lewis. "Generalization through
+    Memorization: Nearest Neighbor Language Models" (kNN-LM). Stanford / Facebook AI, ICLR
+    2020. https://arxiv.org/abs/1911.00172
+37. K. Lee, M.-W. Chang, K. Toutanova. "Latent Retrieval for Weakly Supervised Open Domain
+    Question Answering" (ORQA). Google Research, ACL 2019. https://arxiv.org/abs/1906.00300
+38. D. Edge, H. Trinh, N. Cheng, et al. "From Local to Global: A Graph RAG Approach to
+    Query-Focused Summarization." Microsoft Research, 2024. https://arxiv.org/abs/2404.16130
+    (code: https://github.com/microsoft/graphrag)
+39. P. Sarthi, S. Abdullah, A. Tuli, S. Khanna, A. Goldie, C. D. Manning. "RAPTOR: Recursive
+    Abstractive Processing for Tree-Organized Retrieval." Stanford, ICLR 2024.
+    https://arxiv.org/abs/2401.18059
+40. M. Faysse, H. Sibille, T. Wu, et al. "ColPali: Efficient Document Retrieval with Vision
+    Language Models." Illuin Technology / CentraleSupelec et al., ICLR 2025 (arXiv 2024).
+    https://arxiv.org/abs/2407.01449 (code: https://github.com/illuin-tech/colpali)
+41. B. Jin, H. Zeng, Z. Yue, et al. "Search-R1: Training LLMs to Reason and Leverage Search
+    Engines with Reinforcement Learning." UIUC et al., 2025.
+    https://arxiv.org/abs/2503.09516 (code: https://github.com/PeterGriffinJin/Search-R1)

@@ -7,9 +7,9 @@ A RAG system has four places where learning can happen. Each one fixes a differe
 3. **The retriever.** The bi-encoder or late-interaction model that produces candidates. It is trained with synthetic queries (InPars, Promptagator, GPL, E5-Mistral), mined hard negatives (ANCE, RocketQA, NV-Retriever), or the LLM's own preferences (REPLUG-LSR, Atlas, RA-DIT).
 4. **The reranker.** A cross-encoder or LLM reranker. It is often a distillation target or a distillation teacher (RankGPT, RankZephyr, Rank1).
 
-The chapter starts with the evidence on the first-order question, "should knowledge go into the weights or into the index?". It then covers generator-side training (RAFT, RA-DIT, ChatQA), LM-supervised and RL-trained retrieval (REPLUG-LSR, Atlas, reader-to-retriever distillation, Search-R1, DeepRetrieval), synthetic-query pipelines (InPars, Promptagator, GPL, UDAPDR and their LLM-scale successors such as E5-Mistral, Gecko and Qwen3-Embedding), hard-negative mining, and distillation into rerankers and retrievers (MarginMSE, TAS-B, ColBERTv2, RankGPT, RankZephyr, Rank1). It closes with a domain-adaptation playbook. Chapter 3 covers embedding-model loss functions and the Sentence Transformers tooling in detail. This chapter is about where the training signal comes from and which component it should update.
+The chapter starts with the evidence on the first-order question, "should knowledge go into the weights or into the index?". It then covers generator-side training (RAFT, RA-DIT, ChatQA, RankRAG), LM-supervised and RL-trained retrieval (REPLUG-LSR, Atlas, reader-to-retriever distillation, Search-R1, DeepRetrieval, ZeroSearch), synthetic-query pipelines (InPars, Promptagator, GPL, UDAPDR and their LLM-scale successors such as E5-Mistral, Gecko and Qwen3-Embedding), hard-negative mining, and distillation into rerankers and retrievers (MarginMSE, TAS-B, ColBERTv2, RankGPT, RankZephyr, Rank1, ReasonRank). Section 17.1 also covers Cartridges, a trained per-corpus KV cache that sits between fine-tuning and putting the corpus in context. It closes with a domain-adaptation playbook. Chapter 3 covers embedding-model loss functions and the Sentence Transformers tooling in detail. This chapter is about where the training signal comes from and which component it should update.
 
-*Source note.* arXiv was not directly reachable while this chapter was researched. Papers were read in full text from public mirrors of the arXiv PDFs. They are cited by their canonical arXiv URLs. Where a fact comes only from a secondary summary, the text says so.
+*Source note.* arXiv was not directly reachable while this chapter was researched. Papers were read in full text from public mirrors of the arXiv PDFs. They are cited by their canonical arXiv URLs. Where a fact comes only from a secondary summary, the text says so. In a later fact-check pass (October 2026), arXiv was again unreachable. Numbers were re-checked against the official code repositories (Gorilla RAFT, GPL, InPars, rank1, RankLLM, DeepRetrieval, Qwen3-Embedding, Sentence Transformers), the Hugging Face and Weaviate blog sources, and the Microsoft Research publication pages. Claims those sources could not confirm were softened.
 
 ---
 
@@ -73,7 +73,17 @@ The authors conclude that LLMs mostly acquire facts in pre-training, and that fi
 - At the endpoint, closed-book synthetic continued pre-training recovered about 80% of the accuracy gain of giving the model the source documents at inference time.
 - The two were complementary. EntiGraph CPT + RAG scored 62.60, against 60.35 for Llama 3 8B Base + RAG, with retrieval recall@8 at 99.63 for both.
 
-### 17.1.6 Synthesis
+### 17.1.6 Cartridges and self-study (Stanford / HazyResearch, 2025): a third option between weights and the prompt
+
+**Problem.** Long-context "put the whole corpus in the prompt" is the simplest alternative to RAG. Its serving cost grows with KV-cache size, though, and the cache is rebuilt for every request [52].
+
+**Method.** Cartridges train a small KV cache *offline* for a specific corpus, and the base model's weights stay frozen. Training data comes from **self-study**: two instances of the model hold synthetic conversations about the corpus, one asking questions or making requests and the other answering with the corpus in context. The cartridge is then trained with a *context-distillation* objective, so that the model with the cartridge matches the model with the full corpus in context. The cartridge size (`max_tokens`) trades memory against quality [52].
+
+**Results.** The authors claim quality comparable to in-context learning with up to about 26x higher serving throughput. The repository states the throughput figure without a detailed baseline, so treat it as the authors' headline number [52].
+
+**Where it fits.** A cartridge is closer to EntiGraph-style synthetic training [10] than to RAG: it needs a training run per corpus, and it must be retrained when the corpus changes. It does not touch the base weights, though, so it avoids the hallucination risk of SFT on unknown facts [7]. It suits small, static, heavily queried corpora such as a manual or a codebase. It is not a replacement for an index over large or fast-changing collections.
+
+### 17.1.7 Synthesis
 
 | Study | Knowledge type | Weights-only result | RAG result | Combined |
 |---|---|---|---|---|
@@ -123,7 +133,7 @@ These studies share a pattern. Fine-tuning on raw facts is a weak and risky way 
  default: 1 oracle + 4 distractors; CoT generated by GPT-4-1106
 ```
 
-The open-source generator (`raft.py` in the Gorilla repository) automates this. It chunks a PDF, TXT, JSON or API-doc corpus (512-token chunks in the examples), has GPT-4 write N questions per chunk with CoT answers, adds `--distractors` random chunks, and sets the oracle-inclusion rate with `--p`. It can emit chat or completion formats for fine-tuning, and also runs against Azure OpenAI or local Hugging Face models [2].
+The open-source generator (`raft.py` in the Gorilla repository) automates this. It chunks a PDF, TXT, JSON or API-doc corpus (512-token chunks in the examples), has GPT-4 write N questions per chunk with CoT answers, adds `--distractors` random chunks, and sets the oracle-inclusion rate with `--p`. It can emit Hugging Face, chat, completion or eval formats (JSONL or Parquet) and can call Azure OpenAI deployments. A separate script, `raft_local.py`, runs the pipeline on local Hugging Face models instead [2].
 
 **Results (Llama-2-7B)** [1]:
 
@@ -223,6 +233,16 @@ The open-source generator (`raft.py` in the Gorilla repository) automates this. 
 
 **Lesson.** Collapsing query rewriting into the retriever's weights is a latency optimisation that pays off when conversational traffic is high. The cost is that the retriever must be retrained whenever dialogue patterns shift.
 
+### 17.2.4 RankRAG (NVIDIA / Georgia Tech, NeurIPS 2024): one LLM for reranking and generation
+
+**Problem.** A typical RAG stack uses a separate reranker to pick the top-k contexts before generation. Small rerankers generalise poorly, and the generator never learns to judge relevance itself [53].
+
+**Method.** RankRAG extends ChatQA-style context-enhanced instruction tuning (section 17.2.3) with ranking tasks. The instruction-tuning blend adds a small share of context-ranking data: given a question and a passage, output whether the passage is relevant, plus retrieval-augmented ranking over passage sets. At inference the same LLM first reranks the retrieved candidates (for example the top 100), then generates from the top-k it selected [53].
+
+**Results.** The authors report that Llama3-RankRAG (8B and 70B) outperforms ChatQA-1.5 and GPT-4-class baselines on nine knowledge-intensive benchmarks. It also does well on biomedical RAG benchmarks without domain fine-tuning. They also report that adding only a small fraction of ranking data to the blend was enough for ranking quality comparable to, or better than, dedicated rerankers trained on far more ranking data [53].
+
+**Trade-off.** Scoring 100 candidates with a 70B model is much more expensive than a cross-encoder pass, so the reranking step needs batching or a smaller candidate set. The design matters mainly as evidence that ranking and reading are *one* skill that can be trained jointly, which is the same intuition behind RAFT's distractor training [1].
+
 ---
 
 ## 17.3 LM-supervised retriever training: REPLUG-LSR and Atlas
@@ -282,7 +302,7 @@ A newer line of work skips relevance labels and teacher scores entirely. It rewa
 
 The reported relative gains over RAG baselines across seven QA datasets differ between paper versions. Later versions report about 24% for Qwen2.5-7B and about 20% for Qwen2.5-3B; an earlier version reported 41% for 7B [42]. Treat these as approximate.
 
-**DeepRetrieval (UIUC, 2025).** The model rewrites queries inside a `<think>`/`<answer>` format, and the reward is the retrieval metric itself (recall, nDCG, or SQL execution accuracy). It needs no labelled query-rewrite pairs [43]. Against *real* search engines, the v3 paper reports 65.07% recall for publication search (prior best 24.68%) and 63.18% for clinical-trial search (prior best 32.11%). The v1 preprint reported different figures with a 3B model [43].
+**DeepRetrieval (UIUC, 2025).** The model rewrites queries inside a `<think>`/`<answer>` format, and the reward is the retrieval metric itself (recall, nDCG, or SQL execution accuracy). It needs no labelled query-rewrite pairs [43]. Against *real* search engines, the project reports 65.07% recall for publication search (prior best 24.68%) and 63.18% for clinical-trial search (prior best 32.11%), both with a 3B model (DeepRetrieval-3B). Earlier preprint versions reported different figures [43].
 
 ```
   question --> policy LLM --(query)--> frozen search engine / retriever
@@ -294,6 +314,16 @@ The reported relative gains over RAG baselines across seven QA datasets differ b
 ```
 
 **Design implication.** These methods train the *query side* (the LLM that writes queries) and leave the index untouched, which is the same zero-re-index property that makes query-tower tuning attractive [11][3]. The risk is reward hacking against a specific engine. DeepRetrieval's own v3 title ("Hacking Real Search Engines...") hints that learned queries can be engine-specific and may not transfer when the backend changes [43]. Chapter 8 covers agentic search loops from the serving side.
+
+### 17.3.5 ZeroSearch (Alibaba Tongyi Lab, 2025): RL without a live search engine
+
+Search-R1-style training issues hundreds of thousands of search calls during rollouts. That is costly with commercial APIs, and the quality of returned documents is uncontrolled. ZeroSearch replaces the live engine with a **simulated search LLM** [54]:
+
+- An LLM (released in 3B, 7B and 14B versions) is fine-tuned to act as a retrieval module. Given a query, it generates either relevant or deliberately noisy documents.
+- **Curriculum rollout.** The share of noisy documents rises during training (configured with start and end thresholds), so the policy faces harder retrieval conditions over time.
+- The policy (Qwen2.5 3B and 7B, or Llama-3.2-3B, base or instruct) is trained with PPO, GRPO or REINFORCE, as in Search-R1 [54][42].
+
+The authors claim that policies trained this way match or beat those trained against a real search engine, with zero API cost. The 14B simulator is recommended for stable training [54]. The design point is that the *environment* in retrieval RL can itself be a trained model. That gives control over document difficulty, but it risks teaching the policy the simulator's quirks instead of the production engine's, which is the reward-hacking concern above seen from the other side.
 
 ---
 
@@ -532,7 +562,7 @@ Distillation runs down a quality/latency ladder: LLM listwise ranker, then cross
 
 RankGPT showed that GPT-4 prompted to output a *permutation* of candidate passages beat supervised rerankers. It reranked the top 100 BM25 results with a sliding window of size 20 and step 10, and averaged +2.7 and +2.3 nDCG@10 over monoT5-3B on TREC and BEIR [27].
 
-To make that affordable, the authors sampled 10K MS MARCO queries, retrieved 20 BM25 candidates for each, and had ChatGPT rank them. A DeBERTa-large cross-encoder was trained on these permutations with RankNet loss, which yields M(M-1)/2 pairs per list. The resulting **435M-parameter student beat the 3B monoT5 by 1.67 nDCG@10 on BEIR**, with no human labels [27]. Castorini's RankLLM toolkit packages the open successors: listwise RankZephyr and RankVicuna, LiT5-Distill (a T5 listwise model that can rerank 100 documents in one pass), and FirstMistral (first-token logits only) [28].
+To make that affordable, the authors sampled 10K MS MARCO queries, retrieved 20 BM25 candidates for each, and had ChatGPT rank them. A DeBERTa-large cross-encoder was trained on these permutations with RankNet loss, which yields M(M-1)/2 pairs per list. The resulting **DeBERTa-large student (about 440M parameters) outperformed the 3B monoT5 on BEIR**, with no human relevance labels [27]. The margin is small, under 2 nDCG@10 points on average. The public RankGPT repository's training command uses DeBERTa-v3-base, so check which size a released checkpoint is before reusing the numbers. Castorini's RankLLM toolkit packages the open successors: listwise RankZephyr and RankVicuna, LiT5-Distill (a T5 listwise model that can rerank 100 documents in one pass), and FirstMistral (first-token logits only) [28].
 
 **RankZephyr (Waterloo, 2023)** shows the listwise version of the same recipe. A 7B Zephyr model was instruction-tuned to output permutations matching RankGPT-3.5 and then RankGPT-4 orderings of BM25 candidate lists. RankVicuna's training data came from RankGPT-3.5 reorderings over 100K MS MARCO training queries [51]. The authors report that RankZephyr closes most of the gap to GPT-4 and outperforms it on NovelEval, a set of queries and passages newer than the models' training data, which addresses contamination concerns [51]. The advantage is metric-dependent: the same paper reports Judged@10 2-4 points below RankGPT-4 [51].
 
@@ -542,12 +572,22 @@ Rank1 distils test-time reasoning into a pointwise reranker. A secondary survey 
 
 There is a cost-quality trade-off. ReasonIR reports that its retriever with query rewriting beats recent LLM-reranker baselines while needing "over 200x less compute" [35].
 
-### 17.6.4 Domain fine-tuning of small rerankers (2024-2025 practice)
+### 17.6.4 SFT then RL for listwise reasoning rerankers: ReasonRank (2025)
 
-- **Hugging Face (Aarsen, 2025).** A 150M ModernBERT-base cross-encoder was trained in 30 minutes on one RTX 3090 with binary cross-entropy. The data was 99k of GooAQ's 3M pairs, with 5 hard negatives per pair mined by a static embedding model (`range_min=10`, `range_max=100`, `max_score=0.8`, margin 0.1). Reranking the top 30 from a static retriever (59.12 nDCG@10 with no reranking), it reached 77.14. That beat all 13 general-purpose rerankers tested, including `bge-reranker-v2-m3` (568M, 73.56) and `mxbai-rerank-large-v2` (1.54B, 75.40). A 396M ModernBERT-large version trained in under an hour reached 79.42 [29b]. The author notes that the result is domain-specific: the model is "simply the strongest in *our* domain".
+Rank1 is pointwise and trained only by imitation. ReasonRank (Renmin University / Baidu, ACL 2026) moves the reasoning-trace recipe to the *listwise* setting and adds an RL stage [55]:
+
+1. **Data synthesis.** DeepSeek-R1 performs listwise reranking over queries from several domains, producing both reasoning chains and relevance labels. A self-consistency filter keeps only examples whose labels reach NDCG@10 above 0.4. The released training set has about 13K examples.
+2. **Cold-start SFT** on the reasoning traces.
+3. **RL with GRPO**, using a "multi-view" ranking reward based on ranking metrics over the sliding-window output, in place of a plain exact-match reward.
+
+ReasonRank-7B and -32B are built on Qwen2.5-Instruct, and an 8B model on Qwen3 followed in 2026. The authors report that, with ReasonIR as first stage, ReasonRank beats Rank1 on BRIGHT and is more efficient. With a stronger hybrid first stage, the 32B model reached 40.8 nDCG@10 on BRIGHT, which they describe as state of the art at release [55]. RankLLM later added custom prompt templates so that such models can be served from the same toolkit [28]. The pattern matches the Search-R1 shift on the generator side (section 17.3.4): distil a strong teacher first, then optimise the target metric directly with RL.
+
+### 17.6.5 Domain fine-tuning of small rerankers (2024-2025 practice)
+
+- **Hugging Face (Aarsen, 2025).** A 150M ModernBERT-base cross-encoder was trained in 30 minutes on one RTX 3090 with binary cross-entropy. The data was 99k of GooAQ's roughly 3M pairs. A static embedding model mined 5 hard negatives per pair (`num_negatives=5`, `range_max=100`, `sampling_strategy="top"` in the training script), giving 578k labelled pairs: 99k positive and 479k negative. The post's illustrative mining example also shows a `max_score` cap, but the training script does not use one. Reranking the top 30 from a static retriever (59.12 nDCG@10 with no reranking), it reached 77.14. That beat all 13 general-purpose rerankers tested, including `bge-reranker-v2-m3` (568M, 73.56) and `mxbai-rerank-large-v2` (1.54B, 75.40). A 396M ModernBERT-large version trained in under an hour reached 79.42 [29b]. The author notes that the result is domain-specific: the model is "simply the strongest in *our* domain".
 - **Managed fine-tuning (Cohere Rerank via Weaviate tutorial, 2024).** Weaviate's walkthrough generated synthetic queries over its blog corpus with DSPy, then fine-tuned Cohere's hosted reranker. The service required at least 256 unique training queries and at least 64 non-overlapping validation queries. Hard negatives were optional but had to differ from the positives. The tutorial states that the fine-tuned model was priced the same as the zero-shot one at the time [30b].
 
-### 17.6.5 Instruction-following retrievers
+### 17.6.6 Instruction-following retrievers
 
 Promptriever trains bi-encoders (LLaMA-2 7B, LLaMA-3.1 8B, Mistral 7B) so that a per-query natural-language instruction changes what counts as relevant. This lets a retriever be "prompted like a language model" instead of retrained for each intent [37]. It is a complement to Promptagator: one adapts the *data* to the intent, the other makes the *model* accept the intent at query time.
 
@@ -616,7 +656,7 @@ The pieces above combine into a standard pipeline. Steps marked (G) touch the ge
 | ANCE [22] | Microsoft, 2020 | retriever | global ANN negatives | labelled pairs | periodic corpus re-encode | - |
 | RocketQA [23] | Baidu, 2021 | retriever | cross-batch + denoised negatives + CE augmentation | labelled + unlabelled queries | up to 8 V100 | MS MARCO MRR@10 37.0 |
 | NV-Retriever [24] | NVIDIA, 2024 | retriever | positive-aware negatives (95%) | labelled pairs + teachers | 7B model training | MTEB retrieval 60.9 (reported) |
-| RankGPT distil [27] | Shandong/Baidu, 2023 | cross-encoder | ChatGPT permutations, RankNet | 10K queries x 20 docs | ChatGPT calls once | 435M beats monoT5-3B by 1.67 BEIR |
+| RankGPT distil [27] | Shandong/Baidu, 2023 | cross-encoder | ChatGPT permutations, RankNet | 10K queries x 20 docs | ChatGPT calls once | about 440M student beats monoT5-3B on BEIR |
 | Rank1 [29][30] | JHU, 2025 | LLM reranker | R1 reasoning traces | 635K traces (reported) | 0.5B-32B SFT | reasoning reranking |
 | E5-Mistral [32] | Microsoft, 2024 | embedder | GPT-4 synthetic triplets | 500k synthetic + labelled | about 180M generated tokens; under 1k steps | MTEB first (+2.4) |
 | ReasonIR [35] | Meta/UW, 2025 | embedder | synthetic reasoning queries + synthetic negatives | seed docs | 8B model | BRIGHT 29.9 / 36.9 |
@@ -625,8 +665,12 @@ The pieces above combine into a standard pipeline. Steps marked (G) touch the ge
 | Gecko [44] | Google DeepMind, 2024 | embedder | LLM-generated task + query, LLM-relabelled pos/neg | web passages | not disclosed | MTEB 66.31 (768-d) |
 | RankZephyr [51] | Waterloo, 2023 | 7B listwise reranker | GPT-3.5/4 permutation distillation | 100K MS MARCO queries (GPT-3.5 stage) | 7B SFT | beats GPT-4 on NovelEval |
 | Search-R1 [42] | UIUC et al., 2025 | generator's search policy | RL, answer-EM reward, retrieved-token masking | QA pairs only | RL rollouts with live search | about 20-24% relative over RAG |
-| DeepRetrieval [43] | UIUC, 2025 | query rewriter | RL, recall/nDCG reward | queries + engine | 3B-7B RL | 65.07% recall pub. search (v3) |
+| DeepRetrieval [43] | UIUC, 2025 | query rewriter | RL, recall/nDCG reward | queries + engine | 3B RL | 65.07% recall pub. search |
 | EntiGraph CPT [10] | Stanford, 2024 | generator weights | entity-graph synthetic corpus | 1.3M source tokens | 455M generated tokens | about 80% of RAG gain closed-book |
+| Cartridges [52] | Stanford, 2025 | per-corpus trained KV cache (weights frozen) | self-study conversations + context distillation | the corpus only | offline training per corpus | ICL-level quality, up to about 26x throughput (reported) |
+| RankRAG [53] | NVIDIA, 2024 | generator as reranker + reader | instruction tuning with a small share of ranking data | ChatQA-style blend + ranking data | 8B/70B SFT | beats ChatQA-1.5 on nine benchmarks (reported) |
+| ZeroSearch [54] | Alibaba, 2025 | search policy | RL against a simulated search LLM with a noise curriculum | QA pairs | 3B-14B simulator; no API calls | matches or beats real-engine RL (reported) |
+| ReasonRank [55] | Renmin/Baidu, 2025 | listwise LLM reranker | R1 listwise traces (SFT) + GRPO ranking reward | about 13K synthesised examples | 7B/32B | BRIGHT 40.8 with a hybrid first stage |
 
 ---
 
@@ -702,3 +746,7 @@ The pieces above combine into a standard pipeline. Steps marked (G) touch the ge
 49. S. Hofstätter, S. Althammer, M. Schröder, M. Sertkan, A. Hanbury. "Improving Efficient Neural Ranking Models with Cross-Architecture Knowledge Distillation" (Margin-MSE). TU Wien, 2020. https://arxiv.org/abs/2010.02666
 50. S. Hofstätter, S.-C. Lin, J.-H. Yang, J. Lin, A. Hanbury. "Efficiently Teaching an Effective Dense Retriever with Balanced Topic Aware Sampling" (TAS-B). TU Wien / Waterloo, SIGIR 2021. https://arxiv.org/abs/2104.06967
 51. R. Pradeep, S. Sharifymoghaddam, J. Lin. "RankZephyr: Effective and Robust Zero-Shot Listwise Reranking is a Breeze!" University of Waterloo, 2023. https://arxiv.org/abs/2312.02724
+52. S. Eyuboglu, R. Ehrlich, S. Arora, N. Guha, D. Zinsley, E. Liu, W. Tennien, A. Rudra, J. Zou, A. Mirhoseini, et al. "Cartridges: Lightweight and general-purpose long context representations via self-study." Stanford / HazyResearch, 2025. https://arxiv.org/abs/2506.06266 (code: https://github.com/HazyResearch/cartridges)
+53. Y. Yu, W. Ping, Z. Liu, B. Wang, J. You, C. Zhang, M. Shoeybi, B. Catanzaro. "RankRAG: Unifying Context Ranking with Retrieval-Augmented Generation in LLMs." NVIDIA / Georgia Tech, NeurIPS 2024. https://arxiv.org/abs/2407.02485
+54. H. Sun, Z. Qiao, J. Guo, X. Fan, Y. Hou, Y. Jiang, P. Xie, Y. Zhang, F. Huang, J. Zhou. "ZeroSearch: Incentivize the Search Capability of LLMs without Searching." Tongyi Lab, Alibaba Group, 2025. https://arxiv.org/abs/2505.04588 (code: https://github.com/Alibaba-nlp/ZeroSearch)
+55. W. Liu, X. Ma, W. Sun, Y. Zhu, Y. Li, D. Yin, Z. Dou. "ReasonRank: Empowering Passage Ranking with Strong Reasoning Ability." Renmin University / Baidu, 2025 (ACL 2026). https://arxiv.org/abs/2508.07050 (code: https://github.com/8421BCD/ReasonRank)

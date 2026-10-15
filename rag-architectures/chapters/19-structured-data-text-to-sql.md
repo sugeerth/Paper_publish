@@ -8,9 +8,9 @@ Three facts shape every production design in this chapter.
 
 1. **The retrieval problem is schema selection.** A data warehouse can hold hundreds of thousands of tables. Pinterest's later context-layer work cites roughly 400,000 ungoverned tables [5], and LinkedIn describes cutting "millions" of tables down to a few thousand before retrieval [6][9]. Nothing generates SQL correctly until it has found the right 3-10 tables and the right columns. Uber, Pinterest and LinkedIn all report that table selection, not SQL syntax, was the dominant failure mode [1][3][7].
 2. **The context that matters is mostly not in the DDL.** Join keys, metric definitions, which of five near-duplicate tables is "certified", what `status = 3` means: all of this lives in query logs, wikis, dbt models and analysts' heads. Production systems invest heavily in harvesting it, as table summaries (Pinterest), knowledge graphs (LinkedIn), workspaces (Uber), semantic models (Snowflake) or knowledge stores (Databricks).
-3. **Benchmarks overstate real-world accuracy.** Systems reach about 80% execution accuracy on BIRD [35][37] and above 90% on Spider 1.0 [29]. The enterprise-style Spider 2.0 started with a best agent solving only 21.3% of tasks [29]. Vendor-internal BI benchmarks show the same gap: GPT-4o drops to 51% on Snowflake's internal set [11], and a leading coding agent scores 32% on Databricks' internal data-analysis tasks [18].
+3. **Benchmarks overstate real-world accuracy.** By late 2026 the top BIRD test-set entries reach about 82-83% execution accuracy [42], and systems exceed 90% on Spider 1.0 [29]. The enterprise-style Spider 2.0 started with a best o1-preview agent solving only 17-21% of tasks, depending on the paper version [29][43]. Heavily engineered agents have since climbed to the 90s on Spider 2.0-Snow, but they still sit around 76% on Spider 2.0-Lite and about 66% on the repository-level Spider 2.0-DBT [43]. Vendor-internal BI benchmarks show the same gap for unaided models: GPT-4o drops to 51% on Snowflake's internal set [11], and a leading coding agent scores 32% on Databricks' internal data-analysis tasks [18].
 
-The chapter first covers the generic architecture, then the major industrial systems (Uber QueryGPT, Pinterest, LinkedIn SQL Bot, Swiggy Hermes, Snowflake Cortex Analyst, Databricks Genie, Google Conversational Analytics), then the semantic-layer approach, schema-linking and candidate-selection research (DIN-SQL, CHESS, CHASE-SQL, RL-trained generators), table QA without SQL (TableRAG, Chain-of-Table), and finally the benchmarks.
+The chapter first covers the generic architecture, then the major industrial systems (Uber QueryGPT, Pinterest, LinkedIn SQL Bot, Swiggy Hermes, Snowflake Cortex Analyst, Databricks Genie, Google Conversational Analytics), then the semantic-layer approach, schema-linking, example-selection and candidate-selection research (DIN-SQL, DAIL-SQL, CHESS, CHASE-SQL, XiYan-SQL, ReFoRCE, synthetic-data and RL-trained generators), table QA without SQL (TableRAG, Chain-of-Table), and finally the benchmarks.
 
 ## 19.1 The canonical structured-data RAG pipeline
 
@@ -262,7 +262,7 @@ question --> [classify: answerable? ambiguous? off-topic?] --> clarify / refuse
 
 ### Evaluation tooling and evolution
 
-Snowsight can run evaluations over a semantic view. Verified queries serve as ground truth, and a verified query under evaluation is temporarily removed from the semantic view so it cannot leak into the answer [11]. Snowflake has since positioned **Cortex Agents** as the successor. Cortex Agents adds agentic orchestration, self-correction and a unified interface across structured data (Analyst) and unstructured data (Cortex Search), and existing semantic views work unchanged [16]. On the model side, Snowflake's **Arctic-Text2SQL-R1** is trained with GRPO using execution correctness as a simple reward. Its 32B model reported 71.83% on the BIRD leaderboard, and the 14B model was described as the first open model above 70% [34].
+Snowsight can run evaluations over a semantic view. Verified queries serve as ground truth, and a verified query under evaluation is temporarily removed from the semantic view so it cannot leak into the answer [11]. Snowflake has since positioned **Cortex Agents** as the successor. Cortex Agents adds agentic orchestration, self-correction and a unified interface across structured data (Analyst) and unstructured data (Cortex Search), and existing semantic views work unchanged [16]. On the model side, Snowflake's **Arctic-Text2SQL-R1** is trained with GRPO using execution correctness as a simple reward. On BIRD's single-model leaderboard (May 2025) the 32B model scored 73.84% on the test set, the 14B 72.22% and even the 7B 70.43% [34][42].
 
 ## 19.7 Databricks AI/BI Genie (Genie Agents)
 
@@ -314,7 +314,7 @@ A semantic layer (dbt Semantic Layer/MetricFlow, LookML, Cube, Snowflake semanti
 Evidence:
 
 - **data.world benchmark (2023).** Sequeda, Allemang and Jacob built an insurance-domain benchmark: 13 tables from a real industry model and 43 questions. They showed that querying through a knowledge-graph representation of the schema substantially improved GPT-4 accuracy [25]. The follow-up paper summarizes the earlier result as an improvement "from 16% to 54%" [26].
-- **dbt Labs (2023 and 2026).** Using the same questions, dbt Labs reported that the semantic layer answered about 83% of questions [24]. Delphi later reported 100% using Cube as the semantic layer [24]. dbt's 2026 rerun with newer models found that schema modeling alone raised plain text-to-SQL accuracy substantially (64.5% to 90.0% in one summary), and that semantic-layer grounding added several more points. Summaries cite Claude Sonnet 4.6 going from 90.0% to 98.2% and GPT-5.3-Codex from 84.1% to 100% [23]. These figures come from secondary summaries of a small question set (reported as 11 questions), so treat them as approximate.
+- **dbt Labs (2023 and 2026).** Using a selection of the same questions, dbt Labs had GPT-4 write dbt Semantic Layer queries from a few-shot prompt and reported that the semantic layer answered about 83% of them [44]. The published repository extends the data.world experiment and includes the notebook and results [44]. Delphi later reported 100% using Cube as the semantic layer [24]. dbt's 2026 rerun with newer models found that schema modeling alone raised plain text-to-SQL accuracy substantially (64.5% to 90.0% in one summary), and that semantic-layer grounding added several more points. Summaries cite Claude Sonnet 4.6 going from 90.0% to 98.2% and GPT-5.3-Codex from 84.1% to 100% [23]. These figures come from secondary summaries of a small question set (reported as 11 questions), so treat them as approximate.
 - **Snowflake.** The 57% to 78% average lift from adding a semantic model is in effect the same experiment run by a vendor [12].
 
 Takeaway: semantic layers trade coverage for correctness. Questions that fit the modeled metrics become close to deterministic. Questions outside them need a fallback to raw text-to-SQL, which is why Cortex Analyst, Genie and Looker all combine curated objects with free-form generation.
@@ -323,11 +323,15 @@ Takeaway: semantic layers trade coverage for correctness. Questions that fit the
 
 ### DIN-SQL (2023)
 
-DIN-SQL decomposes the task into **schema linking**, **query classification** (easy / non-nested complex / nested complex), **SQL generation** with class-specific prompts, and **self-correction** [30]. It reached 85.3% execution accuracy on the Spider holdout test set (previous SOTA 79.9) and 55.9% on BIRD, improving few-shot prompting by about 10 points across three LLMs [30]. It established the decompose-then-correct template that most industrial pipelines echo.
+DIN-SQL decomposes the task into **schema linking**, **query classification** (easy / non-nested complex / nested complex), **SQL generation** with class-specific prompts, and **self-correction** [30]. It reached 85.3% execution accuracy on the Spider holdout test set (previous SOTA 79.9) and 55.90% on the BIRD test set with GPT-4, improving few-shot prompting by about 10 points across three LLMs [30][42]. It established the decompose-then-correct template that most industrial pipelines echo.
+
+### DAIL-SQL (2023): example selection as retrieval
+
+Gao et al. (Alibaba) ran a systematic benchmark of text-to-SQL prompt engineering. They compared question representations, then compared how few-shot examples are selected and organized [45]. The finding that carried over to production: pick examples whose *SQL skeleton* resembles the likely answer, not only examples whose question text is similar, and drop cross-domain detail from the examples to save tokens. DAIL-SQL encodes the schema as SQL statements and reached 86.6% execution accuracy on the Spider test set with GPT-4 plus self-consistency voting, at roughly 1,600 tokens per question [45]. This is the research basis for the "verified query" stores in Cortex Analyst, Genie and Vanna: the few-shot index is itself a retrieval problem, and the right similarity function is structural.
 
 ### CHESS (2024)
 
-CHESS (Stanford and collaborators) uses four agents [31]:
+CHESS (Talaei, Pourreza, Chang, Mirhoseini and Saberi; listed as Stanford on the BIRD leaderboard) uses four agents [31]:
 
 ```
 Information Retriever --> Schema Selector --> Candidate Generator --> Unit Tester
@@ -336,21 +340,30 @@ Information Retriever --> Schema Selector --> Candidate Generator --> Unit Teste
   over catalog docs)       usually < 10)         feedback)              candidate)
 ```
 
-Two ideas carried over to production. The first is **value retrieval**: locality-sensitive hashing over millions of database values, so "NYC" in a question can be matched to `'New York'` in a column. The second is **aggressive schema pruning** down to fewer than ten columns. A third-party review reports 71.10% on the BIRD test set and a large reduction in LLM calls compared with prior agentic approaches. Both figures are approximate and should be checked against the paper.
+Two ideas carried over to production. The first is **value retrieval**: locality-sensitive hashing over millions of database values, so "NYC" in a question can be matched to `'New York'` in a column. The second is **aggressive schema pruning** down to fewer than ten columns. The full configuration (retriever, candidate generator, unit tester) scored 71.10% on the BIRD test set (May 2024) [42]. The authors report that this came within about 2 points of the leading proprietary method while using about 83% fewer LLM calls, and that the schema selector gave roughly a 2-point gain and a 5x cut in tokens on very large schemas [31].
 
 ### "The Death of Schema Linking?" (2024)
 
-Maamari et al. argue that strong reasoning models can find the relevant schema elements themselves when the whole schema fits in context. Their pipeline skips explicit schema linking in that case and reached 71.83% on BIRD with a fine-tuned GPT-4o [33]. This does not contradict the industrial systems: a single BIRD database fits in context, and an enterprise catalog of 10^5 tables does not. Table *retrieval* stays mandatory at enterprise scale. Fine-grained *column* linking becomes optional once the candidate set is small.
+Maamari et al. argue that strong reasoning models can find the relevant schema elements themselves when the whole schema fits in context. Their pipeline (Distillery) skips explicit schema linking in that case and reached 71.83% on the BIRD test set with a fine-tuned GPT-4o (July 2024) [33][42]. This does not contradict the industrial systems: a single BIRD database fits in context, and an enterprise catalog of 10^5 tables does not. Table *retrieval* stays mandatory at enterprise scale. Fine-grained *column* linking becomes optional once the candidate set is small.
 
 ### CHASE-SQL (2024)
 
-Google Cloud and Stanford's CHASE-SQL generates diverse candidates through three generators: divide-and-conquer decomposition, chain-of-thought based on query execution plans, and instance-aware synthetic few-shot examples. A fine-tuned binary selection model then compares candidates pairwise [32]. It reported 73.0% on the BIRD test set, first on the leaderboard at the time (ICLR 2025).
+Google Cloud and Stanford's CHASE-SQL generates diverse candidates through three generators: divide-and-conquer decomposition, chain-of-thought based on query execution plans, and instance-aware synthetic few-shot examples. A fine-tuned binary selection model then compares candidates pairwise [32]. The paper reported 73.0% on the BIRD test set, first on the leaderboard at the time (ICLR 2025). A later CHASE-SQL + Gemini submission (April 2025) is listed at 76.02% [42].
 
-### Test-time scaling and RL (2025-2026)
+### XiYan-SQL (2024-2025): multi-generator ensembles
 
-- **Agentar-Scale-SQL** orchestrates test-time scaling (many candidates, iterative refinement, selection) and reported 81.67% execution accuracy on the BIRD test set, ranked first as of September 2025 [35].
-- **Arctic-Text2SQL-R1** (Snowflake) shows that GRPO with a plain execution-correctness reward, without elaborate reward shaping, produces strong open models [34].
-- **Gemini-SQL2** was reported in June 2026 at 80.04% on BIRD's single-model track, with no public model card or technical report at the time [37]. **ReViSQL** reports exceeding BIRD's 92.96% proxy human score on the Mini-Dev subset [36]. That is a different split from the main test set and should not be read as "BIRD solved".
+Alibaba's XiYan-SQL pushes the CHASE-SQL idea further. Several differently fine-tuned and in-context generators produce candidates, and a separately trained selection model picks one [46]. It also introduces **M-Schema**, a compact semi-structured schema serialization that carries column types, primary keys and example values, which makes it a schema-representation contribution as well as a generation one. The team releases open XiYanSQL-QwenCoder models (3B to 32B) and an MCP server that lets agents query databases through the generator [46]. Its "CRITIC" variant leads the BIRD-CRITIC SQL-debugging benchmark at about 44-48% depending on the split (October-November 2025) [46], so even the best systems fix fewer than half of its SQL-debugging tasks.
+
+### ReFoRCE (2025): agents for enterprise-scale schemas
+
+ReFoRCE (Hao AI Lab and Snowflake) was built for Spider 2.0, where schemas often exceed 1,000 columns [47]. It combines **table compression**, which collapses families of similarly named tables (for example, date-sharded tables) so the schema fits in context, **format restriction** of the expected answer, and **iterative column exploration**, where the agent runs small probing queries to learn what columns and values actually contain. Parallel workflows then vote on the answer. At release it led Spider 2.0 with 31.26 on Spider 2.0-Snow and 30.35 on Spider 2.0-Lite [47]. Column exploration is the agentic counterpart to CHESS's value index: instead of pre-indexing every value, the agent queries the database for them.
+
+### Synthetic data, test-time scaling and RL (2025-2026)
+
+- **OmniSQL / SynSQL-2.5M** (Renmin University and ByteDance, 2025) synthesizes about 2.54 million (database, question, SQL, chain-of-thought) examples over 16,583 synthetic databases, generated entirely with open models and released under Apache 2.0 [48]. The fine-tuned OmniSQL-32B scored 72.05% on the BIRD test set [42]. It showed that open 7B-32B models trained on synthetic data can match much larger prompted systems.
+- **Agentar-Scale-SQL** (Ant Group) orchestrates test-time scaling (many candidates, iterative refinement, selection) and reported 81.67% execution accuracy on the BIRD test set, ranked first as of September 2025 [35][42]. It has since been overtaken: AT&T's AskData + GPT-4o (81.95%, December 2025) and, by October 2026, several entries above 82%, led by GrainSQL at 82.95% [42].
+- **Arctic-Text2SQL-R1** (Snowflake) shows that GRPO with a plain execution-correctness reward, without elaborate reward shaping, produces strong open models [34]. Databricks' RLVR 32B model (July 2025) scored a similar 73.56% on the single-model track [42].
+- **Gemini-SQL2** (Google Research & Cloud) appears on BIRD's single-model leaderboard dated 3 June 2026 at 80.04% on the test set, the top single-model entry as of October 2026 [42][37]. **ReViSQL** reports exceeding BIRD's 92.96% proxy human score on the Mini-Dev subset [36]. That is a different split from the main test set and should not be read as "BIRD solved".
 
 The research trajectory is: schema linking, then decomposition, then multi-candidate generation with learned selection, then RL on execution reward. Production systems borrow selectively, mainly value retrieval, pruning, self-correction and, increasingly, parallel sampling with judging (Databricks [18]).
 
@@ -378,22 +391,38 @@ TableRAG's split between schema retrieval and cell retrieval is the same split C
 
 ## 19.12 Open-source building blocks
 
-**Vanna** is an open-source Python framework that "trains" a RAG store on three item types: DDL statements, documentation snippets and question-SQL pairs. It retrieves related items per question (about 10 in one write-up) before generation, and it supports vector stores such as ChromaDB, Qdrant or Milvus. NVIDIA's NeMo Agent Toolkit ships a Vanna-based text-to-SQL function that keeps separate Milvus collections for SQL, DDL and documentation [41]. The three-collection layout is a compact version of the industrial context store. Its main gaps are the lack of governance, popularity signals or table-level summaries.
+**Vanna** is an open-source Python framework that "trains" a RAG store on three item types: DDL statements, documentation snippets and question-SQL pairs. It retrieves related items per question (about 10 in one write-up) before generation, and it supports vector stores such as ChromaDB, Qdrant or Milvus. NVIDIA's NeMo Agent Toolkit ships a Vanna-based text-to-SQL function that keeps separate Milvus collections for SQL, DDL and documentation [41]. The three-collection layout is a compact version of the industrial context store. **Vanna 2.0** reworked the project into an agent framework that is "user-aware at every layer": user identity flows into system prompts, tool execution and SQL filtering, with row-level security, per-user audit logs and rate limiting, plus a streaming web component that returns SQL, tables, charts and a summary [49]. That closes part of the governance gap. What open-source stacks still generally lack is the popularity signals, certification and LLM-written table summaries that the industrial systems rely on.
+
+**MCP database servers.** Since 2025, a common integration pattern is to expose the warehouse to a general-purpose agent through a Model Context Protocol server with tools such as "list tables", "describe table" and "run query", instead of building a dedicated text-to-SQL pipeline. XiYan-SQL ships such a server, which can run a local 3B model for privacy-sensitive data [46]. The pattern moves schema retrieval into the agent's tool loop, so the agent explores the schema like ReFoRCE's column exploration [47]. The risks are the ones in section 19.15, plus the access-control problems covered in chapter 16: a read-only role, row-level security and query cost limits belong in the server, not in the prompt.
 
 ## 19.13 Benchmarks
 
 | Benchmark | Year | Scale | What it stresses | Reference results |
 |---|---|---|---|---|
 | Spider 1.0 [27] | 2018 | 10,181 questions, 5,693 SQL, 200 DBs, 138 domains | Cross-domain generalization; small clean DBs | Best model at release ~12% exact match; ~91% EX by 2024 [29] |
-| BIRD [28] | 2023 | 12,751 pairs, 95 DBs, 33.4 GB, 37 domains | Dirty values, external knowledge ("evidence"), efficiency (VES) | Human 92.96%; GPT-4 54.89% at release; ~80-82% top EX in 2025-26 [35][37] |
-| Spider 2.0 [29] | 2024 | 632 enterprise workflow tasks; BigQuery, Snowflake, SQLite, DuckDB, PostgreSQL | Huge schemas, dialects, multi-step workflows, docs | o1-preview agent 21.3% at release; Spider2-lite best ~5.7% |
-| Spider2-Snow [29] | 2024 | 547 tasks hosted on Snowflake | Snowflake dialect, large schemas | Used as base for later variants |
+| BIRD [28] | 2023 | 12,751 pairs, 95 DBs, 33.4 GB, 37 domains | Dirty values, external knowledge ("evidence"), efficiency (VES) | Human 92.96%; GPT-4 54.89% at release; top test EX 82.95% (Sep 2026) [42] |
+| Spider 2.0 [29] | 2024 | 632 enterprise workflow tasks; BigQuery, Snowflake, SQLite, DuckDB, PostgreSQL | Huge schemas (often 1,000+ columns), dialects, multi-step workflows, docs | o1-preview agent 17.1% (site) / 21.3% (later paper version); original setting retired May 2025 [29][43] |
+| Spider 2.0-Lite [43] | 2024 | 547 tasks: BigQuery 214, Snowflake 198, SQLite 135 | Text-in/text-out with metadata and docs | ReFoRCE 30.35 (early 2025); top ~76.2 by late 2026 |
+| Spider 2.0-Snow [43] | 2024 | 547 tasks hosted on Snowflake | Snowflake dialect, large schemas | ReFoRCE 31.26 (early 2025); top ~96.7 by late 2026 |
+| Spider 2.0-DBT [43] | 2025 | 68 repository-level dbt tasks on DuckDB | Code-agent work over a dbt project | Top ~65.6 by late 2026 |
+| BIRD-Interact [50] | 2025 | 600 tasks (BI, CRUD), user simulator | Clarification, multi-turn, agentic DB interaction | Best reasoning models ~24% (conversational) / ~18% (agentic) |
 | data.world insurance [25] | 2023 | 13 tables, 43 questions | Enterprise schema + KG/semantic layer | 16% -> 54% with KG (as summarized in [26]) |
 | Snowflake internal [11] | 2024 | 150 BI questions, 3 tiers | Real BI schemas, time series | GPT-4o 51%; Cortex Analyst 90%+ |
 | LinkedIn internal [7] | 2025 | 133 questions, 10 areas, 167 tables | Enterprise catalog, multiple valid answers | 53% correct/close (expert) |
 | Databricks internal [19] | 2026 | 28 enterprise questions | Agentic multi-query analysis | Genie 84.5%; best coding agent 52.4% |
 
-Metrics. Spider originally emphasized exact set match. BIRD uses **execution accuracy (EX)**, meaning the result sets match, plus a **Valid Efficiency Score (VES)** that penalizes correct but slow SQL [28]. Enterprise teams add **table/column recall** [7], **first-shot acceptance** [3], **search hit rate** [3] and LLM-as-judge grading for agentic reports [20]. BIRD's human baseline of 92.96% assumes oracle external knowledge and falls to about 72% without it, as reported in secondary sources. This is a reminder that much of the "difficulty" in text-to-SQL is missing business context, not SQL skill.
+Metrics. Spider originally emphasized exact set match. BIRD uses **execution accuracy (EX)**, meaning the result sets match, plus a **Valid Efficiency Score (VES)** that penalizes correct but slow SQL [28]. Enterprise teams add **table/column recall** [7], **first-shot acceptance** [3], **search hit rate** [3] and LLM-as-judge grading for agentic reports [20]. BIRD's human baseline of 92.96% assumes oracle external knowledge. The leaderboard source also carries a 72.37% human figure, which corresponds to the setting without that knowledge [42]. This is a reminder that much of the "difficulty" in text-to-SQL is missing business context, not SQL skill.
+
+### 2025-2026: interactive, debugging and agentic benchmarks
+
+Single-turn benchmarks are close to saturated, so newer benchmarks test the parts of the production loop that BIRD and Spider leave out.
+
+- **BIRD-Interact** (HKU and Google Cloud; ICLR 2026 oral) has 600 tasks spanning BI questions and full CRUD operations, each checked by executable test cases [50]. Ambiguities are resolved by talking to a function-driven user simulator backed by a hierarchical knowledge base. It has two modes, passive conversational (c-Interact) and active agentic (a-Interact). At release, state-of-the-art reasoning models solved only about 24% and 18% respectively [50]. The benchmark measures what production systems call "clarifying questions" (Cortex Analyst, Hermes), which had no public benchmark before.
+- **BIRD-CRITIC** evaluates *fixing* broken SQL across several dialects. The best reported systems are in the 40s [46]. This matches the "Fix with AI" and query-fixer components of LinkedIn's SQL Bot.
+- **Spider 2.0-DBT** replaced the original Spider 2.0 agent setting in May 2025 with 68 repository-level tasks over dbt projects [43]. It tests the semantic-layer and transformation-code side of the stack, not just ad hoc queries.
+- **LiveSQLBench** (from the BIRD team) is a continuously refreshed benchmark meant to limit contamination. A SQLite version of its Lite split was released in August 2025 [50].
+
+Spider 2.0's leaderboards also show how fast agentic systems moved. Spider 2.0-Snow went from about 31% (ReFoRCE, early 2025) to above 96% for the top commercial agents by late 2026, and an AT&T and RelationalAI entry built on a relational knowledge graph scored 86.28 [43]. The scores come from organizers' runs of submitted systems, and many entries have no paper, so read them as evidence that enterprise-style SQL tasks are solvable with heavy context engineering. They are not evidence that any one method transfers to your warehouse.
 
 ## 19.14 Comparison of production designs
 
@@ -421,12 +450,13 @@ Metrics. Spider originally emphasized exact set match. BIRD uses **execution acc
 
 - **Treat table retrieval as the core RAG problem.** At warehouse scale (10^4-10^6 tables), apply cheap priors first (domain routing, access popularity, certification, top-tier-only indexing), then embedding retrieval, then an LLM re-rank to roughly 5-10 tables. Pinterest's 40% -> 90% hit-rate jump from documentation weighting [3] is the strongest single data point in this space.
 - **Index meaning, not just DDL.** Embed LLM-generated table summaries built from schema plus real historical queries, embed summarized past queries, and store verified question-SQL pairs. Query logs are the most underused metadata source.
-- **Retrieve values as well as names.** Build a value or cell index (LSH, distinct-value catalogs, synonyms) so filters match the literal values actually stored.
+- **Retrieve values as well as names.** Build a value or cell index (LSH, distinct-value catalogs, synonyms) so filters match the literal values actually stored. Agents can also probe values with small exploratory queries (ReFoRCE [47]).
+- **Retrieve few-shot examples by structure.** Select verified examples by SQL-skeleton similarity, not only question similarity (DAIL-SQL [45]).
 - **Prune before generating.** Column pruning cuts tokens, cost and latency and reduces hallucination (Uber [1], CHESS [31]). Long-context models can skip fine-grained linking only once the candidate schema is small [33].
 - **Use a semantic layer where the question space is known.** Generating against metrics and dimensions is close to deterministic for covered questions. Keep a free-form fallback, and route between the two.
 - **Close the loop with execution.** Validate with dry-run or EXPLAIN, repair with bounded retries, and for hard questions sample several candidates and select with a judge or tests (CHASE-SQL [32], Genie parallel thinking [18]).
 - **Keep humans in the loop at the right step.** Table confirmation is cheap for the user and catches the most expensive errors. Always show the SQL and the assumptions behind it.
-- **Build your own benchmark.** Public leaderboards (BIRD ~80%) do not predict enterprise accuracy (Spider 2.0 ~21% at release; internal sets 32-57% for unaided models). Curate 100-200 verified questions per domain, measure table/column recall plus execution accuracy, keep the evaluation questions out of the context, and rerun after every metadata change.
+- **Build your own benchmark.** Public leaderboards (BIRD ~83%) do not predict enterprise accuracy (Spider 2.0 17-21% at release; internal sets 32-57% for unaided models). Interactive benchmarks such as BIRD-Interact (~18-24% at release) are closer to how production assistants are actually used. Curate 100-200 verified questions per domain, measure table/column recall plus execution accuracy, keep the evaluation questions out of the context, and rerun after every metadata change.
 - **Expect the work to become data governance.** Every mature program here (Pinterest, LinkedIn, Snowflake, Databricks) ended up investing in certification, documentation and semantic models. The LLM part plateaued faster than the metadata part.
 
 ## References
@@ -437,10 +467,10 @@ Metrics. Spider originally emphasized exact set match. BIRD uses **execution acc
 4. "Pinterest: Text-to-SQL System with RAG-Enhanced Table Selection." ZenML LLMOps Database, 2024. https://www.zenml.io/llmops-database/text-to-sql-system-with-rag-enhanced-table-selection
 5. "How Pinterest Powers Its #1 AI Agent With DataHub." DataHub (customer story), 2026. https://datahub.com/customer-stories/pinterest/
 6. "LinkedIn: Building a Production Text-to-SQL Assistant with Multi-Agent Architecture." ZenML LLMOps Database (summary of LinkedIn Engineering post, Dec 2024). https://www.zenml.io/llmops-database/building-a-production-text-to-sql-assistant-with-multi-agent-architecture
-7. Chen, A. et al. "Text-to-SQL for Enterprise Data Analytics." LinkedIn, arXiv:2507.14372, 2025. https://arxiv.org/abs/2507.14372
+7. LinkedIn authors. "Text-to-SQL for Enterprise Data Analytics." arXiv:2507.14372, 2025. https://arxiv.org/abs/2507.14372
 8. "LinkedIn AI at Trino Summit 2024" (slides). LinkedIn / Trino, 2024. https://trino.io/assets/blog/trino-summit-2024/trino-summit-2024-linkedin-ai.pdf
 9. "What LinkedIn Learned Building an AI Data Agent for 300+ Weekly Users." Dot, 2025. https://www.getdot.ai/blog/linkedin-sql-bot-data-agent
-10. Sehrawat, N. "Snowflake Cortex Analyst: Behind the Scenes." Snowflake Engineering, 2024. https://www.snowflake.com/en/engineering-blog/snowflake-cortex-analyst-behind-the-scenes/
+10. "Snowflake Cortex Analyst: Behind the Scenes." Snowflake Engineering, 2024. https://www.snowflake.com/en/engineering-blog/snowflake-cortex-analyst-behind-the-scenes/
 11. "Snowflake Cortex Analyst: Evaluating Text-to-SQL Accuracy for Real-World BI Scenarios." Snowflake Engineering, 2024. https://www.snowflake.com/en/blog/engineering/cortex-analyst-text-to-sql-accuracy-bi/
 12. "Agentic Semantic Model Improvement: Elevating Text-to-SQL Performance." Snowflake Engineering, 2025. https://www.snowflake.com/en/blog/engineering/agentic-semantic-model-text-to-sql/
 13. "Cortex Analyst semantic model specification." Snowflake Documentation, 2025. https://docs.snowflake.com/user-guide/snowflake-cortex/cortex-analyst/semantic-model-spec
@@ -461,14 +491,23 @@ Metrics. Spider originally emphasized exact set match. BIRD uses **execution acc
 28. Li, J. et al. "Can LLM Already Serve as A Database Interface? A BIg Bench for Large-Scale Database Grounded Text-to-SQLs (BIRD)." NeurIPS 2023. https://arxiv.org/abs/2305.03111
 29. Lei, F. et al. "Spider 2.0: Evaluating Language Models on Real-World Enterprise Text-to-SQL Workflows." ICLR 2025. https://arxiv.org/abs/2411.07763
 30. Pourreza, M., Rafiei, D. "DIN-SQL: Decomposed In-Context Learning of Text-to-SQL with Self-Correction." NeurIPS 2023. https://arxiv.org/abs/2304.11015
-31. Talaei, S. et al. "CHESS: Contextual Harnessing for Efficient SQL Synthesis." Stanford, arXiv:2405.16755, 2024. https://arxiv.org/abs/2405.16755
+31. Talaei, S., Pourreza, M., Chang, Y.-C., Mirhoseini, A., Saberi, A. "CHESS: Contextual Harnessing for Efficient SQL Synthesis." arXiv:2405.16755, 2024. https://arxiv.org/abs/2405.16755 ; code: https://github.com/ShayanTalaei/CHESS
 32. Pourreza, M. et al. "CHASE-SQL: Multi-Path Reasoning and Preference Optimized Candidate Selection in Text-to-SQL." Google Cloud / Stanford, ICLR 2025. https://arxiv.org/abs/2410.01943
 33. Maamari, K. et al. "The Death of Schema Linking? Text-to-SQL in the Age of Well-Reasoned Language Models." Distyl AI, NeurIPS 2024 workshop. https://arxiv.org/abs/2408.07702
 34. "Arctic-Text2SQL-R1: Simple Rewards, Strong Reasoning in Text-to-SQL." Snowflake, arXiv:2505.20315, 2025; and "Smaller Models, Smarter SQL: Arctic-Text2SQL-R1 Tops BIRD and Wins Broadly." Snowflake Engineering, 2025. https://arxiv.org/abs/2505.20315 ; https://www.snowflake.com/en/blog/engineering/arctic-text2sql-r1-sql-generation-benchmark/
 35. "Agentar-Scale-SQL: Advancing Text-to-SQL through Orchestrated Test-Time Scaling." arXiv:2509.24403, 2025. https://arxiv.org/abs/2509.24403
 36. "ReViSQL: Achieving Human-Level Text-to-SQL." arXiv:2603.20004, 2026. https://arxiv.org/abs/2603.20004
-37. "Google's Gemini-SQL2 Tops BIRD Text-to-SQL at 80.04%." AI Weekly, 2026. https://aiweekly.co/alerts/googles-gemini-sql2-tops-bird-text-to-sql-at-8004
+37. "Google's Gemini-SQL2 Tops BIRD Text-to-SQL at 80.04%." AI Weekly (secondary news coverage), 2026. https://aiweekly.co/alerts/googles-gemini-sql2-tops-bird-text-to-sql-at-8004
 38. Chen, S.-A. et al. "TableRAG: Million-Token Table Understanding with Language Models." Google, NeurIPS 2024. https://arxiv.org/abs/2410.04739
 39. Wang, Z. et al. "Chain-of-Table: Evolving Tables in the Reasoning Chain for Table Understanding." Google, ICLR 2024; Google Research Blog. https://arxiv.org/abs/2401.04398 ; https://research.google/blog/chain-of-table-evolving-tables-in-the-reasoning-chain-for-table-understanding/
 40. "Swiggy Hermes conversational AI" (news coverage of Hermes V3). InfoQ, 2026. https://www.infoq.com/news/2026/01/swiggy-hermes-conversational-ai
 41. "Text-to-SQL with Vanna." NVIDIA NeMo Agent Toolkit documentation, 2025. https://docs.nvidia.com/nemo/agent-toolkit/1.6/components/functions/text-to-sql.html
+42. BIRD-SQL leaderboard (overall, single-model and Mini-Dev tracks; accessed October 2026). https://bird-bench.github.io/ ; source: https://github.com/bird-bench/bird-bench.github.io
+43. Spider 2.0 project site and leaderboards (Spider 2.0-Snow, -Lite, -DBT; accessed October 2026) and repository. https://spider2-sql.github.io/ ; https://github.com/xlang-ai/Spider2
+44. Ganz, J., Labes, J., Stein, J. "semantic-layer-llm-benchmarking" (companion repository to the dbt Roundup article at https://roundup.getdbt.com/p/semantic-layer-as-the-data-interface). dbt Labs, 2023. https://github.com/dbt-labs/semantic-layer-llm-benchmarking
+45. Gao, D., Wang, H., Li, Y., Sun, X., Qian, Y., Ding, B., Zhou, J. "Text-to-SQL Empowered by Large Language Models: A Benchmark Evaluation" (DAIL-SQL). VLDB 2024, arXiv:2308.15363. https://arxiv.org/abs/2308.15363 ; https://github.com/BeachWang/DAIL-SQL
+46. "XiYan-SQL: A Multi-Generator Ensemble Framework for Text-to-SQL." Alibaba, arXiv:2411.08599 (preview) and arXiv:2507.04701, 2024-2025; repository, M-Schema and MCP server. https://arxiv.org/abs/2411.08599 ; https://github.com/XGenerationLab/XiYan-SQL
+47. Deng, M. et al. "ReFoRCE: A Text-to-SQL Agent with Self-Refinement, Format Restriction, and Column Exploration." Hao AI Lab / Snowflake, ICLR 2025 VerifAI Workshop, arXiv:2502.00675. https://arxiv.org/abs/2502.00675 ; https://github.com/Snowflake-Labs/ReFoRCE
+48. Li, H. et al. "OmniSQL: Synthesizing High-quality Text-to-SQL Data at Scale." Renmin University of China / ByteDance, arXiv:2503.02240, 2025. https://arxiv.org/abs/2503.02240 ; https://github.com/RUCKBReasoning/OmniSQL
+49. "Vanna 2.0: Turn Questions into Data Insights." Vanna AI, GitHub repository, 2025-2026. https://github.com/vanna-ai/vanna
+50. "BIRD-INTERACT: Re-imagining Text-to-SQL Evaluation via Lens of Dynamic Interactions." HKU / Google Cloud, ICLR 2026, arXiv:2510.05318; repository (also LiveSQLBench releases). https://huggingface.co/papers/2510.05318 ; https://github.com/bird-bench/BIRD-Interact

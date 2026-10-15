@@ -7,9 +7,9 @@ The embedding model sits on the hot path of almost every RAG system twice. At in
 This chapter covers the design space as it stands in late 2026.
 
 1. **Commercial API families.** OpenAI `text-embedding-3`, Cohere Embed v3/v4/v5, Voyage AI (voyage-3 to voyage-4) and Google Gemini Embedding (001 and the multimodal Embedding 2).
-2. **Open-weight families.** BAAI BGE (including BGE-M3), Microsoft E5 (including E5-Mistral), Alibaba GTE and Qwen3-Embedding, Nomic Embed, Jina Embeddings v3 to v5, NVIDIA NV-Embed and Nemotron, and Google EmbeddingGemma.
-3. **Cross-cutting techniques.** Instruction- and task-conditioned embeddings, LLM-backbone embedders, Matryoshka Representation Learning (MRL), int8 and binary quantization with rescoring, and multi-vector and sparse outputs.
-4. **Evaluation.** MTEB, MMTEB and their blind spots, including the theoretical capacity limits of single-vector retrieval.
+2. **Open-weight families.** BAAI BGE (including BGE-M3), Microsoft E5 (including E5-Mistral), Alibaba GTE and Qwen3-Embedding, Nomic Embed, Jina Embeddings v3 to v5, NVIDIA NV-Embed and Nemotron, Google EmbeddingGemma, and Snowflake Arctic Embed 2.0.
+3. **Cross-cutting techniques.** Instruction- and task-conditioned embeddings, LLM-backbone embedders, Matryoshka Representation Learning (MRL), int8 and binary quantization with rescoring, multi-vector and sparse outputs, context-aware chunk embeddings, and the privacy properties of vectors.
+4. **Evaluation.** MTEB, MMTEB, the leakage-resistant RTEB and their blind spots, including the theoretical capacity limits of single-vector retrieval.
 5. **Domain adaptation.** Contrastive fine-tuning, synthetic query generation, GPL pseudo-labelling, adapters and model merging.
 
 Almost every design in this chapter instantiates the same asymmetric bi-encoder pattern:
@@ -52,7 +52,7 @@ The main design choices are which encoder to use, which prefix or instruction to
 
 **Design.** In January 2024 OpenAI released `text-embedding-3-small` (1536 dimensions by default) and `text-embedding-3-large` (3072 dimensions by default). Both accept up to 8,191 input tokens with the `cl100k_base` tokenizer [1][2][3]. The headline feature is the `dimensions` request parameter, which shortens the embedding at creation time "without the embedding losing its concept-representing properties." OpenAI's documentation reports that `text-embedding-3-large` cut to 256 dimensions still beats `ada-002` at 1536 dimensions on MTEB [1]. This is Matryoshka-style behaviour (Section 3.2), although OpenAI does not describe its training method. Outputs are unit-normalised, so dot product and cosine give the same ranking. If you truncate an embedding yourself instead of using `dimensions`, you must re-normalise it [1].
 
-**Published numbers.** OpenAI's embeddings guide lists these MTEB averages: 62.3% for 3-small, 64.6% for 3-large and 61.0% for ada-002. At roughly 800 tokens per page it also lists approximate cost-efficiency of 62,500 pages per dollar for 3-small, 9,615 for 3-large and 12,500 for ada-002 [1]. A Hugging Face analysis reports that `text-embedding-3-large` keeps about 93.1% of its retrieval performance at 12x dimensional compression [38].
+**Published numbers.** OpenAI's embeddings guide lists these MTEB averages: 62.3% for 3-small, 64.6% for 3-large and 61.0% for ada-002. At roughly 800 tokens per page it also lists approximate cost-efficiency of 62,500 pages per dollar for 3-small, 9,615 for 3-large and 12,500 for ada-002 [1]. Hugging Face's quantization write-up reports that `text-embedding-3-large` keeps about 93.1% of its performance at 12x dimensional compression [39].
 
 **Long inputs.** The OpenAI cookbook gives three strategies for text over the 8,191-token limit: truncate, embed chunks separately, or take a token-count-weighted average of chunk embeddings and re-normalise it [2]. For RAG, embedding chunks separately is nearly always the right choice. Averaged embeddings blur exactly the local detail that retrieval needs.
 
@@ -74,7 +74,7 @@ The main design choices are which encoder to use, which prefix or instruction to
 
 **Problem.** General-purpose embedders underperform on specialised domains (law, finance, code), and storage cost limits index size.
 
-**Design history.** Voyage released domain models early: `voyage-code-2` (January 2024), `voyage-law-2` (April 2024), `voyage-finance-2` (May 2024) and `voyage-multilingual-2` (June 2024). The 2024 general models `voyage-3` and `voyage-3-lite` (September 2024) moved to a 32K-token context [9]. `voyage-3-large` (7 January 2025) brought MRL (2048, 1024, 512 and 256 dimensions) and quantization-aware training (float, signed and unsigned int8, binary) [6].
+**Design history.** Voyage released domain models early: `voyage-code-2` (January 2024), `voyage-law-2` (April 2024), `voyage-finance-2` (May 2024) and `voyage-multilingual-2` (June 2024). The 2024 general models `voyage-3` and `voyage-3-lite` (September 2024) moved to a 32K-token context [9]. `voyage-code-3` followed in December 2024 [9]. `voyage-3-large` (7 January 2025) brought MRL (2048, 1024, 512 and 256 dimensions) and quantization-aware training (float, signed and unsigned int8, binary) [6], and `voyage-3.5` later in 2025 carried these options to the mid-size tier [9]. In February 2025 MongoDB acquired Voyage AI [61]. The models remain available through Voyage's API, and MTEB now lists them under the `mongodb/` namespace [9].
 
 **Published numbers (vendor-reported).** Across 100 datasets in eight domains (technical documentation, code, law, finance, web reviews, multilingual, long documents, conversations), Voyage reports that voyage-3-large beats OpenAI-v3-large by an average of 9.74% and Cohere-v3-English by 20.71% [6]. Its storage trade-off claims are the most aggressive published by any vendor [6]:
 
@@ -116,7 +116,7 @@ Gemini itself is used to improve the data: it generates synthetic examples, filt
 
 ### 2.1 BAAI BGE: from C-Pack to BGE-M3 and LLM embedders
 
-**BGE v1/v1.5 (2023).** The C-Pack work (arXiv:2309.07597) produced `bge-large-en-v1.5` and its siblings: 335M parameters, 1024 dimensions, 512 tokens [16][53]. When released they ranked first on MTEB and C-MTEB according to BAAI [14]. Queries take the instruction `Represent this sentence for searching relevant passages: ` and passages take none. The v1.5 release specifically fixed a similarity-distribution problem in v1 [14].
+**BGE v1/v1.5 (2023).** The C-Pack work (arXiv:2309.07597) produced `bge-large-en-v1.5` and its siblings: 335M parameters, 1024 dimensions, 512 tokens [16][53]. When released they ranked first on MTEB and C-MTEB according to BAAI [14]. Queries take the instruction `Represent this sentence for searching relevant passages: ` and passages take none. The v1.5 release fixed a similarity-distribution problem in v1 and improved retrieval when no instruction is given, so the query instruction became optional rather than required [14].
 
 **BGE-M3 (2024).** BGE-M3 (arXiv:2402.03216) is a 568M-parameter, 1024-dimensional model with an 8,192-token context and 100+ languages. One forward pass gives three outputs: a dense vector, a lexical sparse vector (weights only for tokens present in the text), and ColBERT-style multi-vectors [14][15]. BAAI describes it as the first embedding model to support all three retrieval methods [14].
 
@@ -187,9 +187,9 @@ Training uses **self-knowledge distillation**: the combined score of the three h
 
 ### 2.4 Nomic Embed: reproducibility and MoE
 
-**nomic-embed-text v1/v1.5 (2024).** The report (arXiv:2402.01613) presents a "reproducible long context text embedder" [27]. The model has 137M parameters, 768 dimensions and an 8,192-token context [30]. Weights, training code (the `contrastors` library) and training data are all published. The contrastive stage uses about 200M examples [29]. Inputs carry task prefixes: `search_query: `, `search_document: `, `classification: `, `clustering: ` [29][30]. v1.5 added MRL. Hugging Face reports it keeps 95.8% of performance at 3x compression and 90% at 6x, and that it needs a layer norm before truncation [38][39]. In Hugging Face's quantization tests it kept only 87.7% under binary quantization [39]. It is a useful example of a model that tolerates truncation better than binarisation.
+**nomic-embed-text v1/v1.5 (2024).** The report (arXiv:2402.01613) presents a "reproducible long context text embedder" [27]. The model has 137M parameters, 768 dimensions and an 8,192-token context [30]. Weights, training code (the `contrastors` library) and training data are all published. The contrastive stage uses about 200M examples [29]. Inputs carry task prefixes: `search_query: `, `search_document: `, `classification: `, `clustering: ` [29][30]. v1.5 added MRL. Hugging Face reports it keeps 95.8% of performance at 3x compression and 90% at 6x [39], and notes that, unlike most Matryoshka models, it needs an explicit layer norm before truncation [38]. In Hugging Face's quantization tests it kept only 87.7% under binary quantization [39]. It is a useful example of a model that tolerates truncation better than binarisation.
 
-**nomic-embed-text-v2-moe (2025).** "Training Sparse Mixture of Experts Text Embedding Models" (arXiv:2502.07972) applies MoE to an embedder: 475M total parameters, about 142M active, 768 dimensions [28][30]. Its max length is 512 tokens [30]. The design point is multilingual quality at small-model inference cost. Nomic also released `nomic-embed-code` (7B, 3584 dimensions, 32K tokens), trained on the CoRNStack data (arXiv:2412.01007) [30].
+**nomic-embed-text-v2-moe (2025).** "Training Sparse Mixture of Experts Text Embedding Models" (arXiv:2502.07972) applies MoE to an embedder (8 experts, top-2 routing): 475M total parameters, of which Nomic's model card says 305M are active at inference, and 768 dimensions [28][63]. (MTEB's metadata records a lower active count of about 142M, which appears to exclude embedding parameters [30].) Its max length is 512 tokens [30][63]. The design point is multilingual quality at small-model inference cost. Nomic also released `nomic-embed-code` (7B, 3584 dimensions, 32K tokens), trained on the CoRNStack data (arXiv:2412.01007) [30].
 
 ### 2.5 Jina Embeddings v3, v4 and v5: task adapters and distillation
 
@@ -197,6 +197,7 @@ Training uses **self-knowledge distillation**: the combined score of the three h
 - **v3 (September 2024).** jina-embeddings-v3 (arXiv:2409.10173) is "a novel text embedding model with 570 million parameters" with an 8,192-token context [31]. Its main idea is **task-specific LoRA adapters** (`retrieval.query`, `retrieval.passage`, `separation`, `classification`, `text-matching`) on a shared backbone. The task changes the weights, not only the prompt. MRL is built into training [31][34]. The abstract reports that it beats OpenAI and Cohere proprietary embeddings on English MTEB tasks and multilingual-e5-large-instruct on all multilingual tasks [31].
 - **v4 (June 2025).** jina-embeddings-v4 (arXiv:2506.18902) is a 3.8B-parameter multimodal model (about 3.93B by MTEB's count, 2048 dimensions, 32K tokens). It produces both single-vector and multi-vector (late-interaction) embeddings for text and images, with LoRA adapters for retrieval, text matching and code. The authors also released Jina-VDR, a benchmark for visually rich documents [32][34].
 - **v5 (February to April 2026).** jina-embeddings-v5-text (arXiv:2602.15547) introduces **task-targeted embedding distillation**, which combines distillation from a larger teacher with a task-specific contrastive loss. The authors report this beats either method alone for small models [33]. `v5-text-small` (596M, 32K tokens, MRL from 1024 down to 32 dimensions) and `v5-text-nano` (212M, 8K tokens) are reported to match or beat the state of the art for their size. They are also reported to stay robust under truncation and binary quantization [33][34]. `v5-omni` variants (April 2026) add image, audio and video [34].
+- **Ownership.** Elastic completed its acquisition of Jina AI on 9 October 2025, so the v5 generation was released under Elastic [62].
 
 **Lessons.** Jina shows the trade-off between adapter-based and prompt-based task conditioning. LoRA adapters give more capacity per task, but the serving stack must route each request to the right adapter. For RAG this means `retrieval.query` at query time and `retrieval.passage` at index time. Mixing them up is a silent failure mode.
 
@@ -212,9 +213,19 @@ It reached 69.32 on MTEB (56 tasks) and 59.36 on the 15 BEIR retrieval tasks, ra
 
 ### 2.7 Small and on-device embedders: EmbeddingGemma and static embeddings
 
-**EmbeddingGemma.** Google DeepMind's EmbeddingGemma is about 308M parameters [13]. It modifies the Gemma 3 backbone to use bidirectional attention, then applies mean pooling and two dense layers to produce 768-dimensional outputs. MRL lets those be truncated to 512, 256 or 128. Context is 2K tokens, it covers 100+ languages, and quantized it runs in under 200 MB of RAM. Training used about 320B tokens [13]. At launch it was the highest-ranking text-only multilingual model under 500M parameters on MTEB [13]. The launch post's fine-tuning case study is the clearest public example of domain adaptation paying off. On the MIRIAD medical retrieval data, 100K pairs with CachedMultipleNegativesRankingLoss (about 5.5 hours on one RTX 3090) raised NDCG@10 from 0.8340 to 0.8862. That beat the general-purpose Qwen3-Embedding-0.6B (0.8493), a model about twice as large [13].
+**EmbeddingGemma.** Google DeepMind's EmbeddingGemma is about 308M parameters [13]. It modifies the Gemma 3 backbone to use bidirectional attention, then applies mean pooling and two dense layers to produce 768-dimensional outputs. MRL lets those be truncated to 512, 256 or 128. Context is 2K tokens, it covers 100+ languages, and quantized it runs in under 200 MB of RAM. Training used about 320B tokens [13]. It is prompt-conditioned: queries take `task: search result | query: ` and documents take `title: none | text: `. This is the same textual format that Gemini Embedding 2 uses in place of `task_type` (Section 1.4) [12][13]. At launch it was the highest-ranking text-only multilingual model under 500M parameters on MTEB [13]. The launch post's fine-tuning case study is the clearest public example of domain adaptation paying off. On the MIRIAD medical retrieval data, 100K pairs with CachedMultipleNegativesRankingLoss (about 5.5 hours on one RTX 3090) raised NDCG@10 from 0.8340 to 0.8862. That beat the general-purpose Qwen3-Embedding-0.6B (0.8493), a model about twice as large [13].
 
 **Static embeddings.** At the extreme low end, Sentence Transformers' static models (`static-retrieval-mrl-en-v1`, `static-similarity-mrl-multilingual-v1`) drop attention entirely and use per-token static vectors. They run 100x to 400x faster on CPU, and the English retrieval model reaches about 87.4% of all-mpnet-base-v2's NanoBEIR score [50]. They suit first-pass filtering on edge devices or very large re-embedding jobs.
+
+### 2.8 Snowflake Arctic Embed 2.0: multilingual without an English penalty
+
+**Problem.** Multilingual embedders have usually traded away English retrieval quality, which pushes teams to run two models.
+
+**Design.** Arctic-Embed 2.0 (Yu, Merrick, Nuti and Campos, arXiv:2412.04506, December 2024) comes in two sizes [54]. The medium model is built on GTE-multilingual and has 305M parameters, 113M of them non-embedding. The large model is built on a long-context XLM-R-Large and has 568M parameters, 303M of them non-embedding. Both handle 8,192 tokens, are trained with MRL so that vectors can be cut to 256 dimensions, and are released under Apache 2.0 [54]. The paper reports strong English MTEB-Retrieval scores alongside competitive multilingual results (CLEF, MIRACL) [54].
+
+**Evidence outside the vendor.** On Hugging Face's MIRIAD medical retrieval comparison, `snowflake-arctic-embed-m-v2.0` scored 0.8467 NDCG@10 and the large model 0.8433. Both were well ahead of BGE and mE5 models of similar size, and close to Qwen3-Embedding-0.6B (0.8493) [13].
+
+**Lessons.** Arctic 2.0 is a strong Apache-licensed default at encoder scale. It also shows that "medium" encoders with large vocabularies spend most of their parameters on the embedding table, which matters when you compare parameter counts across families.
 
 ## 3. Cross-cutting techniques
 
@@ -288,7 +299,7 @@ Retention depends heavily on the model. Under binary quantization with rescoring
 
 Rescoring uses the full-precision *query* against quantised *documents* (asymmetric distance), which recovers most of the lost accuracy. Voyage's measurements point the same way: binary search plus rescoring gains up to 5.84% over plain binary [6].
 
-**Combining MRL and quantization.** The two compressions multiply. Voyage's binary at 512 dimensions against OpenAI float at 3072 dimensions is a 192x size ratio (6x from dimensions times 32x from precision), which matches the "1/200 of storage" claim [6]. Hugging Face also suggests, speculatively, that 1024 to 128 dimensions plus binary could yield large speed-ups at single-digit-percent loss [39].
+**Combining MRL and quantization.** The two compressions multiply. Voyage's binary at 512 dimensions against OpenAI float at 3072 dimensions is a 192x size ratio (6x from dimensions times 32x from precision), which matches the "1/200 of storage" claim [6]. Hugging Face also suggests, speculatively, that shrinking MRL embeddings from 1024 to 128 dimensions (usually about a 2% loss) and then quantizing could speed retrieval up by up to 32x for about a 3% quality loss, or up to 256x for about 10% [39].
 
 ### 3.4 Pooling and attention choices in LLM embedders
 
@@ -300,15 +311,36 @@ Decoder LLMs use causal attention, so only the final token has seen the whole in
 
 There is no consensus winner. In practice, use the pooling the model was trained with. Generic wrappers that default to mean pooling for a last-token model produce badly degraded embeddings.
 
+### 3.5 Context-aware chunk embeddings: late chunking, contextual document embeddings, voyage-context-3
+
+A chunk embedded on its own loses whatever its neighbours said ("the city" no longer refers to "Berlin"). Three designs from 2024 to 2025 move that context into the embedder instead of into chunk text (compare contextual chunk headers in Chapter 02):
+
+- **Late chunking** (Günther et al., Jina AI, arXiv:2409.04701) runs a long-context encoder over the whole document, or as much of it as fits, and only then mean-pools token vectors over each chunk's span. Every chunk vector is conditioned on the surrounding text, at the cost of a single forward pass [55]. It needs a mean-pooling, long-context model and no retraining. Jina's repository reports nDCG@10 gains on several BEIR tasks, with the largest effect on chunks that refer to an entity only by anaphora ("its", "the city") [55].
+- **Contextual Document Embeddings (CDE)** (Morris and Rush, ICLR 2025, arXiv:2410.02525) condition on the *corpus* rather than the document. Training uses "contextual batches" of clustered neighbouring documents, which act as hard in-batch negatives. A two-stage architecture first embeds a sample of corpus documents and feeds those embeddings as extra input tokens when encoding each document and query. This adapts the embedder to an unseen domain at index time without fine-tuning [56].
+- **voyage-context-3** (Voyage AI / MongoDB, July 2025) is a commercial model trained for the job. It takes all of a document's chunks in one call and returns per-chunk vectors that encode document-level context. It offers 256 to 2048 dimensions, int8 and binary outputs and a 32K context. Voyage reports gains of about 14% (chunk-level) and 12.6% (document-level) over OpenAI-v3-large on its own suites [57].
+
+**Trade-off.** Re-embedding one chunk now means re-encoding its document, and a corpus-conditioned model (CDE) must be re-indexed when the corpus distribution shifts. In return, these designs remove most of the need for LLM-written chunk context, which is expensive at ingestion.
+
+### 3.6 Embeddings are not anonymised data: inversion and cross-model translation
+
+It is easy to treat a vector store as safer than the source text. It is not:
+
+- **Inversion.** Vec2Text (Morris, Kuleshov, Shmatikov and Rush, EMNLP 2023, arXiv:2310.06816) iteratively corrects a hypothesis text until its embedding matches a target vector. It recovered 92% of 32-token inputs exactly from a GTR-base embedding and extracted personal names from clinical-note embeddings. Public inverters exist for OpenAI `ada-002` [58].
+- **Universal geometry.** vec2vec (Jha, Zhang, Shmatikov and Morris, arXiv:2505.12540, 2025) learns, without paired data, to translate embeddings from an unknown model into the space of a known one. This makes leaked vectors from an undocumented model attackable as well [59]. Constructively, the same idea points to migrating an index between models without full re-embedding, though production-grade quality has not been shown.
+
+**Design implications.** Apply the same access control, encryption and retention rules to embeddings as to the source text, especially in multi-tenant indexes (Chapter 05). Do not treat MRL truncation or quantization as privacy protection. Inversion quality drops with them, but the vectors are not protected.
+
 ## 4. Benchmarks: MTEB, MMTEB and their limits
 
 **MTEB (2022).** The Massive Text Embedding Benchmark (Muennighoff et al., arXiv:2210.07316) launched with 56 datasets across 8 task types (retrieval, reranking, classification, clustering, pair classification, STS, summarisation, bitext mining) and up to 112 languages [40][43]. Its original central finding still holds: "Model performance varies a lot depending on the task and dataset". No single model dominated [43]. The retrieval subset is essentially BEIR (15 datasets), which is why papers report both numbers [35].
 
 **MMTEB (2025).** The Massive Multilingual Text Embedding Benchmark (Enevoldsen et al., arXiv:2502.13595) is a community expansion with "over 500 quality-controlled evaluation tasks across 250+ languages". It adds instruction-following, long-document and code retrieval [41]. It introduced inter-task-correlation downsampling and hard-negative-sampled retrieval splits to cut evaluation cost while preserving rankings. This produced the leaner MTEB(eng, v2) benchmark now used for English comparisons [41][42]. The `mteb` toolkit now also evaluates image, audio and video tasks [42].
 
+**RTEB (2025).** The Retrieval Embedding Benchmark, released in beta in October 2025 by MTEB maintainers with MongoDB/Voyage and Hugging Face contributors, responds directly to leaderboard overfitting [60]. It mixes open datasets, where corpus, queries and labels are public, with private datasets that only the MTEB maintainers evaluate. Each private set is described only by statistics and sample triplets. A large drop between a model's open and private scores signals overfitting, and the authors report such drops for some models [60]. The datasets cover enterprise domains (legal, healthcare, code, finance) in about 20 languages, each with at least 1K documents and 50 queries [60]. For RAG model selection, the RTEB retrieval view is a better default than the MTEB overall mean.
+
 **Known pitfalls.**
 
-1. **Train/test leakage.** Many models are fine-tuned on the training splits of MTEB retrieval datasets (MS MARCO, NQ, HotpotQA, FEVER). Qwen3's metadata, for example, lists NQ, MSMARCO, HotpotQA, FEVER and MIRACL among its training data [24]. The Sentence Transformers team warns that competitors trained on (Nano)BEIR training splits get an advantage on that benchmark [50]. Treat leaderboard gaps of 1 to 2 points as noise for your use case.
+1. **Train/test leakage.** Many models are fine-tuned on the training splits of MTEB retrieval datasets (MS MARCO, NQ, HotpotQA, FEVER). Qwen3's metadata, for example, lists NQ, MSMARCO, HotpotQA, FEVER and MIRACL among its training data [24]. The Sentence Transformers team warns that competitors trained on (Nano)BEIR training splits get an advantage on that benchmark [50]. Treat leaderboard gaps of 1 to 2 points as noise for your use case. RTEB's private splits were built to expose exactly this effect [60].
 2. **Average-of-averages hides retrieval.** A model can gain on the overall mean through classification or STS while losing on retrieval. Read the retrieval column, or better, your own evaluation.
 3. **Vendor benchmarks are curated.** Voyage's 100-dataset suite and similar internal suites are informative but chosen by the vendor [6].
 4. **Size is not destiny.** MMTEB found a 560M model (multilingual-e5-large-instruct) to be the best public model overall [41]. The EmbeddingGemma fine-tune beat a model twice its size in-domain [13].
@@ -322,7 +354,7 @@ The implication for RAG designers: queries that combine attributes (AND/OR/NOT, 
 **When it pays.** The general models above are trained on web, Wikipedia and Q&A distributions. Specialised vocabularies (clinical, legal, internal product codes), unusual query styles and low-resource languages can be poorly served. Public evidence that fine-tuning helps:
 
 - **Medical.** EmbeddingGemma gained 5.2 NDCG@10 points (0.834 to 0.886) with 100K pairs [13].
-- **Low-resource language.** Navasardyan et al. (Metric AI Lab, arXiv:2603.22290) fine-tuned multilingual-e5-base on only 10K noisy, LLM-translated Armenian pairs. The benchmark average rose from 64.30 to about 76.4, and manually curated retrieval from 58.15 to 79.35. Scaling to 1M pairs changed results by under 1%. The method transferred to Georgian, and the data cost under $20 [51].
+- **Low-resource language.** Navasardyan et al. (Metric AI Lab, arXiv:2603.22290) fine-tuned multilingual-e5-base on only 10K noisy, LLM-translated Armenian pairs. The authors report an average gain of about 11 to 12 points across their benchmark (64.30 to about 76.4) and more than 20 points on manually curated retrieval (58.15 to 79.35). Scaling to about 1M pairs, using stronger translation LLMs, or diversifying domains gave no significant further gain. They also report that the method transfers to another low-resource language with its own script (Georgian) at very low data cost [51].
 - **Weaker evidence.** LlamaIndex's financial-filing example (Lyft 10-K to train, Uber 10-K to validate) shows the shape of a typical result. bge-small-en reached a hit rate of 0.793 against 0.878 for ada-002 before tuning. A cheap linear adapter on top of the frozen model improved hit rate only modestly, from 0.787 to 0.799, and MRR from 0.643 to 0.662 [48][49].
 
 **Reference pipeline.**
@@ -396,18 +428,20 @@ It can be combined with TSDAE pre-training on the target corpus [47].
 | e5-mistral-7b-instruct (2024) | Microsoft | Open | 7.1B | 4096 | 32K | Client-side | Query instruction |
 | Qwen3-Embedding-0.6B / 4B / 8B (2025-06) | Alibaba Qwen | Open (Apache-2.0) | 0.6 / 4 / 7.6B | 1024 / 2560 / 4096, MRL | 32K | Client-side | Query instruction |
 | nomic-embed-text-v1.5 (2024-02) | Nomic | Open (code + data) | 137M | 768, MRL | 8,192 | Client-side | Prefixes |
-| nomic-embed-text-v2-moe (2025-02) | Nomic | Open | 475M (~142M active) | 768 | 512 | Client-side | Prefixes |
+| nomic-embed-text-v2-moe (2025-02) | Nomic | Open | 475M (305M active) | 768 | 512 | Client-side | Prefixes |
 | jina-embeddings-v3 (2024-09) | Jina | Open | 572M | 1024, MRL | 8,192 | Client-side | LoRA adapters |
 | jina-embeddings-v4 (2025-06) | Jina | Open | 3.8B | 2048 + multi-vector | 32K | Client-side | LoRA adapters |
 | jina-embeddings-v5-text-small (2026-02) | Jina | Open | 596M | 1024 / down to 32 | 32K | Client-side | Adapters + prefixes |
 | NV-Embed-v2 (2024) | NVIDIA | Open (check licence) | 7.85B | 4096 | 32K | Client-side | Query instruction |
-| EmbeddingGemma (2025) | Google DeepMind | Open | ~308M | 768 / 512, 256, 128 | 2K | Client-side | Not stated in [13] |
+| EmbeddingGemma (2025) | Google DeepMind | Open | ~308M | 768 / 512, 256, 128 | 2K | Client-side | Text prefixes (`task: ... \| query:`) |
+| snowflake-arctic-embed-l-v2.0 (2024-12) | Snowflake | Open (Apache-2.0) | 568M | 1024, MRL to 256 | 8,192 | Client-side | Query prefix |
+| voyage-context-3 (2025-07) | Voyage / MongoDB | Closed | n/a | 1024 / 256-2048 | 32K | int8, uint8, binary, ubinary | Contextualized chunks |
 
-Sources: [1][3][4][5][6][7][9][11][12][13][14][21][24][25][26][30][31][32][34][36][53]. Release months come from vendor posts or MTEB model metadata. "n/a" means the vendor does not publish the parameter count. For every open model, check the licence on the model card before commercial use.
+Sources: [1][3][4][5][6][7][9][11][12][13][14][21][24][25][26][30][31][32][34][36][53][54][57][63]. Release months come from vendor posts or MTEB model metadata. "n/a" means the vendor does not publish the parameter count. For every open model, check the licence on the model card before commercial use.
 
 ## Key takeaways for system designers
 
-1. **Choose on your own retrieval eval, not the MTEB average.** Leaderboard gaps of 1 to 2 points are within noise from training-set overlap and task mix [41][50]. A few hundred real queries with judged relevance will tell you more than any public table.
+1. **Choose on your own retrieval eval, not the MTEB average.** Leaderboard gaps of 1 to 2 points are within noise from training-set overlap and task mix [41][50]. If you need a public signal, prefer retrieval-only, partly private suites such as RTEB [60]. A few hundred real queries with judged relevance will tell you more than any public table.
 2. **Get the asymmetry right.** Every modern embedder expects role information: a prefix, an `input_type`, a task adapter or a query instruction. Missing or swapped roles are the most common silent quality bug, and Gemini Embedding 2 changes how roles are passed [11].
 3. **Budget storage with MRL times quantization.** Start at a 256 to 1024-dimension int8 index and keep full-precision or int8 vectors on disk for rescoring. Binary-plus-rescore at about 96% retention and 32x compression is mature for models trained for it [6][39]. Test retention per model, because it ranges from about 75% to 100% [39].
 4. **Prefer query-only instructions and shared spaces to reduce re-indexing.** Query-side instructions [19][26], query-side adapters [49] and cross-size shared embedding spaces [7] let you change behaviour or cost without re-embedding the corpus.
@@ -415,6 +449,7 @@ Sources: [1][3][4][5][6][7][9][11][12][13][14][21][24][25][26][30][31][32][34][3
 6. **Domain fine-tuning is cheap and effective when the domain is truly shifted.** 10K to 100K synthetic pairs, an in-batch-negative loss, merging with the base model, and evaluation on real queries is a proven recipe [13][51]. Watch for false negatives and forgetting.
 7. **Single vectors have hard capacity limits.** For combinatorial or exact-match queries, add BM25/sparse retrieval (BGE-M3 gives both from one model), multi-vector retrieval or a cross-encoder stage [15][44].
 8. **Plan for model churn.** Every major family released a new generation in 2025 to 2026. Store raw chunk text and metadata so you can re-embed. Version embeddings by model ID, dimension and dtype. Never mix vectors from different models in one index unless the vendor guarantees a shared space [7].
+9. **Secure vectors like text.** Embeddings can be inverted back to close paraphrases of their inputs [58][59]. Apply the source documents' access controls to the index.
 
 ## References
 
@@ -471,3 +506,13 @@ Sources: [1][3][4][5][6][7][9][11][12][13][14][21][24][25][26][30][31][32][34][3
 51. Navasardyan, Z., Bughdaryan, S., Minasyan, B., Davtyan, H. "Less is More: Adapting Text Embeddings for Low-Resource Languages with Small Scale Noisy Synthetic Data." Metric AI Lab, arXiv:2603.22290, 2026. https://arxiv.org/abs/2603.22290
 52. MTEB model metadata: Cohere models (cohere_models.py). MTEB maintainers, 2023-2026. https://github.com/embeddings-benchmark/mteb/blob/main/mteb/models/model_implementations/cohere_models.py
 53. MTEB model metadata: BGE models (bge_models.py). MTEB maintainers, 2023-2025. https://github.com/embeddings-benchmark/mteb/blob/main/mteb/models/model_implementations/bge_models.py
+54. Yu, P., Merrick, L., Nuti, G., Campos, D. "Arctic-Embed 2.0: Multilingual Retrieval Without Compromise." Snowflake, arXiv:2412.04506, 2024. https://arxiv.org/abs/2412.04506 (code: https://github.com/Snowflake-Labs/arctic-embed)
+55. Günther, M., Mohr, I., Williams, D. J., Wang, B., Xiao, H. "Late Chunking: Contextual Chunk Embeddings Using Long-Context Embedding Models." Jina AI, arXiv:2409.04701, 2024. https://arxiv.org/abs/2409.04701 (code: https://github.com/jina-ai/late-chunking)
+56. Morris, J. X., Rush, A. M. "Contextual Document Embeddings." ICLR 2025, arXiv:2410.02525. https://arxiv.org/abs/2410.02525 (code: https://github.com/jxmorris12/cde)
+57. "Introducing voyage-context-3: Focused Chunk-Level Details with Global Document Context." Voyage AI / MongoDB, July 2025. https://www.mongodb.com/company/blog/product-release-announcements/voyage-context-3-focused-chunk-level-details-global-document-context
+58. Morris, J. X., Kuleshov, V., Shmatikov, V., Rush, A. M. "Text Embeddings Reveal (Almost) As Much As Text." EMNLP 2023, arXiv:2310.06816. https://arxiv.org/abs/2310.06816 (code: https://github.com/jxmorris12/vec2text)
+59. Jha, R., Zhang, C., Shmatikov, V., Morris, J. X. "Harnessing the Universal Geometry of Embeddings." arXiv:2505.12540, 2025. https://arxiv.org/abs/2505.12540 (code: https://github.com/rjha18/vec2vec)
+60. Liu, F., Enevoldsen, K., Chung, I., Aarsen, T., et al. (MTEB maintainers and MongoDB). "Introducing RTEB: A New Standard for Retrieval Evaluation." Hugging Face, October 2025. https://huggingface.co/blog/rteb
+61. "MongoDB picks up Voyage AI, aims to integrate model reranking." Constellation Research, 24 February 2025. https://www.constellationr.com/blog-news/insights/mongodb-picks-voyage-ai-aims-integrate-model-reranking
+62. "Elastic Completes Acquisition of Jina AI, a Leader in Frontier Models for Multimodal and Multilingual Search." Elastic investor relations, 9 October 2025. https://ir.elastic.co/News--Events/news/news-details/2025/Elastic-Completes-Acquisition-of-Jina-AI-a-Leader-in-Frontier-Models-for-Multimodal-and-Multilingual-Search/default.aspx
+63. nomic-embed-text-v2-moe model card. Nomic AI, 2025. https://huggingface.co/nomic-ai/nomic-embed-text-v2-moe

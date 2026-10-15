@@ -29,16 +29,17 @@ This chapter is organised from the bottom of the cascade upward:
 
 1. **Lexical plus dense hybrid retrieval**, and the fusion problem: reciprocal rank fusion
    (RRF), score normalisation and weighted combination, as implemented in Azure AI Search,
-   Elasticsearch, OpenSearch, Weaviate, Vespa and Qdrant.
+   Elasticsearch, OpenSearch, Weaviate, Vespa and Qdrant, and what the academic comparison
+   of fusion functions found.
 2. **Learned sparse retrieval**: SPLADE and its ancestors (DeepCT, DeepImpact, uniCOIL),
-   plus a cautionary tale (BM42).
+   SPLADE-v3, plus a cautionary tale (BM42).
 3. **Late interaction**: ColBERT, ColBERTv2, PLAID and its successors (XTR, WARP,
-   FastPlaid, MUVERA).
+   FastPlaid, MUVERA), and visual late interaction (ColPali).
 4. **Cross-encoder rerankers**: MS MARCO MiniLM models, the BGE family, Qwen3-Reranker,
-   mxbai-rerank, and managed services (Cohere Rerank, Azure semantic ranker, Elastic Rerank,
-   Voyage, Jina).
-5. **LLM rerankers**: RankGPT's listwise permutation generation, and its open distilled
-   successors (RankVicuna, RankZephyr, LiT5, FIRST).
+   jina-reranker-v3, mxbai-rerank, and managed services (Cohere Rerank, Azure semantic
+   ranker, Elastic Rerank, Voyage).
+5. **LLM rerankers**: RankGPT's listwise permutation generation, its open distilled
+   successors (RankVicuna, RankZephyr, LiT5, FIRST), and 2025 reasoning rerankers (Rank1).
 6. **Score calibration and thresholding**, the least documented part of the stack.
 7. **Multi-stage cascade design**: candidate counts per stage, where each stage runs, and
    how the stages fit together.
@@ -46,7 +47,8 @@ This chapter is organised from the bottom of the cascade upward:
 A note on method. This chapter draws on primary sources that could be fetched and verified
 in October 2026: vendor documentation (mostly from the vendors' public source
 repositories), engineering blogs, and the official code repositories of the research
-systems. Where a number comes from a paper abstract that was not re-read in full for this
+systems. The Azure AI Search figures are taken from Microsoft Learn pages that could not be
+re-fetched during the final check, so treat their defaults as subject to change. Where a number comes from a paper abstract that was not re-read in full for this
 chapter, it is marked as approximate.
 
 The canonical cascade that the rest of the chapter refines:
@@ -194,12 +196,26 @@ results include more than 50 results" [2][3]. A relevant document at fused rank 
 therefore never be promoted. Recall at the fusion stage sets the ceiling for everything
 downstream.
 
-### 1.5 Lessons
+### 1.5 What the fusion literature says: convex combination versus RRF
+
+The engine defaults above favour RRF, but the most systematic academic comparison points the
+other way when labels exist. Bruch, Gai and Ingber ("An Analysis of Fusion Functions for
+Hybrid Retrieval", ACM TOIS 2023) compared a convex combination of normalised lexical and
+semantic scores, `alpha * s_dense + (1 - alpha) * s_lexical`, against RRF in-domain and
+out-of-domain [44]. Their findings: RRF is sensitive to its parameters (k = 60 is not
+universally safe), the convex combination outperforms RRF in both settings, and its single
+parameter can be tuned with a small set of labelled queries. The choice of normaliser
+mattered less than expected. This is the academic counterpart to Weaviate's switch of
+default and OpenSearch's normalisation processor [8][11]. RRF remains the right choice when
+there are no labels at all, or when more than two heterogeneous lists are fused.
+
+### 1.6 Lessons
 
 - **Hybrid is the default.** Anthropic, Azure, Elastic, Weaviate, Vespa and Qdrant all
   ship it as a first-class query type [2][4][7][8][12][17].
 - **RRF with k = 60 is the zero-configuration baseline.** Move to weighted or normalised
-  fusion only with labelled queries to tune against. Weaviate's roughly 6% FiQA recall gain
+  fusion once you have labelled queries to tune against; the convex combination needs only
+  a small set [44]. Weaviate's roughly 6% FiQA recall gain
   from normalised fusion is an internal benchmark, not a universal law [8].
 - **Size each child list deliberately.** RRF can only reorder what the children return,
   and Elastic's pagination stability depends on a fixed window [4].
@@ -295,7 +311,19 @@ Its abstract claims latency within 4 ms of BM25 under the same compute, with les
   expanded queries produce longer posting-list traversals. Hence the separate lightweight
   query encoders in Efficient SPLADE [14].
 
-### 2.5 Cautionary tale: BM42
+### 2.5 SPLADE-v3 and the 2024 baselines
+
+SPLADE-v3 (Lassance, Déjean, Formal and Clinchant, March 2024 technical report) is the
+current NAVER baseline series [45]. The main training changes are many hard negatives per
+query and distillation from an ensemble of cross-encoder rerankers. The abstract reports
+above 40 MRR@10 on MS MARCO dev, statistically significant gains over BM25 and SPLADE++,
+about 2% better out-of-domain BEIR effectiveness, and competitiveness with cross-encoder
+rerankers. The v3 checkpoints keep the non-commercial licence noted above, so the same
+commercial caveat applies [14][45]. Engine vendors meanwhile ship their own learned-sparse
+models under commercial terms (Elastic's ELSER is the sparse leg in Elastic's retriever
+trees [5]), which is the practical route for most production deployments.
+
+### 2.6 Cautionary tale: BM42
 
 In July 2024 Qdrant introduced BM42 [17]. It replaced BM25's term frequency with the
 attention weights of the `[CLS]` token in a small transformer (all-MiniLM-L6-v2 by
@@ -367,9 +395,8 @@ reimplementation with PyO3 and tch-rs bindings, defaults to `n_ivf_probe = 8` an
 `n_full_scores = 4096`. On an H100 it reports 69% to 554% higher QPS than the original
 PLAID across eight BEIR datasets, with nearly identical NDCG@10 (for example Quora
 43 -> 282 QPS at 0.88 vs 0.87 NDCG@10) [22]. PyLate (LightOn, CIKM 2025) is a Sentence
-Transformers-based training and inference library for ColBERT-style models. It uses
-FastPlaid as its default index and states about 10x storage reduction via product
-quantisation with sub-200 ms latency [23].
+Transformers-based training and inference library for ColBERT-style models. Its README
+builds its PLAID index on FastPlaid and offers alternative WARP and TACHIOM backends [23].
 
 ### 3.4 XTR, WARP and the CPU path
 
@@ -392,21 +419,35 @@ retrieve the top 50 with the pooled vector, then MaxSim-rerank to the top 10. Re
 
 - SciFact NDCG@10: 0.645 -> 0.703 (MiniLM) and 0.682 -> 0.731 (bge-small).
 - TREC-COVID: 0.472 -> 0.638 (MiniLM).
-- ArguAna: reranking hurt, 0.502 -> 0.454 (MiniLM).
+- ArguAna: reranking hurt for both models, 0.502 -> 0.454 (MiniLM) and 0.589 -> 0.573
+  (bge-small).
 
 The ArguAna drop shows that late-interaction reranking is not monotonically beneficial
 [26]. Storage is the real cost. MiniLM token vectors are 384-dimensional versus 128 for
 ColBERT. uint8 scalar quantisation cut memory about 4x with negligible quality loss
 (SciFact 0.707 -> 0.703) [26].
 
-MUVERA (from Google Research) goes further. It compresses a multi-vector set into one
+MUVERA (Google Research, NeurIPS 2024) goes further [47]. It compresses a multi-vector set into one
 fixed-dimensional encoding (FDE) so that a standard ANN index can serve the first stage,
 with exact MaxSim as a rerank. On NFCorpus with ColBERTv2, Qdrant measured NDCG@10 of 0.347
 for full multi-vector search (1.27 s average), 0.242 for MUVERA alone (0.15 s), and 0.343
 for MUVERA plus multi-vector rerank (0.18 s). That is about 7x faster at nearly identical
 quality. FDEs can be very large, for example 40,960 dimensions in one configuration [27].
 
-### 3.6 Lessons
+### 3.6 Visual late interaction: ColPali
+
+ColPali (Faysse et al., ICLR 2025) carries late interaction from text tokens to image
+patches [46]. A vision-language model (PaliGemma) embeds each page image directly into one
+vector per patch, and queries are scored against pages with the same MaxSim operator as
+ColBERT. This skips OCR, layout parsing and chunking entirely. The paper also introduced the
+ViDoRe benchmark for visually rich page retrieval, where queries need both textual and visual
+understanding. The authors report that it largely outperforms text-extraction pipelines
+while being simpler and faster to index [46]. For cascade design, ColPali-style indexes
+behave like ColBERT ones: each page yields on the order of a thousand patch vectors, so the
+storage, pooling and MUVERA-style approximation techniques above apply directly [27][47].
+Chapter 02's discussion of document parsing is the natural companion.
+
+### 3.7 Lessons
 
 - **Late interaction is a storage problem first.** Residual compression, product
   quantisation and scalar quantisation are mandatory, not optional [19][22][26].
@@ -467,10 +508,20 @@ instruction-aware: one model can be steered toward, for example, code search or 
 relevance. On reranking the top 100 from Qwen3-Embedding-0.6B, the 4B model scored 69.76
 MTEB-R and 81.20 MTEB-Code, versus 57.03 and 41.38 for bge-reranker-v2-m3 and 58.22 and
 58.98 for jina-multilingual-reranker-v2-base [31]. On FollowIR (instruction following) the
-4B model scored 14.84, while the 8B scored only 8.05. Bigger was not uniformly better [31].
+4B model scored 14.84, while the 8B scored only 8.05, and the 8B was also slightly behind
+the 4B on MTEB-R (69.02). Bigger was not uniformly better [31].
 
-**mxbai-rerank v2 (Mixedbread).** Sizes are 0.5B and 1.5B, trained with a three-step recipe
-that includes reinforcement learning (GRPO), contrastive learning and preference learning.
+**jina-reranker-v3 (Jina AI, September 2025).** A 0.6B multilingual reranker that is
+listwise inside a single forward pass [48]. Instead of scoring each pair separately, it puts
+the query and many candidate documents in one causal-attention context window and reads
+each document's relevance from its final-token embedding, a design the paper calls "last but
+not late" interaction. The paper reports about 61.9 BEIR nDCG@10, slightly above the
+Qwen3-Reranker-4B figure in its own comparison, at roughly one sixth of the size [48]. It
+shows that listwise comparison does not require autoregressive permutation generation
+(Section 5).
+
+**mxbai-rerank v2 (Mixedbread).** Sizes are 0.5B and 1.5B, trained with a three-stage recipe
+that the README lists as GRPO, contrastive learning and preference learning.
 The models support 100+ languages and an 8K default context, extendable to 32K. BEIR average
 is 57.49 for large-v2 and 55.57 for base-v2, versus 49.32 for the v1 large model. Latency
 on an A100 is 0.89 s and 0.67 s respectively, under a benchmark setting the README does not
@@ -510,13 +561,16 @@ text is trimmed [3].
 defaults to the `.rerank-v1-elasticsearch` endpoint and a `rank_window_size` of 10, and it
 can also call Cohere, Google Vertex AI or self-hosted Hugging Face models [6]. Its
 `chunk_rescorer` (GA in 9.4) scores the best chunks of long documents instead of truncating
-them. The documentation warns that oversize chunks can "significantly degrade relevance"
-[6].
+them. The documentation calls it "an expert feature" and warns that chunks configured
+larger than the reranker's token limit "can degrade relevance significantly" [6].
 
 **Voyage and Jina.** Both sell API rerankers. Anthropic notes Voyage offers one but did not
 test it [12], and the `rerankers` library wraps Cohere, Jina, Voyage, MixedBread, Pinecone
-and others behind one interface [42]. The vendors' own announcement pages could not be
-retrieved for this chapter, so their claims are not reproduced here. The independent
+and others behind one interface [42]. Voyage's `rerank-2.5` and `rerank-2.5-lite` (August
+2025) were announced as its first instruction-following rerankers, with a 32K-token
+context; the vendor reports about 7.9% and 7.2% higher accuracy than Cohere Rerank 3.5 on its
+own 93-dataset suite [49]. Jina's reranker line is covered under open models above
+(jina-reranker-v3) [48]. Both sets of figures are vendor-reported. The independent
 comparison point available is Qwen's table, where jina-multilingual-reranker-v2-base (0.3B)
 scores 58.22 MTEB-R [31].
 
@@ -594,7 +648,21 @@ trivially batched, compatible with thresholds) while inheriting LLM instruction 
 In 2025-2026 this has become the dominant open design. Full listwise generation is
 increasingly reserved for offline teaching and for small, high-value candidate sets.
 
-### 5.4 Failure modes and costs
+### 5.4 Reasoning rerankers (2025)
+
+The 2025 wave of reasoning models produced rerankers that think before they judge. Rank1
+(Weller et al., COLM 2025) distils reasoning traces from DeepSeek-R1 on MS MARCO, releasing
+more than 600,000 of them, into pointwise rerankers from 0.5B to 32B parameters built mostly
+on Qwen2.5 [50]. Each model generates a reasoning chain and then a relevance judgment. The
+motivation is the BRIGHT benchmark (Su et al., ICLR 2025), whose queries from StackExchange,
+coding and maths require reasoning to judge relevance and on which conventional retrievers
+and rerankers score poorly [51]. Rank1 reports large gains on BRIGHT over non-reasoning
+rerankers, and an ablation shows the reasoning chains, not only the extra training data,
+drive much of that gain [50]. The cost is many generated tokens per candidate. Reasoning
+rerankers are therefore a stage-3 option for hard, reasoning-intensive queries, not a
+default stage 2.
+
+### 5.5 Failure modes and costs
 
 - **Latency and cost.** A 100-candidate sliding window with window 20 and step 10 costs
   about 9 sequential LLM calls per query (see the diagram). That fits research evaluation
@@ -630,8 +698,9 @@ fusion? The public guidance:
 | LLM listwise | Permutation only | Needs a separate scorer for cut-offs [35] |
 
 Cohere's documentation is the most explicit vendor statement on calibration [34]. The
-primary output is the rank. Scores are query-dependent, and ratios between scores are "not
-meaningful". To set a cut-off, pick 30-50 representative queries, pair each with a
+primary output is the rank. Scores fall in [0, 1] but are query-dependent, and the
+documentation warns against reading ratios: a document scoring 0.91 is not "twice as
+relevant" as one scoring 0.04. To set a cut-off, pick 30-50 representative queries, pair each with a
 borderline-relevant document, score them, and use the mean as the reference threshold.
 Microsoft adds a second caution. Semantic ranker scores can shift slightly for the same
 query because of infrastructure conditions and model updates, so thresholds should not be
@@ -759,6 +828,7 @@ redeploying application code.
 | LLM-backbone pointwise | Qwen3-Reranker-4B, bge-v2-gemma | None | High | MTEB-R 69.76 [31] | Stage 2, instruction-aware |
 | Managed reranker | Cohere 3.5/4.0, Azure semantic | None (API) | API latency | Failure rate 2.9% -> 1.9% [12] | Stage 2 without MLOps |
 | LLM listwise | RankGPT, RankZephyr, FIRST | None | Very high (multi-call) | Teacher-quality rankings [35][36] | Stage 3, distillation teacher |
+| Reasoning reranker | Rank1 | None | Very high (long generations) | Large gains on BRIGHT [50][51] | Stage 3 for reasoning-heavy queries |
 
 ---
 
@@ -806,10 +876,10 @@ redeploying application code.
    https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf
 2. Microsoft. "Relevance scoring in hybrid search using Reciprocal Rank Fusion (RRF)."
    Azure AI Search documentation, 2024-2026.
-   https://github.com/MicrosoftDocs/azure-ai-docs/blob/main/articles/search/hybrid-search-ranking.md
+   https://learn.microsoft.com/azure/search/hybrid-search-ranking
 3. Microsoft. "Semantic ranking in Azure AI Search." Azure AI Search documentation,
    2024-2026.
-   https://github.com/MicrosoftDocs/azure-ai-docs/blob/main/articles/search/semantic-search-overview.md
+   https://learn.microsoft.com/azure/search/semantic-search-overview
 4. Elastic. "Reciprocal rank fusion." Elasticsearch reference, 2025-2026.
    https://github.com/elastic/elasticsearch/blob/main/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion.md
 5. Elastic. "Retrievers." Elasticsearch reference, 2025-2026.
@@ -905,3 +975,24 @@ redeploying application code.
     Benchmark for Zero-shot Evaluation of Information Retrieval Models." NeurIPS Datasets
     and Benchmarks, 2021. https://github.com/beir-cellar/beir (paper:
     https://arxiv.org/abs/2104.08663)
+44. S. Bruch, S. Gai, A. Ingber. "An Analysis of Fusion Functions for Hybrid Retrieval."
+    ACM Transactions on Information Systems, 2023. https://doi.org/10.1145/3596512
+    (preprint: https://arxiv.org/abs/2210.11934)
+45. C. Lassance, H. Déjean, T. Formal, S. Clinchant. "SPLADE-v3: New baselines for
+    SPLADE." arXiv technical report, 2024. https://arxiv.org/abs/2403.06789
+46. M. Faysse, H. Sibille, T. Wu, B. Omrani, G. Viaud, C. Hudelot, P. Colombo. "ColPali:
+    Efficient Document Retrieval with Vision Language Models." ICLR, 2025.
+    https://arxiv.org/abs/2407.01449
+47. L. Dhulipala, M. Hadian, R. Jayaram, J. Lee, V. Mirrokni. "MUVERA: Multi-Vector
+    Retrieval via Fixed Dimensional Encodings." NeurIPS, 2024.
+    https://arxiv.org/abs/2405.19504
+48. Jina AI. "jina-reranker-v3: Last but Not Late Interaction for Listwise Document
+    Reranking." arXiv, 2025. https://arxiv.org/abs/2509.25085
+49. Voyage AI (MongoDB). "rerank-2.5 and rerank-2.5-lite: instruction-following
+    rerankers." August 2025.
+    https://www.mongodb.com/company/blog/product-release-announcements/rerank-2-5-and-rerank-2-5-lite-instruction-following-rerankers
+50. O. Weller, K. Ricci, E. Yang, A. Yates, D. Lawrie, B. Van Durme. "Rank1: Test-Time
+    Compute for Reranking in Information Retrieval." COLM, 2025.
+    https://github.com/orionw/rank1 (paper: https://arxiv.org/abs/2502.18418)
+51. H. Su, H. Yen, M. Xia et al. "BRIGHT: A Realistic and Challenging Benchmark for
+    Reasoning-Intensive Retrieval." ICLR, 2025. https://arxiv.org/abs/2407.12883

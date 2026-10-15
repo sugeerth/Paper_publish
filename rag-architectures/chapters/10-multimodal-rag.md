@@ -58,15 +58,16 @@ table and takeaways.
 
 Before 2024, PDF RAG meant a brittle chain of PDF parsing, OCR, layout detection, table
 recognition, figure captioning, chunking and text embedding. The ColPali authors measured
-the cost of that chain. In their benchmark the parse, OCR and captioning pipeline took
-roughly 7.2 seconds of offline processing per page, against roughly 0.4 seconds per page to
-embed the page image directly (approximate, as reported in the paper's latency figure,
-which Hugging Face reproduces in its 2025 VLM survey) [1][35]. Even after all that work,
+the cost of that chain. In their latency table (1,000 ViDoRe pages, one NVIDIA L4 GPU), an
+Unstructured pipeline with layout detection (0.81 s), OCR (2.67 s) and figure captioning
+(3.71 s) took 7.22 seconds of offline processing per page, against 0.39 seconds per page
+for ColPali to embed the page image directly, roughly an 18x gap [1][35]. Even after all that work,
 the parsed pipelines still lost to direct visual retrieval on visually rich pages [1].
 
 ### Architecture
 
-ColPali (Faysse, Sibille, Wu et al., ILLUIN Technology / CentraleSupélec, 2024) takes the
+ColPali (Faysse, Sibille, Wu et al., ILLUIN Technology / CentraleSupélec; arXiv 2024,
+ICLR 2025) takes the
 PaliGemma-3B VLM and turns it into a ColBERT-style retriever [1][2]:
 
 - **Vision encoder.** SigLIP-So400m resizes each page to 448x448 pixels and cuts it into
@@ -222,12 +223,35 @@ engineering for visual retrievers [10]:
   screenshots. The work releases the VIRA training data and the MVRB benchmark, and its
   queries can themselves be screenshot-plus-text [17].
 
+### Dual-mode and bidirectional VLM retrievers: jina-embeddings-v4 and Nemotron ColEmbed
+
+Two 2025 releases blurred the line between families 2 and 3:
+
+- **jina-embeddings-v4** (Jina AI, June 2025) is a 3.8B-parameter model built on
+  Qwen2.5-VL-3B that embeds text and page images in one space and can emit *either* a
+  single 2,048-dim vector (Matryoshka-truncatable to 128) *or* ColBERT-style multi-vector
+  output from the same forward pass. Task-specific LoRA adapters (retrieval, text matching,
+  code) are selected at inference time. The release also introduced the Jina-VDR benchmark
+  for visually rich documents [55]. One model can therefore serve a cheap single-vector
+  first stage and a multi-vector rerank, which is the pattern behind the jina rows in
+  Section 10.4.
+- **Llama Nemoretriever ColEmbed** (NVIDIA, July 2025) starts from the Eagle2 VLM, switches
+  its LLM attention from causal to *bidirectional*, and adds late interaction. The 3B model
+  reported nDCG@5 of 91.0 on ViDoRe V1 and 63.5 on ViDoRe V2, first on both leaderboards as
+  of June 2025. The technical report quantifies the storage and latency cost of
+  multi-vector output and motivates the smaller single-vector `embed-vl` siblings [56]. The
+  later `nemotron-colembed-vl` checkpoints appear in the ViDoRe V3 pipeline results
+  (Section 10.4). Like ModernVBERT, it supports the lesson that bidirectional attention suits
+  retrieval better than causal decoding.
+
 ### API-hosted multimodal embedders
 
 Google's **Gemini Embedding 2** (public preview, March 2026) maps text, images, video,
-audio and PDFs into one space. Its input limits are: up to 6 PNG/JPEG images per request,
-MP4/MOV video up to 128 s, MP3/WAV audio up to 80 s, PDFs up to 6 pages, and 8,192 input
-tokens. Output dimensions run from 128 to 3,072 via Matryoshka learning. Qdrant recommends
+audio and PDFs into one space. Its input limits, as reported at launch, are: up to 6
+PNG/JPEG images per request, one PDF of up to 6 pages, MP3/WAV audio up to about 80 s,
+MP4/MOV video up to about 128 s (secondary sources disagree on the exact video cap, and
+Google's Vertex AI documentation expresses the limits as per-frame and per-second token
+costs), and an 8,192-token context shared by all modalities in a request. Output dimensions run from 128 to 3,072 via Matryoshka learning. Qdrant recommends
 a two-pass design: retrieve on a truncated vector, then rescore with the full 3,072 dims
 [46].
 
@@ -237,10 +261,14 @@ a two-pass design: retrieve on a truncated vector, then rescore with the full 3,
 with synthetic "practical" sets (energy, government, healthcare, AI, Shift Project). These
 quickly saturated: `vdr-2b` scores 95-98 nDCG@5 on several of them [10]. **ViDoRe V2**
 (Macé, Loison, Faysse, 2025) "raised the bar" with harder, more realistic queries [3].
-**ViDoRe V3** has more than 26,000 pages, 3,099 queries in 6 languages and 10 datasets
-(8 public and 2 private). It covers HR, finance (English and French), industrial,
-pharmaceutical, computer-science, energy and physics documents, all with human-verified
-annotations [6]. Single-model evaluation has moved into MTEB. The `vidore-benchmark`
+**ViDoRe V3** (Loison, Macé, Edy et al., ACL 2026) has about 26,000 pages and 3,099
+human-verified queries, each available in 6 languages, across 10 datasets (8 public and
+2 private). The source documents are English and French, covering HR, finance (English and
+French), industrial, pharmaceutical, computer-science, energy and physics. Roughly 12,000
+hours of annotation produced relevance labels, bounding-box evidence localisation and
+reference answers. The paper finds that visual retrievers and late interaction help, but
+that current models still struggle with non-text elements, open-ended queries and
+fine-grained visual grounding [6][54]. Single-model evaluation has moved into MTEB. The `vidore-benchmark`
 repository now evaluates **whole pipelines** (OCR, retriever, reranker, agent) and records
 indexing and search times [4].
 
@@ -284,7 +312,7 @@ Five observations follow from these numbers:
    set for 5-6 points.
 5. **Agentic retrieval wins on quality at about 100x the latency.** The NVIDIA agent
    rewrites queries, calls the ColEmbed-8B retriever (top-500) repeatedly, and has
-   Claude Opus 4.5 select and rank the final 10 pages. It reaches the best score, 0.692,
+   the LLM (Claude Opus 4.5 in this submission) submit the final ranked 10 pages. It reaches the best score, 0.692,
    at roughly 100 s per query, against 1.1 s for the same retriever alone [4][53]. This
    is the visual counterpart of the agentic-RAG trade-offs in Chapter 8.
 
@@ -332,8 +360,8 @@ goes all the way to binary. Each patch vector is stored as `tensor<int8>(patch{}
 which is 128 sign bits packed into 16 bytes, with Hamming distance and an HNSW index. The
 query is sent twice: as binarised tokens for a cheap Hamming MaxSim in the first phase
 (`1/(1+hamming)` summed over the per-token maxima), and as float tokens for an exact
-MaxSim against `unpack_bits(embedding)` in a second phase limited to `rerank-count: 10`
-[23]. PLAID (ColBERTv2) stores a centroid ID plus a quantised residual per vector. A
+MaxSim against `unpack_bits(embedding)` in a second phase limited to a small rerank
+window (the demo's Python client requests `ranking.rerankCount` of 100) [23]. PLAID (ColBERTv2) stores a centroid ID plus a quantised residual per vector. A
 608,414-vector text index shrinks from 311.5 MB (float32) to 92 MB as a fast-plaid index
 [27][32]. The same residual compression took ColBERT's MS MARCO index from 154 GB to
 16-25 GB (1- and 2-bit residuals) [30].
@@ -397,6 +425,21 @@ single pipeline runs "purely from visual features". Pages are resized to 1,344x1
 Queries carry an instruction prefix ("I'm looking for an image that answers the
 question") [14].
 
+### ViDoRAG (Alibaba Tongyi Lab, EMNLP 2025): multi-agent visual RAG
+
+ViDoRAG (Wang et al., 2025) addresses two weaknesses of single-pass visual RAG: purely
+visual retrieval integrates text and visual cues poorly, and the generator gets too few
+reasoning tokens for multi-page questions [57]. Retrieval fuses a text and a visual
+retriever, and a **Gaussian Mixture Model** fitted to the similarity scores picks a
+query-specific number of pages instead of a fixed top-k. Generation is a loop of three
+agents. A *seeker* explores retrieved images, an *inspector* examines selected pages in
+detail and returns feedback or a draft, and an *answer* agent checks consistency and
+produces the final answer. The authors frame the loop as test-time scaling for RAG.
+They also release **ViDoSeek**, a benchmark of questions that need retrieval and reasoning
+over a large visually rich corpus rather than a single given page [57]. ViDoRAG is an
+early academic version of the agentic pattern that NVIDIA's ViDoRe V3 submission scaled up
+(Section 10.4).
+
 ### Production patterns: Vespa, Weaviate and NVIDIA
 
 ```
@@ -416,8 +459,11 @@ question") [14].
 - **Weaviate's Query Agent** wraps multi-vector page retrieval in multi-step reasoning. It
   returns a synthesised answer whose numerical claims are "anchored to a specific page in a
   specific PDF, with the page image right there for verification" [29].
-- **NVIDIA's NeMo Retriever agentic pipeline** has an LLM agent with think, retrieve and
-  select-and-rerank tools over a ColEmbed index (Section 10.4) [4][53].
+- **NVIDIA's NeMo Retriever agentic pipeline** gives an LLM agent `think`, `retrieve` and
+  `final_results` tools over a dense or ColEmbed backend (top-500 candidates per call),
+  falls back to RRF over its retrieval calls if the agent fails, and returns 10 pages.
+  The LLM is a configuration parameter; the ViDoRe V3 submission used Claude Opus 4.5
+  (Section 10.4) [4][53].
 
 ### Failure modes
 
@@ -529,7 +575,7 @@ modalities is wrong**. Text-to-text hits will crowd out text-to-image hits. Fuse
 Video multiplies every visual cost by the frame count and adds an audio track. Published
 designs differ mainly in *what* they index per time segment.
 
-### VideoRAG (HKUDS, 2025): graph plus segment embeddings
+### VideoRAG (HKUDS, 2025; KDD 2026): graph plus segment embeddings
 
 VideoRAG targets "extremely long-context" video, hundreds of hours, on a **single RTX 3090
 (24 GB)** [47][48]. Its default configuration, from the code:
@@ -565,7 +611,20 @@ Video-RAG takes the opposite stance. It does not build a new index structure. In
 auxiliary text", extracted by open tools: OCR (EasyOCR), ASR (Whisper) and open-vocabulary
 object detection (APE). The query retrieves the relevant auxiliary text, which is then
 added to the frames in the prompt. It is plug-and-play and needs no training. Applied to a
-72B open model, the authors report results on Video-MME above Gemini-1.5-Pro [49].
+72B open model, the authors report state-of-the-art open-model results on Video-MME,
+surpassing Gemini-1.5-Pro. The work appeared at NeurIPS 2025 [49].
+
+### VideoRAG over a video corpus (KAIST, Findings of ACL 2025)
+
+A second, unrelated system also called **VideoRAG** (Jeong, Kim, Baek, Hwang, 2025)
+tackles a different problem: retrieving *which videos* in a large corpus are relevant to
+a query, instead of assuming the relevant video is given [58]. A large video-language model
+represents each video jointly from its frames and its subtitles or ASR text. The retrieved
+videos are then passed, with the query, to the same class of model for generation. The
+authors show that it beats text-only and static-image RAG baselines on knowledge-seeking
+QA. The two VideoRAG papers are complementary. KAIST's work is corpus-level video
+retrieval. HKUDS's work is about indexing and navigating within very long videos.
+Check which one a citation means.
 
 ### Embedding video directly
 
@@ -586,7 +645,7 @@ VRAM-per-vector numbers make full-rate encoding unaffordable [27][48].
 
 ## 10.10 Audio RAG
 
-Three designs are documented:
+Four designs are documented:
 
 1. **ASR-first.** Transcribe with Whisper-class models and index the text. This is the
    default inside VideoRAG and Video-RAG [48][49]. It is cheap and keeps everything in
@@ -601,8 +660,14 @@ Three designs are documented:
    margin, with no transcription step. The release guidance is to chunk long audio into
    30-second pieces of about 800 tokens [27]. Gemini Embedding 2 embeds MP3/WAV clips of
    up to 80 s [46].
+4. **Audio-native retrieval for spoken dialogue.** WavRAG (Chen, Ji et al., ACL 2025)
+   drops the ASR step. Its WavRetriever embeds raw speech queries and a mixed audio-and-text knowledge base into
+   one space. Chain-of-thought prompting then helps the spoken dialogue model use the
+   retrieved material. The authors report retrieval quality comparable to ASR-plus-text
+   pipelines at roughly 10x faster processing, while keeping non-speech audio retrievable
+   [59].
 
-A practical pattern combines (1) and (3). Keep the transcript for BM25, dense retrieval and
+A practical pattern combines (1) with (3) or (4). Keep the transcript for BM25, dense retrieval and
 citation, keep a native audio embedding for paralinguistic or non-speech queries, and fuse
 the two by rank.
 
@@ -610,16 +675,18 @@ the two by rank.
 
 | Design | Index unit | Vectors/unit | Strengths | Weaknesses | Representative |
 |---|---|---|---|---|---|
-| Parse + text embed | chunk | 1 | cheap ANN, keyword/hybrid, fine citations | loses charts/layout; brittle parsers; slow ingest (~7 s/page, approx.) | Ch. 2 pipelines [1] |
+| Parse + text embed | chunk | 1 | cheap ANN, keyword/hybrid, fine citations | loses charts/layout; brittle parsers; slow ingest (7.22 s/page in ColPali's test) | Ch. 2 pipelines [1] |
 | Parse + caption + KG | element/entity | 1 + graph | element-level citation; cross-modal relations | LLM-heavy indexing; caption hallucination | RAG-Anything [33] |
 | Single-vector screenshot | page | 1 (MRL-truncatable) | any ANN index; simple ops; ~3 ms search | one vector per page dilutes detail | DSE, vdr-2b, nemotron-embed-vl [4][8][10] |
 | Multi-vector late interaction | page | ~700-1,030 x 128 | best visual retrieval; heatmap explainability | ~170x storage; costly HNSW builds | ColPali/ColQwen/ColEmbed [2][20] |
 | Late interaction + pooling/MUVERA | page | 32-64 pooled or 1 FDE + rerank | 13x faster; ~70% less memory | small recall loss; two stores | Qdrant, Weaviate, Vespa [18][23][24] |
 | Visual + VL reranker | page | 1 + cross-encoder | +5-6 nDCG points | ~5-17 s/query on V3 HR | NVIDIA, Jina [4] |
 | Agentic visual retrieval | page | multi-vector + LLM | best V3 score (0.692) | ~100 s/query | NeMo Retriever Agentic [4] |
+| Multi-agent visual RAG | page | text + visual + GMM top-k | adaptive page count; iterative inspection | several LLM calls per query | ViDoRAG [57] |
 | Omni-modal embedding | clip/page/image/audio | 1 or multi | any-to-any retrieval | modality gap; input-length caps | ImageBind, Gemini Emb. 2, ColQwen-Omni [27][38][46] |
 | Video graph + segments | 30 s segment | text KG + 1,024-d visual | hundreds of hours on 24 GB | heavy captioning at ingest | VideoRAG [48] |
 | Auxiliary-text video RAG | frame/segment text | text | training-free, any LVLM | depends on OCR/ASR/detector quality | Video-RAG [49] |
+| Audio-native retrieval | audio clip / text passage | 1 | no ASR; keeps non-speech audio; ~10x faster than ASR pipelines | needs audio-language backbone | WavRAG [59] |
 
 ## 10.12 Cross-Cutting Failure Modes
 
@@ -676,7 +743,7 @@ the two by rank.
 ## References
 
 1. M. Faysse, H. Sibille, T. Wu, B. Omrani, G. Viaud, C. Hudelot, P. Colombo. "ColPali:
-   Efficient Document Retrieval with Vision Language Models." arXiv, 2024.
+   Efficient Document Retrieval with Vision Language Models." ICLR, 2025 (arXiv 2024).
    https://arxiv.org/abs/2407.01449
 2. ILLUIN Technology. "ColPali / colpali-engine repository (ColVision models, token
    pooling, Sentence Transformers migration)." GitHub, 2024-2026.
@@ -807,3 +874,17 @@ the two by rank.
 53. NVIDIA. "NeMo Retriever retrieval-bench agentic pipeline (AgenticRetrievalPipeline)."
     GitHub, 2026.
     https://github.com/NVIDIA/NeMo-Retriever/blob/main/retrieval-bench/src/retrieval_bench/pipelines/agentic.py
+54. A. Loison, Q. Macé, A. Edy et al. "ViDoRe V3: A Comprehensive Evaluation of Retrieval
+    Augmented Generation in Complex Real-World Scenarios." ACL, 2026.
+    https://arxiv.org/abs/2601.08620
+55. M. Günther et al. (Jina AI). "jina-embeddings-v4: Universal Embeddings for Multimodal
+    Multilingual Retrieval." arXiv, 2025. https://arxiv.org/abs/2506.18902
+56. M. Xu et al. (NVIDIA). "Llama Nemoretriever Colembed: Top-Performing Text-Image
+    Retrieval Model." arXiv, 2025. https://arxiv.org/abs/2507.05513
+57. Q. Wang et al. (USTC, Alibaba Tongyi Lab, SJTU). "ViDoRAG: Visual Document
+    Retrieval-Augmented Generation via Dynamic Iterative Reasoning Agents." EMNLP, 2025.
+    https://arxiv.org/abs/2502.18017 (code: https://github.com/Alibaba-NLP/ViDoRAG)
+58. S. Jeong, K. Kim, J. Baek, S. J. Hwang (KAIST). "VideoRAG: Retrieval-Augmented
+    Generation over Video Corpus." Findings of ACL, 2025. https://arxiv.org/abs/2501.05874
+59. Y. Chen, S. Ji et al. "WavRAG: Audio-Integrated Retrieval Augmented Generation for
+    Spoken Dialogue Models." ACL, 2025. https://arxiv.org/abs/2502.14727

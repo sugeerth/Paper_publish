@@ -34,9 +34,10 @@ This chapter is organized around those constraints. Section 1 traces the researc
 owners (Bing/Copilot, Google), answer-engine natives (Perplexity, You.com, open-source
 clones) and chat assistants with a search tool (ChatGPT, Claude, Gemini API). Section 6
 compares the search APIs built for agents: Perplexity Search, Exa, Tavily, Brave, Grounding
-with Bing and You.com. Section 7 covers deep research agents. Section 8 is about citation
-systems: how they are built, how they are measured, and how they fail. Section 9 covers
-evaluation. Chapter 08 covers agentic and RL-trained search loops in general. Chapter 11
+with Bing and You.com. Section 7 covers deep research agents. Section 3.3 covers publisher economics and
+crawler controls, and Section 5.4 agentic browsers. Section 8 is about citation systems:
+how they are built, how they are measured, how they fail, and the content-side signals
+(llms.txt) that sites offer. Section 9 covers evaluation. Chapter 08 covers agentic and RL-trained search loops in general. Chapter 11
 covers citation metrics such as ALCE in more depth.
 
 **A note on sources.** Most claims in this chapter were checked against primary sources
@@ -166,7 +167,7 @@ offer first-party web search APIs [26].
 search turns into evidence an LLM can use. Search APIs increasingly do this step on the
 server and accept a token budget. Examples are Brave's `maximum_number_of_tokens`
 (1,024-32,768), Perplexity's `max_tokens_per_page`, Exa's relevance-sized highlights and
-Tavily's `chunks_per_source` (Section 6). Anthropic's tool versions from 2026 go further.
+Tavily's `chunks_per_source` (Section 6). Anthropic's tool versions from February 2026 onward go further.
 Claude writes and runs code that filters search or fetch results *before* they enter the
 context window ("dynamic filtering") [36][37].
 
@@ -322,6 +323,29 @@ licence.
 of internal queries per answer, which renting would make uneconomic.
 (2) Failures cluster where retrieval is thin or adversarial, not where the model is weak.
 (3) Both owners make attribution a licence condition for third-party developers.
+
+### 3.3 Publisher economics: clicks, crawlers and pay-per-crawl
+
+Answer layers change the bargain that made the web crawlable: publishers allowed crawling
+in exchange for referral traffic. Three 2025 developments show the pressure.
+
+- **Fewer clicks.** A Pew Research Center study of the browsing data of about 900 US
+  adults (March 2025) found that users clicked a traditional search result on 8% of
+  Google visits that showed an AI summary, against 15% of visits without one, and
+  clicked a link *inside* the summary on only about 1% of visits [61†].
+- **Crawler controls move to the network edge.** In July 2025 Cloudflare began blocking
+  known AI crawlers by default for new domains and launched a private beta of *pay per
+  crawl*, which answers crawler requests with HTTP 402 and a price, so that a site can
+  allow, charge or block each AI crawler [62†]. In August 2025 Cloudflare alleged that
+  Perplexity used undeclared crawlers with generic user agents to fetch sites that had
+  blocked its declared bots; Perplexity disputed the characterization, arguing that
+  user-initiated fetches are not crawling [63†].
+- **Design consequence.** The line between a *crawler* (building an index) and a
+  *user-triggered fetch* (reading a page for one answer) is now contested commercially
+  and technically. Systems should identify their fetchers honestly, honour robots and
+  edge-level signals, and log which pages were fetched live for which request. Licence
+  terms such as Bing's (Section 3.1) and edge-level payment schemes both push towards
+  explicit, auditable retrieval.
 
 ## 4. Answer-engine natives
 
@@ -484,23 +508,43 @@ stand out [36][37]:
   `cited_text`, `title` and `url` do not count as input or output tokens.
 - **Dynamic filtering (2026).** From tool version `web_search_20260209`, search runs by
   default from inside code execution. Claude writes code that filters results before they
-  enter the context window, which reduces token use on search-heavy requests.
-  `response_inclusion: "excluded"` further drops the raw result blocks from the API
-  response [36]. Web fetch gained the same filtering, plus a `max_content_tokens`
-  truncation limit and `use_cache: false` for fresh content [37].
+  enter the context window, which reduces token use on search-heavy requests. A later
+  version, `web_search_20260318`, adds `response_inclusion: "excluded"`, which drops the
+  raw result blocks consumed by a completed code-execution call from the API response
+  [36]. Web fetch gained the same filtering (from `web_fetch_20260209`), cache bypass
+  with `use_cache: false` (from `web_fetch_20260309`) and response inclusion (from
+  `web_fetch_20260318`); every version accepts a `max_content_tokens` truncation limit
+  [37].
 - **Exfiltration guard.** Web fetch can only retrieve URLs that already appeared in the
   conversation: in user messages, in client tool results, or in earlier search or fetch
   results. It cannot fetch URLs that appear only in Claude's own output, or URLs that seem
   to contain credentials. This blocks a common prompt-injection pattern in which a
-  malicious page instructs the model to encode private data into a URL and fetch it. Web
-  fetch does not render JavaScript [37].
-- **Price.** $10 per 1,000 searches plus tokens. Failed searches are not billed [35][36].
+  malicious page instructs the model to encode private data into a URL and fetch it. (A
+  credential-bearing URL is allowed only if that credential appears in the system prompt
+  or a user message.) Web fetch does not render JavaScript [37].
+- **Price.** $10 per 1,000 searches plus tokens. Failed searches are not billed. Web
+  fetch has no charge beyond the tokens of the fetched content [35][36][37].
 
 ### 5.3 Gemini app and API
 
 Section 3.2 covers the Gemini API's grounding tools. The architectural point is that one
 trained behaviour, calling Search from inside reasoning, serves AI Overviews, AI Mode,
 the Gemini app and the developer API [15][20][21].
+
+### 5.4 Agentic browsers: the answer engine becomes the browser
+
+In 2025 the answer engine moved into the browser itself. Perplexity launched **Comet** in
+July 2025 [64†], and OpenAI launched **ChatGPT Atlas** in October 2025 with ChatGPT
+built into the browser and an agent mode that can act on pages [65†]. Architecturally,
+the retrieval set is no longer only search results: it includes the page the user is on,
+open tabs and, with consent, logged-in sessions. That widens the attack surface described
+in Section 5.2. Brave's security team showed in August 2025 that Comet could be steered by
+instructions hidden in a web page that the user asked it to summarize (indirect prompt
+injection), with the agent acting with the user's own authenticated privileges [66†].
+The defences carry over from server-side tools and need to be stronger here: treat page
+content strictly as data, require user confirmation for sensitive actions, separate
+browsing in authenticated sessions from browsing of untrusted pages, and restrict which
+URLs the agent may visit or submit data to [37][66†].
 
 ## 6. Search APIs built for agents
 
@@ -541,7 +585,7 @@ The Exa SDK documents a retrieval stack built for machine consumers [45]:
   high. This is per-field attribution for structured extraction, a citation form the
   chat-oriented APIs lack.
 - **Higher-level products.** An Agent API (with an "ultra" effort level), Websets, and
-  *Agent Monitors*. Monitors keep a table of entities by fields up to date: static fields
+  *Agent Monitors* (in beta as of August 2026). Monitors keep a table of entities by fields up to date: static fields
   are answered once, and dynamic fields are tracked from news on every refresh.
 - **Agent-facing packaging.** The official MCP server exposes `web_search_exa`,
   `web_fetch_exa` (pages as clean markdown), `web_search_advanced_exa` (filters, domains,
@@ -664,8 +708,8 @@ The API, documented in OpenAI's cookbook [30][31], exposes the mechanics:
 
 On Azure the same architecture is visible from the outside. The (now deprecated) Deep
 Research tool used `gpt-4o` to clarify and scope the task, then `o3-deep-research`
-grounded on Grounding with Bing. Deployments were limited to two regions, and the model
-retires on 19 November 2026. Microsoft now recommends general reasoning models with
+grounded on Grounding with Bing. Deployments were limited to two regions, and the documentation
+lists a retirement date for the model (19 November 2026 when last checked; re-verify). Microsoft now recommends general reasoning models with
 `web_search` at high reasoning effort [12][13]. Deep research is being absorbed into
 general-purpose reasoning models plus a search tool.
 
@@ -705,7 +749,8 @@ the focus is on what it shows about web grounding [41][42][43]:
   limit of 20 tool calls and about 100 sources [43].
 - **Economics.** A multi-agent configuration (Opus 4 lead, Sonnet 4 subagents)
   outperformed single-agent Opus 4 by 90.2% on an internal research evaluation. On
-  BrowseComp, token usage alone explained 80% of performance variance. Agents use about
+  BrowseComp, token usage alone explained 80% of performance variance, and token usage,
+  number of tool calls and model choice together explained 95%. Agents use about
   4x the tokens of chat, and multi-agent systems about 15x. Parallel subagents (3-5) and
   parallel tool calls (3 or more) cut research time by up to 90% on complex queries [42].
 - **Source quality is a prompt problem.** Human testers found that early agents preferred
@@ -825,6 +870,20 @@ the most common failure, which is searching for the wrong thing.
 | Evidence tampering across turns | client edits prior results | encrypted result and citation indices [36] |
 | Over-citation | many weak citations look rigorous | citation style rules [43]; precision metrics [4][5] |
 
+### 8.4 Content-side signals: llms.txt and markdown mirrors
+
+Answer engines also depend on what the page side offers. The **/llms.txt** proposal
+(Jeremy Howard, September 2024; v2 in 2026) asks sites to publish a markdown file at the
+root or any path that gives brief background, guidance and links to detailed markdown
+files. Pages are encouraged to provide a clean markdown version at the same URL with
+`.md` appended, discoverable through `rel="alternate" type="text/markdown"` links [67].
+The v2 text reports that thousands of sites publish one, that documentation platforms
+generate it automatically, and that the AI labs publish llms.txt files for their own
+developer docs [67]. For a retrieval system, such files are cheap, clean extraction
+targets (stage [4]). They are also self-descriptions written by the page owner, so they
+deserve the same scepticism as any content optimized for generative engines (GEO,
+Section 1).
+
 ## 9. Evaluating web-grounded systems
 
 Answer engines need evaluation along three axes: answer correctness, retrieval and
@@ -842,19 +901,29 @@ browsing difficulty, and attribution. The current benchmark set:
 | WideSearch [26] | breadth: collecting many independent facts into tables | 200 tasks; row-level F1 |
 | DeepResearch Bench [59] | report quality (RACE) and citation trustworthiness (FACT) | 100 tasks, 22 fields, based on 96,147 real queries |
 | Search Arena [57] | human pairwise preference on real prompts | ~24K conversations |
+| Mind2Web 2 [68] | long-horizon, time-varying search tasks with citation-backed answers | 130 tasks; agent-as-a-judge with task-specific rubrics |
 
 BrowseComp at launch showed the gap between browsing and plain search. As reported,
 GPT-4o with browsing solved under 2% of problems, while OpenAI's deep research agent
 solved about half [33†]. A year later the hosted research agents in Section 4.1 scored
 0.56-0.81 [26].
 
+**Agent-as-a-judge for live answers.** Mind2Web 2 (NeurIPS 2025 Datasets and
+Benchmarks) addresses answers that change over time and cannot be graded against a fixed
+string. Each task has a tree-structured rubric, and judge agents check each required
+fact *and* verify that the cited URL supports it. Submitters are asked to cache the
+cited pages so that evaluation sees what the agent saw [68]. This turns citation
+verification (Section 8.2) into part of correctness grading.
+
 **Methodological cautions.**
 (1) The live web makes runs non-reproducible. BrowseComp-Plus fixes the corpus so that
 retrievers can be compared under one agent [58].
 (2) Grading is done by LLM judges whose prompts come from the original benchmarks [26].
-DeepResearch Bench changed its official judge model twice between 2025 and 2026 and
-re-validated each against human agreement. The human inter-annotator baseline was 68.78%
-[59].
+DeepResearch Bench moved its judges to Gemini-2.5-Pro (RACE) and Gemini-2.5-Flash (FACT)
+in July 2025, then, after Google announced the deprecation of Gemini-2.5-Pro, switched in
+May 2026 to GPT-5.5 (RACE) and GPT-5.4-mini (FACT). The replacement candidates were
+validated on 200 human-annotated reports against a human inter-annotator agreement
+baseline of 68.78% [59]. Scores from different judge generations are not comparable.
 (3) Vendor harnesses set evidence budgets, models and step caps (Section 4.1). Report
 them with every number.
 (4) Separate *failed-as-zero* from *failed-excluded* scores. `search_evals` publishes both
@@ -1026,23 +1095,27 @@ writing this chapter.
     Agents." OpenAI, April 2025. https://openai.com/index/browsecomp/ ;
     https://arxiv.org/abs/2504.12516 (URLs as linked from [26][32].)
 34. Anthropic. "Claude can now search the web." March 2025 (global availability update May
-    2025). https://www.anthropic.com/news/web-search
+    2025). https://www.anthropic.com/news/web-search (now redirects to
+    https://claude.com/blog/web-search)
 35. Anthropic. "Introducing web search on the Anthropic API." May 2025 (web fetch update
-    September 2025). https://www.anthropic.com/news/web-search-api
+    September 2025). https://claude.com/blog/web-search-api (formerly
+    https://www.anthropic.com/news/web-search-api)
 36. Anthropic. "Web search tool." Claude Platform documentation, 2026.
     https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool
 37. Anthropic. "Web fetch tool." Claude Platform documentation, 2026.
     https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool
 38. Anthropic. "Introducing Citations on the Anthropic API." January 2025.
-    https://www.anthropic.com/news/introducing-citations-api
+    https://claude.com/blog/introducing-citations-api (formerly
+    https://www.anthropic.com/news/introducing-citations-api)
 39. Anthropic. "Citations." Claude Platform documentation, 2026.
     https://platform.claude.com/docs/en/build-with-claude/citations
 40. Anthropic. "Search results." Claude Platform documentation, 2026.
     https://platform.claude.com/docs/en/build-with-claude/search-results
 41. Anthropic. "Claude takes research to new places" (Research and Google Workspace
-    launch). April 2025. https://www.anthropic.com/news/research
+    launch). April 2025. https://claude.com/blog/research (formerly
+    https://www.anthropic.com/news/research)
 42. Anthropic Engineering. "How we built our multi-agent research system." June 2025.
-    https://www.anthropic.com/engineering/built-multi-agent-research-system
+    https://www.anthropic.com/engineering/multi-agent-research-system
 43. Anthropic. Agent prompts: `research_lead_agent.md`, `research_subagent.md`,
     `citations_agent.md`. Anthropic Cookbook, 2025.
     https://github.com/anthropics/anthropic-cookbook/tree/main/patterns/agents/prompts
@@ -1086,3 +1159,23 @@ writing this chapter.
 60. † Jaźwińska, K., Chandrasekar, A. "AI Search Has A Citation Problem." Tow Center for
     Digital Journalism, Columbia Journalism Review, March 2025.
     https://www.cjr.org/tow_center/we-compared-eight-ai-search-engines-theyre-all-bad-at-citing-news.php
+61. † Chapekis, A., Lieb, A. "Google users are less likely to click on links when an AI
+    summary appears in the results." Pew Research Center, 22 July 2025.
+    https://www.pewresearch.org/short-reads/2025/07/22/google-users-are-less-likely-to-click-on-links-when-an-ai-summary-appears-in-the-results/
+62. † Cloudflare. "Introducing pay per crawl: enabling content owners to charge AI
+    crawlers for access." 1 July 2025. https://blog.cloudflare.com/introducing-pay-per-crawl/
+63. † Cloudflare. "Perplexity is using stealth, undeclared crawlers to evade website
+    no-crawl directives." 4 August 2025.
+    https://blog.cloudflare.com/perplexity-is-using-stealth-undeclared-crawlers-to-evade-website-no-crawl-directives/
+64. † Perplexity. "Introducing Comet: Browse at the speed of thought." July 2025.
+    https://www.perplexity.ai/hub/blog/introducing-comet
+65. † OpenAI. "Introducing ChatGPT Atlas." 21 October 2025.
+    https://openai.com/index/introducing-chatgpt-atlas/
+66. † Brave. "Agentic Browser Security: Indirect Prompt Injection in Perplexity Comet."
+    August 2025. https://brave.com/blog/comet-prompt-injection/
+67. Howard, J. "The /llms.txt file" (v1 September 2024; v2 2026). https://llmstxt.org/ ;
+    source: https://github.com/AnswerDotAI/llms-txt
+68. Gou, B., et al. "Mind2Web 2: Evaluating Agentic Search with
+    Agent-as-a-Judge." Ohio State University NLP Group, NeurIPS 2025 Datasets and
+    Benchmarks. https://arxiv.org/abs/2506.21506 ; code:
+    https://github.com/OSU-NLP-Group/Mind2Web-2
