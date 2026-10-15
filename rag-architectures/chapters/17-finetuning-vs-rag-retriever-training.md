@@ -7,7 +7,7 @@ A RAG system has four places where learning can happen. Each one fixes a differe
 3. **The retriever.** The bi-encoder or late-interaction model that produces candidates. It is trained with synthetic queries (InPars, Promptagator, GPL, E5-Mistral), mined hard negatives (ANCE, RocketQA, NV-Retriever), or the LLM's own preferences (REPLUG-LSR, Atlas, RA-DIT).
 4. **The reranker.** A cross-encoder or LLM reranker. It is often a distillation target or a distillation teacher (RankGPT, RankZephyr, Rank1).
 
-The chapter starts with the evidence on the first-order question, "should knowledge go into the weights or into the index?". It then covers generator-side training (RAFT, RA-DIT), LM-supervised retriever training (REPLUG-LSR, Atlas), synthetic-query pipelines (InPars, Promptagator, GPL, UDAPDR and their LLM-scale successors), hard-negative mining, and distillation into rerankers and retrievers. It closes with a domain-adaptation playbook. Chapter 3 covers embedding-model loss functions and the Sentence Transformers tooling in detail. This chapter is about where the training signal comes from and which component it should update.
+The chapter starts with the evidence on the first-order question, "should knowledge go into the weights or into the index?". It then covers generator-side training (RAFT, RA-DIT, ChatQA), LM-supervised and RL-trained retrieval (REPLUG-LSR, Atlas, reader-to-retriever distillation, Search-R1, DeepRetrieval), synthetic-query pipelines (InPars, Promptagator, GPL, UDAPDR and their LLM-scale successors such as E5-Mistral, Gecko and Qwen3-Embedding), hard-negative mining, and distillation into rerankers and retrievers (MarginMSE, TAS-B, ColBERTv2, RankGPT, RankZephyr, Rank1). It closes with a domain-adaptation playbook. Chapter 3 covers embedding-model loss functions and the Sentence Transformers tooling in detail. This chapter is about where the training signal comes from and which component it should update.
 
 *Source note.* arXiv was not directly reachable while this chapter was researched. Papers were read in full text from public mirrors of the arXiv PDFs. They are cited by their canonical arXiv URLs. Where a fact comes only from a secondary summary, the text says so.
 
@@ -195,6 +195,34 @@ The open-source generator (`raft.py` in the Gorilla repository) automates this. 
 
 **Lessons.** Most of the gain comes from teaching the LM to use and ignore retrieved text. Retriever alignment adds a smaller increment, and it is cheap when restricted to the query tower. The repository releases the data-prep scripts and a DRAGON index of Wikipedia 2021 [4].
 
+### 17.2.3 ChatQA (NVIDIA, 2024): context-enhanced instruction tuning plus a tuned conversational retriever
+
+**Problem.** A model that has only had general instruction tuning can hold a conversation but answers poorly when it must ground answers in supplied context. This is worst in multi-turn RAG, where the latest user turn ("what about the second one?") is not a usable search query [39].
+
+**Architecture** [39]:
+
+```
+ Stage 1: general SFT (about 128K instruction + dialog samples)
+          -> conversational, but weak at context-grounded QA
+ Stage 2: context-enhanced instruction tuning on a blend of
+          - HumanAnnotatedConvQA (about 7k dialogues)
+          - SyntheticConvQA (about 7k dialogues from GPT-3.5-Turbo)
+          - single-turn context QA (DROP, NarrativeQA, ...)
+          - a slice of stage-1 data (to keep instruction following)
+          - about 1.5k turns annotated "unanswerable"
+ Retriever: dense retriever fine-tuned on multi-turn conversational QA,
+            taking dialogue history + current turn as the query
+```
+
+**Key techniques.**
+
+- **Unanswerable turns.** These teach the model to say "cannot find the answer in the context" rather than invent one. This is the generator-side counterpart to RAFT's distractor-only training examples [39][1].
+- **Tuned conversational retriever.** The authors report that it performs comparably to state-of-the-art LLM query-rewriting approaches while "substantially reducing deployment costs", because it removes the extra LLM call per turn [39].
+
+**Results.** The ChatQA-70B model is reported to outperform GPT-4 on several conversational QA datasets in the authors' ChatRAG Bench. The training data and benchmark were released [39]. ChatQA 2 moves to a Llama 3 base with 128K context and a three-stage recipe, adding long-context tuning [40].
+
+**Lesson.** Collapsing query rewriting into the retriever's weights is a latency optimisation that pays off when conversational traffic is high. The cost is that the retriever must be retrained whenever dialogue patterns shift.
+
 ---
 
 ## 17.3 LM-supervised retriever training: REPLUG-LSR and Atlas
@@ -238,6 +266,34 @@ There were no large systematic differences between the losses, so Atlas adopted 
 **Headline result.** Atlas reached over 42% on Natural Questions with 64 examples. It beat a 540B model by 3 points with 50x fewer parameters [11].
 
 **Lesson.** RA-DIT [3] and Atlas [11] both found query-side-only training to be the best trade-off when labelled data is scarce. That should be the default in production, where re-embedding a corpus of hundreds of millions of chunks is the dominant cost (see Chapters 3 and 4).
+
+### 17.3.3 Reader-to-retriever distillation (Izacard and Grave, ICLR 2021)
+
+Atlas's ADist loss comes from an earlier Meta paper [41]. It trains a retriever for open-domain QA *without* annotated query-passage pairs. A Fusion-in-Decoder reader is trained on (question, retrieved passages, answer). The reader's cross-attention mass over each passage is then used as a soft relevance label, and the retriever is trained to match it. Secondary summaries report that the reader and retriever were updated in alternating rounds, and that KL divergence between the normalised score distributions worked best among the losses tested [41]. This is the conceptual root of "the generator is the teacher": REPLUG-LSR, Atlas PDist and RA-DIT R-ft replace attention with likelihood, which also works for decoder-only and black-box LMs.
+
+### 17.3.4 Reinforcement learning on retrieval outcomes (2025)
+
+A newer line of work skips relevance labels and teacher scores entirely. It rewards a model for *retrieval outcomes* or *final-answer correctness*, with the search engine treated as part of the environment.
+
+**Search-R1 (UIUC et al., COLM 2025).** An LLM is trained with RL to interleave reasoning with self-generated search calls. Retrieved text is spliced into the rollout [42]. Two design choices matter:
+
+1. **Retrieved-token masking.** The policy-gradient loss is applied only to tokens the LLM generated, not to retrieved passages. The authors report that this stabilises training [42].
+2. **Outcome-only reward.** The reward is exact-match correctness of the final answer, with no process supervision [42].
+
+The reported relative gains over RAG baselines across seven QA datasets differ between paper versions. Later versions report about 24% for Qwen2.5-7B and about 20% for Qwen2.5-3B; an earlier version reported 41% for 7B [42]. Treat these as approximate.
+
+**DeepRetrieval (UIUC, 2025).** The model rewrites queries inside a `<think>`/`<answer>` format, and the reward is the retrieval metric itself (recall, nDCG, or SQL execution accuracy). It needs no labelled query-rewrite pairs [43]. Against *real* search engines, the v3 paper reports 65.07% recall for publication search (prior best 24.68%) and 63.18% for clinical-trial search (prior best 32.11%). The v1 preprint reported different figures with a 3B model [43].
+
+```
+  question --> policy LLM --(query)--> frozen search engine / retriever
+                   ^                           |
+                   |                       top-k docs
+                   |                           v
+             PPO / GRPO update <-- reward: answer EM (Search-R1)
+                                   or recall / nDCG (DeepRetrieval)
+```
+
+**Design implication.** These methods train the *query side* (the LLM that writes queries) and leave the index untouched, which is the same zero-re-index property that makes query-tower tuning attractive [11][3]. The risk is reward hacking against a specific engine. DeepRetrieval's own v3 title ("Hacking Real Search Engines...") hints that learned queries can be engine-specific and may not transfer when the backend changes [43]. Chapter 8 covers agentic search loops from the serving side.
 
 ---
 
@@ -346,10 +402,23 @@ The same idea now drives the frontier embedding models, at much larger scale:
 - **E5 (Microsoft, 2022).** Built 1.3B weakly paired texts (Reddit, Stack Exchange, Wikipedia, papers, Common Crawl). A *consistency-based filter* then kept a pair only if a model trained on the noisy data ranked it in the top 2 against 1M random passages. That left about 270M pairs [31].
 - **E5-Mistral (Microsoft, 2024).** A two-step prompt has GPT-4 (with about 25% GPT-3.5-Turbo) first brainstorm retrieval tasks, then write (query, positive, *hard negative*) triplets for each. The output was 500k examples across 150k instructions in 93 languages, using about 180M tokens. Mistral-7B was fine-tuned with LoRA (rank 16) for one epoch, under 1k steps. Training on synthetic data alone was competitive on BEIR and MTEB. Synthetic plus labelled data took first place on MTEB, 2.4 points above the previous best [32].
 - **Qwen3-Embedding (Alibaba, 2025).** About 150M synthetic pairs generated by Qwen3-32B for weak-supervision pre-training. Then about 12M filtered synthetic pairs plus about 7M labelled pairs for SFT, with false-negative masking, and finally checkpoint merging. In the 0.6B ablation, removing the synthetic stage dropped MMTEB from 64.33 to 61.21 [33] (also summarised in Chapter 3).
+- **Gecko (Google DeepMind, 2024).** A two-step LLM distillation. (1) A few-shot-prompted LLM reads a sampled web passage and writes a *task description* and a matching query. (2) A pre-trained embedder retrieves nearest-neighbour candidates for that query, and the same LLM *relabels* them, choosing a positive (often not the seed passage) and a hard negative. The resulting dataset is FRet. Training is pre-finetuning on web pairs, then fine-tuning on FRet mixed with academic sets (NQ, HotpotQA and others), with a Matryoshka loss. On MTEB, the 768-dimension model reported an average of 66.31, and the 256-dimension version beat all existing 768-dimension entries at the time [44]. The relabelling step is the important idea. It recognises that the passage a query was generated from is not always the *best* answer to that query, which is the same false-positive problem round-trip filtering tries to catch [16].
 - **Gemini Embedding (Google, 2025).** Gemini itself generates synthetic examples, filters bad training pairs and helps mine hard negatives [34].
 - **ReasonIR (Meta / UW et al., 2025).** Existing training sets pair short factual queries with documents that answer them directly, so retrievers do poorly on reasoning-heavy tasks. ReasonIR-Synthesizer writes a hard, reasoning-intensive query for each real seed document, plus varied-length query/document pairs. For each query it synthesises a "plausibly related but ultimately unhelpful" hard negative over several turns. The authors found that standard hard-negative mining does not work for such queries. ReasonIR-8B reached 24.4 nDCG@10 on BRIGHT with original queries, 29.9 with GPT-4-rewritten queries, and 36.9 with an LLM reranker. In RAG it improved MMLU by 6.4% and GPQA by 22.6% [35].
 
-### 17.4.6 Where synthetic queries fail
+### 17.4.6 Later refinements of the InPars family and enterprise practice (2025)
+
+- **InPars+ (2025).** This paper re-evaluates InPars, InPars-v2 and Promptagator on SciFact and adds two generator-side changes. The query generator is fine-tuned with Contrastive Preference Optimization, and the static prompts are replaced with DSPy-optimised prompts. The authors report that both changes reduce the need for aggressive post-hoc filtering while improving retrieval [45]. The direction is to move quality control *upstream*, into the generator, instead of generating ten times too many queries and discarding most of them.
+- **Small open generators.** A 2025 study of Promptagator-style training reports that open LLMs as small as about 3B parameters can serve as effective query generators. That removes the original dependency on a proprietary 137B model [46].
+- **Databricks (2025).** In a public write-up, Databricks fine-tuned `gte-large-en-v1.5` and `e5-mistral-7b-instruct` on *synthetic* queries generated over three enterprise corpora (FinanceBench, ManufactQA, Databricks DocsQA). It compared them with OpenAI `text-embedding-3-large` on Recall@10 and end-to-end RAG quality [47]. Reported findings [47]:
+  - Fine-tuning improved Recall@10 across datasets, often significantly.
+  - On FinanceBench the retrieval gain carried through to better RAG answers.
+  - Fine-tuned embedders were as good as or better than adding a reranker in many cases.
+  - The win was not universal: `text-embedding-3-large` still had slightly higher Recall@10 than every `gte` variant in at least one setting.
+  
+  Databricks' retrieval-quality guide points to this synthetic-data recipe but describes fine-tuning as a last resort, after cheaper fixes have been tried [48].
+
+### 17.4.7 Where synthetic queries fail
 
 - **Graded relevance.** Google researchers studied three e-commerce benchmarks with fine-grained relevance labels. They found that, "contrary to claims from prior works", QGen approaches fell short of conventional cross-domain transfer learning. QGen models could not tell relevance grades apart. Label-conditioned generation helped, but the generated queries were still not faithful to the intended label [21].
 - **Quantity versus quality.** Twelve times more E2E-generated QA pairs lost to fewer prompt-generated ones [6].
@@ -454,7 +523,8 @@ Distillation runs down a quality/latency ladder: LLM listwise ranker, then cross
 
 ### 17.6.1 Cross-encoder to retriever
 
-- **MarginMSE (GPL).** The student matches the cross-encoder's positive-negative score *difference*, not absolute scores. This also absorbs label noise (section 17.4.3) [17].
+- **MarginMSE (TU Wien, 2020).** Hofstätter et al. observed that different ranking architectures produce scores on incompatible scales. They therefore trained efficient students (TK, ColBERT, PreTT and a BERT dot-product bi-encoder) to match the *margin* between a teacher BERT cross-encoder's positive and negative scores, using MSE. In their MS MARCO ablation, Margin-MSE beat pointwise MSE and weighted RankNet for every student architecture. The authors released the teacher-score files, so later work could reuse the supervision without rerunning the teacher [49]. GPL later reused the same loss for unsupervised domain adaptation, where it also absorbs label noise (section 17.4.3) [17].
+- **TAS-Balanced (TU Wien, SIGIR 2021).** TAS-B makes distillation cheap. Training queries are clustered once, before training, and each batch draws its queries from a single topic cluster, so in-batch negatives are topically hard. Negatives are also balanced across margin levels. Supervision mixes a pairwise cross-encoder teacher with an in-batch ColBERT teacher. The 6-layer DistilBERT student is reported to train on a single consumer GPU in under 48 hours, against a common setup of 8 V100s, and it served TREC-DL queries at about 64 ms [50]. TAS-B checkpoints became a common base retriever for later domain-adaptation work.
 - **ColBERTv2 (Stanford, 2022).** For each training query, ColBERTv2 retrieves the top-k passages and scores them with a 22M-parameter MiniLM cross-encoder. It distils those scores with KL divergence, because ColBERT's sum-of-cosines scores have a restricted scale that does not align with cross-encoder logits. In-batch negatives are added per GPU. Residual compression then cuts the index 6-10x [26]. The paper credits "denoised supervision" for much of ColBERTv2's quality jump over ColBERT [26].
 - **BGE-M3 self-knowledge distillation.** The combined score of the dense, sparse and multi-vector heads acts as teacher for each single head [36] (see Chapter 3).
 
@@ -463,6 +533,8 @@ Distillation runs down a quality/latency ladder: LLM listwise ranker, then cross
 RankGPT showed that GPT-4 prompted to output a *permutation* of candidate passages beat supervised rerankers. It reranked the top 100 BM25 results with a sliding window of size 20 and step 10, and averaged +2.7 and +2.3 nDCG@10 over monoT5-3B on TREC and BEIR [27].
 
 To make that affordable, the authors sampled 10K MS MARCO queries, retrieved 20 BM25 candidates for each, and had ChatGPT rank them. A DeBERTa-large cross-encoder was trained on these permutations with RankNet loss, which yields M(M-1)/2 pairs per list. The resulting **435M-parameter student beat the 3B monoT5 by 1.67 nDCG@10 on BEIR**, with no human labels [27]. Castorini's RankLLM toolkit packages the open successors: listwise RankZephyr and RankVicuna, LiT5-Distill (a T5 listwise model that can rerank 100 documents in one pass), and FirstMistral (first-token logits only) [28].
+
+**RankZephyr (Waterloo, 2023)** shows the listwise version of the same recipe. A 7B Zephyr model was instruction-tuned to output permutations matching RankGPT-3.5 and then RankGPT-4 orderings of BM25 candidate lists. RankVicuna's training data came from RankGPT-3.5 reorderings over 100K MS MARCO training queries [51]. The authors report that RankZephyr closes most of the gap to GPT-4 and outperforms it on NovelEval, a set of queries and passages newer than the models' training data, which addresses contamination concerns [51]. The advantage is metric-dependent: the same paper reports Judged@10 2-4 points below RankGPT-4 [51].
 
 ### 17.6.3 Reasoning-trace distillation: Rank1 (JHU, 2025)
 
@@ -548,6 +620,12 @@ The pieces above combine into a standard pipeline. Steps marked (G) touch the ge
 | Rank1 [29][30] | JHU, 2025 | LLM reranker | R1 reasoning traces | 635K traces (reported) | 0.5B-32B SFT | reasoning reranking |
 | E5-Mistral [32] | Microsoft, 2024 | embedder | GPT-4 synthetic triplets | 500k synthetic + labelled | about 180M generated tokens; under 1k steps | MTEB first (+2.4) |
 | ReasonIR [35] | Meta/UW, 2025 | embedder | synthetic reasoning queries + synthetic negatives | seed docs | 8B model | BRIGHT 29.9 / 36.9 |
+| ChatQA [39] | NVIDIA, 2024 | generator + conversational retriever | two-stage SFT incl. unanswerable turns | about 7k human + 7k synthetic dialogues | 70B SFT | beats GPT-4 on several ConvQA sets (reported) |
+| MarginMSE [49] / TAS-B [50] | TU Wien, 2020-2021 | bi-encoder / late interaction | cross-encoder margin; topic-clustered batches | MS MARCO + teacher scores | 1 consumer GPU, under 48 h (TAS-B) | about 64 ms/query on TREC-DL |
+| Gecko [44] | Google DeepMind, 2024 | embedder | LLM-generated task + query, LLM-relabelled pos/neg | web passages | not disclosed | MTEB 66.31 (768-d) |
+| RankZephyr [51] | Waterloo, 2023 | 7B listwise reranker | GPT-3.5/4 permutation distillation | 100K MS MARCO queries (GPT-3.5 stage) | 7B SFT | beats GPT-4 on NovelEval |
+| Search-R1 [42] | UIUC et al., 2025 | generator's search policy | RL, answer-EM reward, retrieved-token masking | QA pairs only | RL rollouts with live search | about 20-24% relative over RAG |
+| DeepRetrieval [43] | UIUC, 2025 | query rewriter | RL, recall/nDCG reward | queries + engine | 3B-7B RL | 65.07% recall pub. search (v3) |
 | EntiGraph CPT [10] | Stanford, 2024 | generator weights | entity-graph synthetic corpus | 1.3M source tokens | 455M generated tokens | about 80% of RAG gain closed-book |
 
 ---
@@ -563,7 +641,9 @@ The pieces above combine into a standard pipeline. Steps marked (G) touch the ge
 7. **Synthetic-query quality depends on intent and filtering more than on generator size.** Task-specific few-shot prompts [16], reranker filtering [14] and round-trip consistency matter. One reported follow-up matched Promptagator with a 45x smaller generator [19]. Quality beats volume [6].
 8. **Know where synthetic queries break.** They struggle with graded relevance [21] and with reasoning-intensive queries, where synthesised hard negatives work better than mined ones [35]. Always evaluate on real user queries.
 9. **Let the generator supervise the retriever when the generator is fixed.** LSR-style KL objectives (REPLUG, RA-DIT, Atlas PDist) align retrieval with what actually helps the LM answer, and they work with black-box APIs that expose log-probabilities [12][3][11].
-10. **Budget for the hidden costs.** Corpus re-embedding (about 30% overhead during joint training [11]), teacher inference (cross-encoder or LLM passes over every candidate [14][27]) and synthetic-token bills (about 180M tokens for E5-Mistral [32]) are usually larger than the gradient steps themselves.
+10. **Consider training the query writer instead of the index.** RL on retrieval outcomes (DeepRetrieval) or answer correctness (Search-R1) improves retrieval with zero re-embedding [42][43]. Distilling conversational rewriting into the retriever (ChatQA) removes an LLM call per turn [39]. Guard against policies that overfit one search backend.
+11. **Relabel, don't just filter.** When an LLM generates a query from a passage, the source passage is not always the best positive. Gecko's LLM relabelling of retrieved neighbours [44] and InPars+'s generator-side optimisation [45] improve data quality more efficiently than discarding most generated queries.
+12. **Budget for the hidden costs.** Corpus re-embedding (about 30% overhead during joint training [11]), teacher inference (cross-encoder or LLM passes over every candidate [14][27]) and synthetic-token bills (about 180M tokens for E5-Mistral [32]) are usually larger than the gradient steps themselves.
 
 ---
 
@@ -609,3 +689,16 @@ The pieces above combine into a standard pipeline. Steps marked (G) touch the ge
 36. J. Chen et al. "BGE M3-Embedding: Multi-Lingual, Multi-Functionality, Multi-Granularity Text Embeddings Through Self-Knowledge Distillation." BAAI, 2024. https://arxiv.org/abs/2402.03216
 37. O. Weller et al. "Promptriever: Instruction-Trained Retrievers Can Be Prompted Like Language Models." 2024. https://arxiv.org/abs/2409.11136 (code: https://github.com/orionw/promptriever)
 38. T. Aarsen. "Training and Finetuning Embedding Models with Sentence Transformers v3." Hugging Face Blog, 2024. https://huggingface.co/blog/train-sentence-transformers
+39. Z. Liu, W. Ping, R. Roy, P. Xu, C. Lee, M. Shoeybi, B. Catanzaro. "ChatQA: Surpassing GPT-4 on Conversational QA and RAG." NVIDIA, NeurIPS 2024. https://arxiv.org/abs/2401.10225
+40. P. Xu, W. Ping, X. Wu, et al. "ChatQA 2: Bridging the Gap to Proprietary LLMs in Long Context and RAG Capabilities." NVIDIA, 2024. https://arxiv.org/abs/2407.14482
+41. G. Izacard, E. Grave. "Distilling Knowledge from Reader to Retriever for Question Answering." Meta / Inria, ICLR 2021. https://arxiv.org/abs/2012.04584
+42. B. Jin, H. Zeng, Z. Yue, et al. "Search-R1: Training LLMs to Reason and Leverage Search Engines with Reinforcement Learning." COLM 2025. https://arxiv.org/abs/2503.09516 (code: https://github.com/PeterGriffinJin/Search-R1)
+43. P. Jiang et al. "DeepRetrieval: Hacking Real Search Engines and Retrievers with Large Language Models via Reinforcement Learning." 2025. https://arxiv.org/abs/2503.00223 (code: https://github.com/pat-jj/DeepRetrieval)
+44. J. Lee, Z. Dai, X. Ren, et al. "Gecko: Versatile Text Embeddings Distilled from Large Language Models." Google DeepMind, 2024. https://arxiv.org/abs/2403.20327
+45. "InPars+: Supercharging Synthetic Data Generation for Information Retrieval Systems." 2025. https://arxiv.org/abs/2508.13930
+46. D. Gwon et al. "Study on LLMs for Promptagator-Style Dense Retriever Training." 2025. https://arxiv.org/abs/2510.02241
+47. V. Chen, J. Portes, et al. "Improving Retrieval and RAG with Embedding Model Finetuning." Databricks Blog, 2025. https://www.databricks.com/blog/improving-retrieval-and-rag-embedding-model-finetuning
+48. Databricks. "AI Search retrieval quality guide." Databricks documentation, 2025-2026. https://docs.databricks.com/gcp/en/ai-search/retrieval-quality
+49. S. Hofstätter, S. Althammer, M. Schröder, M. Sertkan, A. Hanbury. "Improving Efficient Neural Ranking Models with Cross-Architecture Knowledge Distillation" (Margin-MSE). TU Wien, 2020. https://arxiv.org/abs/2010.02666
+50. S. Hofstätter, S.-C. Lin, J.-H. Yang, J. Lin, A. Hanbury. "Efficiently Teaching an Effective Dense Retriever with Balanced Topic Aware Sampling" (TAS-B). TU Wien / Waterloo, SIGIR 2021. https://arxiv.org/abs/2104.06967
+51. R. Pradeep, S. Sharifymoghaddam, J. Lin. "RankZephyr: Effective and Robust Zero-Shot Listwise Reranking is a Breeze!" University of Waterloo, 2023. https://arxiv.org/abs/2312.02724
