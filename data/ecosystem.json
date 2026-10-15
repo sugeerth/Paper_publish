@@ -1,0 +1,177 @@
+{
+  "snapshot": "2026-08-08",
+  "window_start": "2025-08-08",
+  "ecosystems": [
+    {
+      "label": "Vega ecosystem",
+      "repositories": [
+        "vega",
+        "vega-lite",
+        "altair",
+        "mosaic",
+        "lyra",
+        "voyager",
+        "draco",
+        "falcon",
+        "arquero",
+        "ipyvega",
+        "vega-editor",
+        "vega-embed",
+        "vega-tooltip",
+        "vega-datasets"
+      ],
+      "human_commits": 26902,
+      "humans": 666,
+      "bus_factor_50": 3,
+      "bus_factor_80": 8,
+      "human_commits_12mo": 483,
+      "humans_12mo": 62,
+      "top_authors": [
+        {
+          "name": "dominik moritz",
+          "commits": 7620,
+          "share": 0.2832503159616385,
+          "repositories": 14
+        },
+        {
+          "name": "jeffrey heer",
+          "commits": 5230,
+          "share": 0.1944093375957178,
+          "repositories": 8
+        },
+        {
+          "name": "kanit wongsuphasawat",
+          "commits": 4833,
+          "share": 0.17965207047803136,
+          "repositories": 8
+        },
+        {
+          "name": "arvind satyanarayan",
+          "commits": 1825,
+          "share": 0.06783882239238719,
+          "repositories": 6
+        },
+        {
+          "name": "jake vanderplas",
+          "commits": 1342,
+          "share": 0.04988476693182663,
+          "repositories": 5
+        },
+        {
+          "name": "jonathan zong",
+          "commits": 390,
+          "share": 0.014497063415359453,
+          "repositories": 4
+        },
+        {
+          "name": "brian e. granger",
+          "commits": 237,
+          "share": 0.008809753921641513,
+          "repositories": 2
+        },
+        {
+          "name": "k. adam white",
+          "commits": 196,
+          "share": 0.007285703665155007,
+          "repositories": 3
+        },
+        {
+          "name": "dan redding",
+          "commits": 176,
+          "share": 0.006542264515649394,
+          "repositories": 4
+        },
+        {
+          "name": "haldenl",
+          "commits": 173,
+          "share": 0.0064307486432235526,
+          "repositories": 1
+        }
+      ]
+    },
+    {
+      "label": "D3 family",
+      "repositories": [
+        "d3",
+        "d3-array",
+        "d3-force",
+        "d3-geo",
+        "d3-hierarchy",
+        "d3-interpolate",
+        "d3-scale",
+        "d3-scale-chromatic",
+        "d3-selection",
+        "d3-shape",
+        "d3-transition"
+      ],
+      "human_commits": 7681,
+      "humans": 252,
+      "bus_factor_50": 1,
+      "bus_factor_80": 2,
+      "human_commits_12mo": 2,
+      "humans_12mo": 2,
+      "top_authors": [
+        {
+          "name": "mike bostock",
+          "commits": 5908,
+          "share": 0.7691706809009243,
+          "repositories": 11
+        },
+        {
+          "name": "jason davies",
+          "commits": 756,
+          "share": 0.09842468428590027,
+          "repositories": 2
+        },
+        {
+          "name": "philippe rivi\u00e8re",
+          "commits": 321,
+          "share": 0.04179143340710845,
+          "repositories": 11
+        },
+        {
+          "name": "chris uehlinger",
+          "commits": 51,
+          "share": 0.006639760447858352,
+          "repositories": 1
+        },
+        {
+          "name": "kristofer monisit",
+          "commits": 50,
+          "share": 0.006509569066527796,
+          "repositories": 1
+        },
+        {
+          "name": "noah",
+          "commits": 31,
+          "share": 0.004035932821247233,
+          "repositories": 1
+        },
+        {
+          "name": "fil",
+          "commits": 25,
+          "share": 0.003254784533263898,
+          "repositories": 1
+        },
+        {
+          "name": "daniel goldbach",
+          "commits": 24,
+          "share": 0.003124593151933342,
+          "repositories": 1
+        },
+        {
+          "name": "curran kelleher",
+          "commits": 22,
+          "share": 0.00286421038927223,
+          "repositories": 8
+        },
+        {
+          "name": "nathan vander wilt",
+          "commits": 11,
+          "share": 0.001432105194636115,
+          "repositories": 1
+        }
+      ]
+    }
+  ]
+}

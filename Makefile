@@ -1,28 +1,32 @@
-PAPER := paper/main
 LATEXMK := latexmk
 LATEXMKFLAGS := -pdf -interaction=nonstopmode -halt-on-error -file-line-error
 
-.PHONY: all paper figures data clean distclean watch
+.PHONY: all paper figures history schema clean distclean watch
 
 all: figures paper
 
-## Build the PDF (runs pdflatex/bibtex as many times as needed)
+## Build the PDF. Run from paper/ because latexmk's -outdir interacts badly
+## with the relative \input paths used for the generated figures.
 paper:
-	$(LATEXMK) $(LATEXMKFLAGS) -outdir=paper $(PAPER).tex
+	cd paper && $(LATEXMK) $(LATEXMKFLAGS) main.tex
 
-## Regenerate the figures from the collected repository metrics
-figures: data
+## Regenerate figures, the maintenance table, and paper/numbers.tex
+figures:
 	python3 scripts/make_figures.py
 
-## Refresh the raw repository metrics from the GitHub API
-data:
-	python3 scripts/collect_metrics.py
+## Re-mine the commit histories (clones into .cache/, needs network)
+history:
+	python3 scripts/analyze_history.py
+
+## Re-measure the Vega-Lite schema across its release tags
+schema:
+	python3 scripts/schema_growth.py
 
 watch:
-	$(LATEXMK) $(LATEXMKFLAGS) -outdir=paper -pvc $(PAPER).tex
+	cd paper && $(LATEXMK) $(LATEXMKFLAGS) -pvc main.tex
 
 clean:
-	$(LATEXMK) -c -outdir=paper $(PAPER).tex
+	cd paper && $(LATEXMK) -c main.tex
 
 distclean:
-	$(LATEXMK) -C -outdir=paper $(PAPER).tex
+	cd paper && $(LATEXMK) -C main.tex
