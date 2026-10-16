@@ -7,7 +7,7 @@
 > - **[Likely]**: an inference from the role, the level and UiPath's products: the agentic automation platform (agents, robots, humans), computer-use agents, Document Understanding and IXP, Communications Mining, Process Mining, Autopilot, Agent Builder and coded agents, Maestro orchestration and the AI Trust Layer. No candidate has reported it. A **[Likely] [n]** tag means the *premise* of the question (a product feature, an SDK behaviour, a benchmark rule) is confirmed by source [n]. It does not mean a candidate was asked it.
 > - Indented sub-bullets are follow-up probes an interviewer may use to push a strong first answer toward the principal bar.
 >
-> **Research limits (please read).** This review pass (October 2026) could not reach any candidate-report site. The shared web-search budget for the workflow was used up. The egress proxy refused connections to glassdoor.com, uipath.com, docs.uipath.com and arxiv.org (HTTP 403 by policy). GitHub raw content was reachable, so the review read UiPath's own public SDK repositories (documentation, samples and source) and the OSWorld repository. Those sources confirm product behaviour, not interview content. So **no question below is tagged [Reported]**, and this chapter does not invent reports. Product names such as Maestro, Agent Builder, Autopilot and IXP should still be checked against current UiPath documentation before the interview.
+> **Research limits (please read).** This review pass (October 2026) could not reach any candidate-report site. The shared web-search budget for the workflow was used up. The egress proxy refused connections to glassdoor.com, uipath.com, docs.uipath.com and arxiv.org (HTTP 403 by policy). GitHub raw content was reachable, so the review read UiPath's own public SDK repositories (documentation, samples and source) and the OSWorld repository. Those sources confirm product behaviour, not interview content. So **no question in sections A-L is tagged [Reported]**, and this chapter does not invent reports. A later deepening pass (see "Deepening pass (October 2026)" near the end) found a few candidate reports through search snippets and tags those questions [Reported]. Product names such as Maestro, Agent Builder, Autopilot and IXP should still be checked against current UiPath documentation before the interview.
 
 ## Format notes for this round
 
@@ -451,6 +451,57 @@
      - What is UiPath's durable advantage at each layer (orchestration, data, governance, models)?
 116. [Likely] How would you design a feedback flywheel from millions of robot and agent executions while respecting tenant data boundaries?
 
+## Deepening pass (October 2026): newly reported questions
+
+> **Source note.** This pass used five web searches. Direct page fetches were not attempted. Every [Reported] tag below rests only on what the search-result snippets said. The closest match to this role is one September 2026 candidate write-up for a UiPath Machine Learning Engineer role on the Agents team [24]. It describes a 15-minute LLM and agent fundamentals block in a one-hour phone round, followed by a coding problem. No snippet described a principal-level applied-science onsite design round, so treat these as signals about the topics the Agents team probes, not as the onsite prompt itself. Sources [25] and [28] are commercial prep guides, not first-hand reports. They are tagged [Reported] only where the definition at the top of this chapter allows it ("interview question bank").
+
+### Newly reported questions
+
+117. [Reported] [24] How does an LLM actually call a tool, end to end, from the tool schema in the prompt to the parsed call and the returned result?
+     - At principal level, how does this change when the platform hosts hundreds of tools (robots, APIs, MCP servers) behind one agent?
+118. [Reported] [24] How do you control the format of a model's tool calls so that downstream code can always parse them?
+     - When would you use constrained decoding or a JSON grammar, native function-calling APIs, or a validate-and-repair loop, and what does each cost in latency and quality?
+119. [Reported] [24] How do you make tool calling stable across runs, prompts and model versions?
+     - Which metrics would you track (wrong-tool rate, malformed-argument rate, unnecessary-call rate), and on what eval set?
+120. [Reported] [24] A model keeps calling tools incorrectly (wrong tool, wrong arguments, hallucinated tools). How do you diagnose and fix it?
+     - When is the fix a better tool description or schema, when is it few-shot examples or routing, and when is it fine-tuning?
+     - How would you build the training data for a tool-calling fine-tune from production traces?
+121. [Reported] [24] An agent's tool-calling loop runs too long or never ends. How do you detect and handle it?
+     - How do you tell legitimate long work apart from a loop that is making no progress?
+     - What should the agent hand back to the orchestrator or a human when you cut it off?
+122. [Reported] [24] [30] Explain transformer internals, beam search and LoRA as they relate to building agents.
+     - Why is beam search rarely used for tool-calling agents, and when would you use it?
+     - When is a LoRA adapter per customer or per tool family the right design, and how do you serve many of them?
+123. [Reported] [25] How would you design a RAG pipeline that minimises hallucinations in a document-processing workflow?
+     - How do you verify that every generated field or answer is supported by a retrieved passage?
+124. [Reported] [25] How would you compare embedding models for retrieval over long technical documents?
+     - What offline eval would you build, and how would you account for chunking and context length?
+125. [Reported] [25] Design a multi-agent system and explain the trade-offs between non-deterministic AI and enterprise reliability.
+126. [Reported] [26] What is the time complexity of matrix multiplication, and how would you parallelise it across GPUs? (Reported for a Research Scientist loop in London, 2025.)
+     - How does this bear on the latency and cost of serving the models behind an agent?
+127. [Reported] [27] The hiring manager gives you a real problem from the team. Design the system end to end, covering the gateway, queues and storage, and justify SQL versus NoSQL. (Reported for an engineering loop in Cluj-Napoca. Expect the same "real team problem" format to be applied to agentic workloads.)
+     - For an agent-run store (traces, checkpoints, case state), which data goes in which store, and why?
+128. [Reported] [28] How does an AI agent plan, call tools and recover when a step fails, and how do you get DAG-style execution, state persistence and idempotent retries around it?
+
+### Gap-closing questions for the principal bar
+
+129. [Likely] [29] UiPath's agent guidance says the model picks a tool from its name, description and the context in the system prompt, and infers arguments from the input schema. Design an automated "tool description linter and optimiser" that finds descriptions likely to cause wrong tool choice or wrong arguments, before an agent ships.
+     - How do you measure that a rewritten description helped without overfitting to the eval set?
+130. [Likely] [29] Coded functions can now be exposed as deterministic agent tools. Design how the platform decides, per tool call, whether to let the LLM compute something itself or to force a deterministic tool, and how you measure the effect on errors.
+131. [Likely] How would you design the agent's context management for a 60-step task whose tool outputs exceed the context window (summarisation, eviction, scratchpads, retrieval over the run's own history)?
+     - How do you evaluate whether compression dropped a fact the agent later needed?
+132. [Likely] Design an offline reinforcement-learning or preference-tuning programme that improves tool-calling agents from enterprise traces, with human corrections as reward signals.
+     - How do you handle reward hacking and the bias of corrections that only cover escalated cases?
+133. [Likely] How would you set and enforce a latency SLO (for example, p95 under 30 seconds) for a conversational agent that calls several robots and APIs in sequence?
+     - Which calls can run in parallel or speculatively, and what is the risk of doing so?
+134. [Likely] Design a red-teaming programme for agents before release: who runs it, which attack classes (indirect prompt injection, tool abuse, data exfiltration, privilege escalation), and what makes a finding block the release?
+135. [Likely] An enterprise customer reports that an agent took a wrong, costly action last week. Walk through the incident review: what you reconstruct from traces, how you assign root cause between model, prompt, tool, data and process design, and what you change platform-wide.
+136. [Likely] How would you write the technical strategy document that convinces product and engineering leadership to invest in a UiPath-trained computer-use or tool-calling model rather than relying on frontier APIs?
+     - What evidence would you gather in the first 90 days, and what would make you abandon the bet?
+137. [Likely] How do you mentor and set the scientific bar for a team of applied scientists shipping agent features on a product cadence (experiment design, eval rigor, negative results)?
+138. [Likely] Design the benchmark that measures agent progress across UiPath's product lines quarter over quarter, so leadership can compare agent, robot and human performance on the same processes.
+     - How do you keep it stable while the products and customer mix change?
+
 ## References
 
 Sources 1-22 were fetched and read in this review pass (October 2026) as raw GitHub content. They confirm product and benchmark facts used in question premises. None of them is a candidate interview report.
@@ -478,3 +529,10 @@ Sources 1-22 were fetched and read in this review pass (October 2026) as raw Git
 21. XLANG Lab. "OSWorld" README (OSWorld-Verified release of 2025-07-28; maintainer-run verified leaderboard). GitHub. https://raw.githubusercontent.com/xlang-ai/OSWorld/main/README.md
 22. XLANG Lab. "OSWorld evaluation_examples" README (task schema with execution-based evaluators). GitHub. https://raw.githubusercontent.com/xlang-ai/OSWorld/main/evaluation_examples/README.md
 23. UiPath Documentation portal (official product documentation for Document Understanding, IXP, Communications Mining, Process Mining, Agents and Maestro). Not reachable in this pass (egress policy); listed as the place to check product names. https://docs.uipath.com
+24. PracHub. "UiPath Machine Learning Engineer Interview Experience: LLM Agent Q&A, a LeetCode 837 Variant, and a Coding Reject" (candidate report, September 2026; Agents team MLE; recruiter, hiring manager and phone rounds). Seen via search snippet only. https://prachub.com/interview-experiences/uipath-machine-learning-engineer-interview-experience-llm-agent-qanda-a-leetcode-837-variant-and-a-coding-reject
+25. Dataford. "UiPath AI Engineer interview guide" (commercial prep guide with sample questions; not a first-hand report). Seen via search snippet only. https://dataford.io/interview-guides/uipath/ai-engineer
+26. Glassdoor. UiPath interview review, Research Scientist, London, April 2025 (candidate report). Seen via search snippet only. https://www.glassdoor.co.nz/Interview/UiPath-Interview-E1102519-RVW98010961.htm
+27. Glassdoor. UiPath interview review, Cluj-Napoca (candidate report; hiring-manager system design round). Seen via search snippet only. https://static.glassdoor.com.au/Interview/UiPath-Interview-E1102519-RVW104635339.htm
+28. techinterview.org. "UiPath Interview Guide (2026): RPA and Automation Engineering" (prep guide; not a first-hand report). Seen via search snippet only. https://www.techinterview.org/companies/uipath-interview-guide/
+29. UiPath Documentation. "Building effective agent tools" (tool selection from name, description and context; argument inference from the input schema). Seen via search snippet only. https://docs.uipath.com/agents/automation-cloud/latest/user-guide/building-effective-agent-tools
+30. 1point3acres. "UiPath Machine Learning Engineering Phone Screen Interview Experience" (candidate report; transformer basics, behavioural and coding). Seen via search snippet only. https://www.1point3acres.com/interview/thread/1140358

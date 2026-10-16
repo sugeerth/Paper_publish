@@ -235,6 +235,55 @@ Tag legend:
 
 ---
 
+## Deepening pass (October 2026): newly reported questions
+
+> Method: five web searches, read only through search-result titles and excerpts, because direct page fetches were blocked. The excerpts confirmed several items already in this chapter: the 5-round loop (breadth, depth, team-specific design, coding, BR) in a Seattle June 2026 report, string compression, bias-variance, bagging vs boosting, attention, BERT vs GPT, DPO vs RLHF, and an LP-only bar raiser. Those were not repeated here. Where an excerpt did not show which Glassdoor locale page a report came from, the reference lists every candidate URL the search returned and says so.
+
+### Newly reported
+
+102. (Technical screen, LLM team, Santa Clara, Mar 2025) Implement beam search decoding for an LLM. The candidate reports having to code it in the screen. [Reported] [44]
+     - How does beam width trade off quality, diversity and latency?
+     - How does beam search compare with greedy, top-k and nucleus sampling?
+103. (Phone screen, Bellevue, Apr 2025) Define precision, recall and AUC-ROC, and explain perplexity. [Reported] [45]
+     - When would you prefer PR-AUC over ROC-AUC?
+     - Why is perplexity a poor proxy for downstream task quality?
+104. (Coding, Palo Alto, Jan 2025) Write a traversal of a binary tree. [Reported] [45]
+     - Can you do it iteratively, and what is the space cost?
+105. (AGI team loops, Apr-Jun 2026) Questions on modern LLM training techniques. [Reported] [45]
+     - How do pretraining, SFT and preference optimization differ in data and objective?
+     - How would you diagnose a loss spike or divergence in a large training run?
+106. (Coding, Santa Monica, Feb 2026) Two easy LeetCode problems plus an ML-coding task in the same loop. [Reported] [45]
+107. (Data science + system design round, Hyderabad, Apr 2026) Design an end-to-end multimodal translation pipeline. [Reported] [46]
+     - Which components would you cascade, and which would you train end to end?
+     - How would you evaluate translation quality offline and online?
+108. (Design rounds, new-grad AS loop ending in an L4 offer, Aug 2025) Design a spam detection system, and design a fraud detection system. [Reported] [47]
+     - How do you handle adversarial drift and delayed labels?
+     - How do you choose the operating threshold when false positives have a customer cost?
+109. (L5 technical phone screen) Answer basic statistics concept questions alongside coding and LP questions. [Reported] [48]
+     - What does a p-value mean, and what does it not mean?
+
+### Gap-closing likely questions
+
+110. Your offline AUC went up but the online A/B test is flat. Walk me through how you would debug it. [Likely]
+     - Which kinds of leakage or train/serve skew would you check first?
+111. How would you evaluate an LLM-based feature when there is no ground truth? [Likely]
+     - When do you trust LLM-as-judge, and how do you calibrate it against human labels?
+112. Fine-tuning, RAG or prompting: how would you choose for a team-specific task? [Likely]
+     - What would the cost and latency budget change?
+113. How would you size an A/B test for a small expected lift, and how would you deal with network effects or interference between buyers and sellers? [Likely]
+114. Explain the core ideas of LoRA or other parameter-efficient fine-tuning, and when they fail. [Likely]
+115. Implement self-attention or a softmax cross-entropy loss in numpy, with numerical stability. [Likely]
+     - How would you add a causal mask?
+116. Design a search-ranking or relevance model for a product catalog with sparse, biased click feedback. [Likely]
+     - How do you correct for position bias?
+117. Tell me about a time you wrote a science document (a six-pager, PR/FAQ or design doc) that changed a decision. [Likely]
+     - What did reviewers push back on?
+118. Tell me about a time you chose a simpler model over a better-scoring one for reasons of cost, latency or maintainability (Frugality / Invent and Simplify). [Likely]
+119. Tell me about a time you had to deliver a science result to a non-technical leader who wanted a yes/no answer (Earn Trust / Are Right, A Lot). [Likely]
+     - How did you communicate uncertainty?
+
+---
+
 ## References
 
 1. Applied Scientist Interview Prep, amazon.jobs (Amazon, official). https://amazon.jobs/content/en/how-we-hire/applied-scientist-interview-prep
@@ -280,3 +329,8 @@ Tag legend:
 41. "Mastering the Amazon Bar Raiser Interview", 4 Day Week. https://4dayweek.io/interview-process/amazon-bar-raiser
 42. "The Amazon Bar Raiser Interview: Who They Are and What They Ask", BarRaiser AI. https://barraiserai.com/guides/amazon-bar-raiser-interview
 43. "Applied scientist interview at Amazon Ads", Blind. https://www.teamblind.com/post/applied-scientist-interview-at-amazon-ads-zoerec5t
+44. Amazon interview review RVW96068026 (Applied Scientist II, Santa Clara, Mar 2025, LLM team), Glassdoor (locale mirrors .hk/.it/.com.br). It was the top match for the "beam search" + "Santa Clara" query, but the excerpt-to-page mapping was inferred from search results, not read directly. https://www.glassdoor.com.hk/Interview/Amazon-Interview-E6036-RVW96068026.htm
+45. Amazon Applied Scientist interview reviews (2025-2026: Bellevue Apr 2025, Palo Alto Jan 2025, Santa Monica Feb 2026, AGI team Apr-Jun 2026), Glassdoor. The search excerpts did not show which review sits at which URL. Candidate pages: https://www.glassdoor.sg/Interview/Amazon-Interview-E6036-RVW99133644.htm ; https://www.glassdoor.com.hk/Interview/Amazon-Interview-E6036-RVW97801473.htm ; https://www.glassdoor.de/Vorstellungsgespräch/Amazon-Vorstellungsgespräch-E6036-RVW103552813.htm ; https://www.glassdoor.fr/Entretien/Amazon-Entretien-E6036-RVW100110012.htm ; https://www.glassdoor.fr/Entretien/Amazon-Entretien-E6036-RVW98904176.htm
+46. Amazon Applied Scientist II interview review (Hyderabad, Apr 2026), Glassdoor. The excerpt-to-URL mapping is uncertain. Candidate pages: https://www.glassdoor.fr/Entretien/Amazon-Entretien-E6036-RVW96903377.htm ; https://www.glassdoor.es/Entrevista/Amazon-Entrevista-E6036-RVW65272345.htm
+47. "Amazon New Grad Applied Scientist interview experience: five virtual onsite rounds, mostly behavioral, end in an L4 offer", PracHub, Aug 2025. https://prachub.com/interview-experiences/amazon-new-grad-applied-scientist-interview-experience-five-virtual-onsite-rounds-mostly-behavioral-end-in-an-l4-offer
+48. "Amazon L5 Applied Scientist Fulltime Tech Phone Screen Overview", 1point3acres. https://www.1point3acres.com/interview/thread/1170176

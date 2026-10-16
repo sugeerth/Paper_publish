@@ -44,7 +44,7 @@ Tag legend: **[Reported]** means a cited source attributes the question, or a cl
    - How do you split the work into candidate generation, ranking and re-ranking?
    - How do you trade relevance against diversity and novelty on one page of widgets?
    - How do you avoid a feedback loop that only recommends already-popular products?
-8. Design an agentic recommendation system for Amazon, covering component architecture, model choices, and quality and safety evaluation. [Reported] [6]
+8. Design an agentic recommendation system for Amazon, covering component architecture, model choices, and quality and safety evaluation. [Reported] [6][36]
    - Which decisions should the LLM agent make, and which belong to a classical ranker?
    - How do you evaluate multi-turn recommendation quality before an A/B test?
    - How do you stop the agent from recommending unsafe, unavailable or irrelevant products?
@@ -199,7 +199,7 @@ Tag legend: **[Reported]** means a cited source attributes the question, or a cl
 64. Evaluate an LLM agent with metrics beyond accuracy, such as tool-use correctness, hallucination and calibration. [Reported] [3]
     - How do you build an offline evaluation set for multi-step agent tasks?
     - When would you trust an LLM-as-judge?
-65. Design a GitHub Copilot-style coding agent (reported in a Senior AS loop, Boston). [Reported] [3]
+65. Design a GitHub Copilot-style coding agent (reported in a Senior AS loop, Boston, April 2025). [Reported] [3][37]
     - What context does the agent retrieve, and how do you rank it?
     - How do you measure whether it helps developers (acceptance rate versus downstream bugs)?
 66. On an LLM team, discuss LLM decoding and training choices in the context of an Amazon use case. [Reported] [22]
@@ -208,7 +208,7 @@ Tag legend: **[Reported]** means a cited source attributes the question, or a cl
     - How do you ground answers in product facts and avoid hallucinated specs?
     - How do you evaluate it offline before an A/B test, and what is the online success metric?
     - How do you mix organic and sponsored products in a generative answer?
-68. How would you summarize thousands of customer reviews into a short "Customers say" blurb? [Likely]
+68. How would you summarize thousands of customer reviews into a short "Customers say" blurb? [Reported] [35] (a 2023 Luxembourg "Science Application" prompt to summarize product reviews by key concepts)
     - How do you measure faithfulness and coverage of minority opinions?
     - How do you stop manipulated reviews from steering the summary?
 69. Design an Alexa skill or intent router that maps an utterance to the right skill or API (natural-language understanding). [Likely]
@@ -257,6 +257,41 @@ Tag legend: **[Reported]** means a cited source attributes the question, or a cl
 94. (Alexa International) Design a multilingual natural-language-understanding model for a marketplace with code-switching (for example Hinglish). [Likely] (see [10][17])
 95. (Ads Trust) Design a policy-violation detection system for ads with an annotation budget of 5,000 labels per month. [Likely] (see [9])
 
+## Deepening pass (October 2026): newly reported questions
+
+> Method: 5 web searches (October 2026). Page fetches were still blocked, so every tag below rests on search-result titles and extracts only. These are anonymous self-reports. Other recent extracts describe loops with "2 ml design" rounds whose questions were "more related to day to day ml implementations" [35]. In that report, the ML system design round also probed the ML architectures on the candidate's resume.
+
+96. Design an end-to-end ML pipeline that translates a set of multimodal objects (for example, product listings with text and images) into another language. (Applied Scientist II, Hyderabad; asked as the system design part of a data-science round) [Reported] [33]
+    - What is the unit of translation: each field separately, or the whole multimodal object?
+    - How would you use the image to disambiguate the text?
+    - How do you evaluate translation quality when there are no reference translations for most marketplaces?
+    - Where do human translators sit in the loop, and how do their edits feed back into training?
+97. Design an ML system for Alexa from scratch. Cover the dataset, the task definition, your model choice and why, and the evaluation metrics. (Applied Scientist II, business-style ML design round, Aug 2024) [Reported] [34]
+    - How do you turn a vague business goal into one or more well-defined ML tasks?
+    - How would you justify your model choice against a simpler baseline?
+    - Which offline metrics would you use, and which online metric decides the launch?
+98. Pick a model architecture from your resume. How would you redesign it for this team's problem at Amazon scale? [Likely] (resume-architecture probes in design rounds reported in [35])
+    - Which assumptions from your original setting no longer hold?
+99. Design an anomaly-detection system for business metrics (for example, sudden drops in sales or traffic for a category or marketplace). [Likely]
+    - How do you separate real anomalies from seasonality, holidays and promotions?
+    - How do you keep alert fatigue low for the on-call team?
+100. Design a seller-facing ML product (for example, listing-quality suggestions or price recommendations for third-party sellers). [Likely]
+    - How do you measure success when the seller, not the end customer, takes the action?
+101. Design a multi-objective ranker that balances short-term conversion against long-term customer value (repeat purchases, Prime retention). [Likely]
+    - How do you estimate long-term effects within a two-week experiment (surrogate metrics, holdbacks)?
+102. Design a contextual-bandit system for widget or creative selection on a page. How does it differ from a supervised ranker? [Likely]
+    - How do you evaluate a new policy offline from logged data (inverse propensity scoring, doubly robust estimators)?
+103. Design a system that uses an LLM to generate training labels (for example, query-product relevance) at scale. [Likely]
+    - How do you measure and correct the LLM labeler's bias against a gold human set?
+    - When does training on LLM labels hurt the downstream model?
+104. Design a review-moderation or toxicity system that works across many languages and marketplaces. [Likely]
+    - How do you set thresholds per marketplace when label distributions differ?
+105. Design a model that predicts customer churn from Prime and targets retention offers. [Likely]
+    - Why is uplift, not churn probability, the right target for the offer decision?
+106. You join a team where the production model has no documented evaluation. In your first month, how do you assess it and decide what to build next? [Likely] (Dive Deep, Ownership)
+107. Design an image-generation feature for advertisers' sponsored creatives (for example, lifestyle backgrounds for product photos). [Likely]
+    - How do you evaluate brand safety, product fidelity and advertiser-perceived quality?
+
 ---
 
 ## References
@@ -293,3 +328,8 @@ Tag legend: **[Reported]** means a cited source attributes the question, or a cl
 30. 2027 Applied Science Internship: Recommender Systems / Information Retrieval (Job ID 10564598), amazon.jobs. https://www.amazon.jobs/en/jobs/10564598/2027-applied-science-internship-recommender-systems-information-retrieval-machine-learning-united-states-phd-student-science-recruiting
 31. "What do I need for cold weather golf?" (Amazon Rufus), IEEE Spectrum. https://spectrum.ieee.org/amazon-rufus
 32. "Amazon Rufus AI assistant personalized shopping features", About Amazon. https://aboutamazon.com/news/retail/amazon-rufus-ai-assistant-personalized-shopping-features
+33. Amazon interview review RVW95352756 (Applied Scientist II, Hyderabad; multimodal translation pipeline design), Glassdoor (French-Canadian mirror), search-result extract, 2025-2026. https://fr.glassdoor.ca/Entretien/Amazon-Entretien-E6036-RVW95352756.htm
+34. r/leetcode post, Aug 27 2024 (Applied Scientist 2; "design an ML system for Alexa from scratch"), Reddit via a redlib mirror, search-result extract. https://redlib.hbubli.cc/r/leetcode/s/PljCbbdntj
+35. Amazon interview review RVW99133644 (review-summarization "Science Application" prompt, Luxembourg 2023; loop with 2 ML design rounds), Glassdoor Singapore, search-result extract. https://www.glassdoor.sg/Interview/Amazon-Interview-E6036-RVW99133644.htm
+36. Amazon interview review RVW102987402 (Seattle, May 2026; agentic recommendation system design), Glassdoor, search-result extract. https://www.glassdoor.ie/Interview/Amazon-Interview-E6036-RVW102987402.htm
+37. Amazon interview review RVW102577344 (Senior Applied Scientist, Boston, April 2025; GitHub Copilot agent design), Glassdoor New Zealand, search-result extract. https://www.glassdoor.co.nz/Interview/Amazon-Interview-E6036-RVW102577344.htm

@@ -141,7 +141,7 @@
 50. Implement dropout (inverted dropout) for training and inference. [Likely]
 51. Implement the batch normalization forward pass with running statistics, and explain or implement the backward pass. [Likely] (batch norm was reported in breadth)
     - How does it behave differently at train and inference time?
-52. Implement a 2D convolution (single channel, then multi-channel) with stride and padding, using loops and then im2col. [Likely] (vision teams; convolution and receptive fields were reported in breadth [41])
+52. Implement a 2D convolution (single channel, then multi-channel) with stride and padding, using loops and then im2col. [Reported] [46] (a reply in a Blind AS loop thread gives "a convolutional layer in a CNN" as an example of the applied ML coding some teams ask for; convolution and receptive fields were also reported in breadth [41])
 53. Implement a single LSTM or GRU cell forward step in matrix form. [Likely] (LSTM math and recurrent shapes in matrix form were reported in breadth [26][32])
     - How does backpropagation through time work, and where do vanishing gradients come from?
 54. Build a minimal scalar autograd engine (a Value class with +, *, tanh and backward via topological sort). [Likely]
@@ -268,6 +268,45 @@
 - **Do not neglect:** data-manipulation and ML-flavored DSA coding (97-109), including the batching DP (103). It shows up in screens and loops where the interviewer is a scientist, not an SDE.
 - **Time management:** practice each core primitive so it fits in 15 minutes, because long LP answers squeeze the coding time [40][41].
 
+## Deepening pass (October 2026): newly reported questions
+
+> Method: five web searches (Blind, Reddit, LeetCode Discuss, 1point3acres, Prepfully/interviewing.io and Chinese "面经" phrasing). Only search-result titles and extracts were available. An item is tagged [Reported] only where the extract could be tied to a single result URL; several other extracts (a February 2025 Berlin k-means report, a mid-2025 "easy probability-related coding question" phone screen, a "connected components" medium coding question, a Blind loop with an "NLP coding round" asking for a tokenizer class) could not be tied to one URL, so the matching items below are tagged [Likely]. Item 52 was retagged [Reported] in place [46].
+
+### Newly reported
+
+118. In an AS II coding round (one round inside a loop of ML breadth, ML depth, team-specific system design, coding and Bar Raiser), solve a string-compression problem. [Reported] [29] (Seattle AS II report; DSA rather than ML coding)
+     - What does your function return when the compressed string is not shorter than the input?
+     - Can you do it in place, in O(1) extra space?
+119. Write a small simulation in code (for example, simulate a random process and estimate a quantity from it) as the "applied" variant of the ML coding round. [Reported] [46] (Blind reply listing "a simulation" alongside from-scratch ML and a CNN convolutional layer; bar described as LeetCode medium)
+     - How many simulation runs do you need for a given precision, and how do you report the uncertainty?
+     - How do you seed it so the result is reproducible?
+120. In a Senior Applied Scientist technical screen, after ML breadth questions (p-values, overfitting, imbalanced data, gradient descent), solve a graph coding question. [Reported] [47] (PracHub, December 2025; the candidate did not finish and still passed, crediting clear narration of the approach)
+     - Which traversal (BFS, DFS, topological sort) fits, and why?
+     - If you run out of time, how do you show the interviewer the rest of the solution?
+
+### Gap-closing [Likely] questions
+
+121. Implement a tokenizer class: normalization, splitting on whitespace and punctuation, building a vocabulary with a frequency cutoff, and encode/decode with an unknown-token id. [Likely] (an unattributed Blind extract described an "NLP coding round" asking for a tokenizer class)
+     - How do you handle out-of-vocabulary words, casing and Unicode normalization?
+     - How would you extend it to subword units (see item 68)?
+122. Estimate a probability by Monte Carlo (for example, the chance that two of k shoppers pick the same item from n, or the expected number of rolls until a target), then compare with the closed form. [Likely] (an unattributed 2025 extract described an "easy probability-related coding question" in an AS phone screen)
+     - How does the standard error shrink with the number of samples?
+123. Group products into connected components from a list of "same item" pairs, using union-find with path compression, then BFS. [Likely] (an unattributed extract reported a medium "connected components" coding question)
+     - What is the amortized complexity of union-find, and how would you do this on a billion edges?
+124. Merge overlapping time intervals (for example, user sessions or delivery windows) and return the total covered time and the busiest moment. [Likely] (the k-means sighting in [39] is paired with "interval/frequency tasks")
+125. Implement a linear SVM trained with the hinge loss by subgradient descent (Pegasos-style), with L2 regularization. [Likely] (SVM appeared in an AS II breadth report [38])
+     - Why is the hinge loss not differentiable at the margin, and what does the subgradient do there?
+126. Implement simple exponential smoothing and Holt's linear trend method for a weekly demand series, and produce a k-step forecast. [Likely] (supply-chain forecasting teams; complements items 19 and 105)
+     - How would you pick the smoothing parameters without leaking future data?
+127. Implement CUPED variance reduction for an A/B test: given pre-period and in-experiment metrics per user, compute theta and the adjusted metric, and compare variances. [Likely] (A/B testing reported in breadth and screens [40])
+     - What happens when the pre-period covariate is missing for new users?
+128. Compute the population stability index (PSI) and the KL divergence between a training and a serving feature distribution, with binning and a small epsilon for empty bins. [Likely] (model-monitoring follow-up common in science-application rounds)
+     - Which threshold would you alert on, and why are both metrics sensitive to the binning?
+129. Write a collate function that pads a batch of variable-length token sequences, builds the attention mask and the label mask (ignore index), and sorts or buckets by length. [Likely] (LLM teams; pairs with the batching DP in item 103)
+     - How does padding side (left versus right) matter for decoder-only generation?
+130. Implement a streaming quantile estimator (for example, a fixed-bin histogram or reservoir-based P50/P90/P99) for model latency or score monitoring, and merge sketches from two hosts. [Likely] (follow-up pattern to items 40 and 102)
+     - What is the error bound of your estimator, and how does memory grow?
+
 ## References
 
 1. Applied Scientist Interview Prep, amazon.jobs (Amazon, official), accessed 2026. https://amazon.jobs/content/en/how-we-hire/applied-scientist-interview-prep
@@ -315,3 +354,5 @@
 43. "AI Companies Interview Questions", Amazon AGI section ("Debug a broken Transformer implementation", "Build/train a small classifier live", "Reinforcement learning fundamentals + coding"), ombharatiya/FAANG-Coding-Interview-Questions, GitHub (aggregator; underlying reports not individually named), 2026; fetched and read October 2026. https://github.com/ombharatiya/FAANG-Coding-Interview-Questions/blob/main/AI-Companies-Interview-Questions.md
 44. amazon-science/muss, "MUSS: Multilevel Subset Selection for Relevance and Diversity" (UAI 2026), GitHub (team context for item 27); fetched and read October 2026. https://github.com/amazon-science/muss
 45. amazon-science/mxfp4-llm, "Training LLMs with MXFP4" (AISTATS 2025), GitHub (team context for item 58); fetched and read October 2026. https://github.com/amazon-science/mxfp4-llm
+46. "Amazon applied scientist loop", Blind (reply: some teams test DSA, others ask you to code simple ML or ML processes from scratch, or something more applied such as a simulation or a convolutional layer in a CNN; coding bar LC medium); seen as a search-result extract October 2026, page not fetched. https://www.teamblind.com/post/amazon-applied-scientist-loop-odlzgrp3
+47. "Amazon Senior Applied Scientist Interview Experience — Passed the Tech Screen Despite an Unfinished Graph Question", PracHub, December 2025 (ML breadth: p-values, overfitting, imbalanced data, gradient descent; then a graph coding question); seen as a search-result extract October 2026, page not fetched. https://prachub.com/interview-experiences/amazon-senior-applied-scientist-interview-experience-passed-the-tech-screen-despite-an-unfinished-graph-question

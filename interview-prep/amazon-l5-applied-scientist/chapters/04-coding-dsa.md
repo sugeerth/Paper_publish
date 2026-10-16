@@ -245,6 +245,43 @@
 100. [Reported] Return the top k slowest requests from a set of logs. This was reported at Amazon (role not stated). [14]
 101. [Likely] Given a log of (user_id, session_start, session_end), compute each user's total active time, merging overlapping sessions.
 
+## Deepening pass (October 2026): newly reported questions
+
+> This pass used five web searches, and only the search-result extracts could be read. Most hits were Glassdoor AS reviews that confirm questions already in the chapter: number of islands in a 2026 LLM-focused AS loop, string compression in a 2026 AS II loop, and median from a data stream. They add no new questions. A December 2025 Senior AS tech screen on PracHub involved a graph problem the candidate did not finish, but the extract does not name the problem [56]. The three new reported items below come from an Amazon **L5 virtual onsite** coding report. The role is most likely SDE, not AS, but AS coding interviewers are often SDEs.
+
+102. [Reported] Generate all subsets of a set of distinct integers (power set). Reported in an Amazon L5 virtual onsite (USA, remote; role not stated as AS). [55]
+    - How would you change it if the input contains duplicates?
+    - Can you write both the backtracking and the bitmask versions, and give the complexity of each?
+103. [Reported] Convert a sorted array to a height-balanced binary search tree, then answer follow-ups on tree traversals. Reported in an Amazon L5 virtual onsite (role not stated as AS). [55]
+    - How would you do the same for a sorted linked list without converting it to an array?
+    - Can you write the in-order traversal iteratively, and explain why it returns the original array?
+104. [Reported] Given birth and death years for a list of people, find the earliest year with the maximum population. Reported in an Amazon L5 virtual onsite (role not stated as AS). [55]
+    - Can you do it with a difference array or sweep line instead of checking every year?
+    - What changes if the year range is very large and the list is sparse?
+
+### Gap-closing [Likely] questions
+
+105. [Likely] Compute the dot product of two very sparse vectors, such as TF-IDF or one-hot feature vectors.
+    - Which representation would you choose when one vector is much sparser than the other?
+106. [Likely] Multiply two sparse matrices, for example a user-item matrix by an item-embedding matrix.
+    - How does the cost depend on the number of non-zeros instead of the matrix dimensions?
+107. [Likely] Intersect k sorted posting lists of document IDs from a product-search inverted index.
+    - When would you use galloping (exponential) search instead of a linear merge?
+108. [Likely] Given a list of candidate feature names, return all combinations of size k whose total cost stays within a budget (a combination-sum or backtracking variant).
+    - How do you prune the search early?
+109. [Likely] Find the longest common subsequence of two users' browsing sessions, given as sequences of product IDs.
+    - How would you reconstruct the subsequence itself?
+110. [Likely] Given each employee's busy intervals, return the common free time across all employees.
+    - How does a heap over the per-employee lists compare with flattening and sorting everything?
+111. [Likely] Find the kth smallest value in an n x n matrix whose rows and columns are sorted, such as a matrix of pairwise scores.
+    - Can you compare the heap approach with binary search on the value range?
+112. [Likely] Implement a binary min-heap from scratch with push, pop and decrease-key.
+    - Why does decrease-key need a position index, and how does that help Dijkstra?
+113. [Likely] In an array where every element appears three times except one, find the single element in O(n) time and O(1) extra space.
+    - How would you generalize it to "every element appears k times"?
+114. [Likely] Given a metric time series, flag every index whose value is more than three standard deviations from the rolling mean of the previous w points, in O(n) overall.
+    - How do you keep the rolling variance numerically stable?
+
 ## References
 
 1. Applied Scientist Interview Prep, amazon.jobs (official). https://amazon.jobs/content/en/how-we-hire/applied-scientist-interview-prep
@@ -301,3 +338,5 @@
 52. Amazon new grad Applied Scientist interview experience: five virtual onsite rounds, L4 offer, PracHub (2025). https://prachub.com/interview-experiences/amazon-new-grad-applied-scientist-interview-experience-five-virtual-onsite-rounds-mostly-behavioral-end-in-an-l4-offer
 53. Glassdoor review RVW74547087, Amazon (Luxembourg, 2022; implementing Dijkstra). https://www.glassdoor.com.au/Interview/Amazon-Interview-E6036-RVW74547087.htm
 54. The 2026 Amazon Senior Applied Scientist Interview Guide, Interview Kickstart. https://interviewkickstart.com/interview-questions/companies/amazon/senior-applied-scientist
+55. Amazon | L5 | Virtual Onsite - Coding questions | USA (remote), LeetCode Discuss (subsets, sorted array to BST, maximum population year, meeting rooms II variant; role not stated, likely SDE); read from search extract only. https://leetcode.com/discuss/interview-question/1921047/amazon-l5-virtual-onsite-coding-questions-usa-remote
+56. Amazon Senior Applied Scientist Interview Experience: Passed the Tech Screen Despite an Unfinished Graph Question, PracHub (December 2025); read from search extract only. https://prachub.com/interview-experiences/amazon-senior-applied-scientist-interview-experience-passed-the-tech-screen-despite-an-unfinished-graph-question

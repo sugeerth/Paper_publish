@@ -42,7 +42,7 @@
 7. List-of-list (2D) iterator with `hasNext`, `next` and a `remove` that may be called once per `next` (LeetCode: Flatten 2D Vector; reported Oct 2025 as "Flatten 2D Array With Remove"). [Reported] [3][5][7][8]
    - What should `remove` do when it is called twice, or before `next`?
    - How would you make the iterator lazy over a very large nested input?
-8. Flatten Nested List Iterator. [Reported] [5][6]
+8. Flatten Nested List Iterator. [Reported] [5][6][86]
 9. Cheapest flights / minimum cost with at most K stops. Return both the cost **and** the route. [Reported] [5][7][27]
    - If the route must be returned, which algorithms still work?
    - How would you handle ties, or a cycle of zero-cost edges?
@@ -85,13 +85,13 @@
 
 ### B. Practical problems reported in 2025-2026 (current question bank)
 
-32. Split stay: given listings with lists of available day numbers and a date range, return every pair of listings [X, Y] where X covers a prefix of the range and Y covers the rest (one split only). [Reported] [3][18][19][20]
+32. Split stay: given listings with lists of available day numbers and a date range, return every pair of listings [X, Y] where X covers a prefix of the range and Y covers the rest (one split only). [Reported] [3][18][19][20][87][88]
     - Your O(N^2 * D) solution works. The interviewer says something better exists. Where is the redundant work?
     - What if a split stay may use up to three listings?
     - How do you deduplicate symmetric pairs, and must the order be preserved?
     - Must the first listing cover a contiguous prefix and the second a contiguous suffix, or is plain set coverage enough? (The two readings give different answers on the reported example.) [Reported] [59]
     - One candidate wrote brute force with `combinations` and earned extra credit for a bitmask encoding of availability. How would you use one? [Reported] [59]
-33. Group lodging / select properties: for a target neighborhood and group size, choose properties with total capacity >= group size, minimizing the number of properties and then the total capacity. Return the IDs, or -1 or [] if impossible. [Reported] [4][21][41]
+33. Group lodging / select properties: for a target neighborhood and group size, choose properties with total capacity >= group size, minimizing the number of properties and then the total capacity. Return the IDs, or -1 or [] if impossible. [Reported] [4][21][41][86]
     - Which tie-break do you confirm first: fewer properties or less wasted capacity? [Reported] [21]
     - Is this subset-sum-like DP or backtracking, and what is the worst-case cost?
 34. Minimum-cost menu order: given single items and combos with prices plus a list of wanted items (at most 3 unique), return the lowest cost **and** the items to order. [Reported] [1][16][22][23]
@@ -122,7 +122,7 @@
 43. Refund allocation: given payments (method, date, amount) and existing refunds, allocate a new refund in full to one payment before the next. Prioritize by method (CREDIT, then CREDIT_CARD, then PAYPAL), and within a method by most recent payment. [Reported] [2][3][42]
     - How do earlier partial refunds change the remaining refundable amount per payment?
     - How do you design the data structures when the interviewer gives only examples? [Reported] [42]
-44. URL query parser: parse `?k=v&...` into a map. Duplicate keys become lists, a bare key means true, and percent-encoded separators (%26, %3D) are decoded *after* splitting. [Reported] [2][3][26]
+44. URL query parser: parse `?k=v&...` into a map. Duplicate keys become lists, a bare key means true, and percent-encoded separators (%26, %3D) are decoded *after* splitting. [Reported] [2][3][26][86]
     - In a typed language, how do you return values that may be a string or a list?
     - Variant: a valueless key maps to an empty string rather than true. Which spec detail do you confirm first? [Reported] [2]
 45. Ski tournament: in a DAG of checkpoints with point values and edge travel times, find the path from start to any end node that maximizes points minus time, and print the path. [Reported] [3][17][42]
@@ -139,9 +139,9 @@
 49. Build the smallest number from a list of digits (leading zeros dropped). Part 2: the smallest permutation that is >= a lower bound. [Reported] [2][30][55][64]
 50. Intersection of two linked lists where either list may contain a cycle (four structural cases). [Reported] [2][3][5]
 51. Multi-stream round-robin iterator: read bytes from several character streams in round-robin order with `has_next` and `next`. [Reported] [2][37]
-52. Calculate board score: for every cell, add the length of the same-character run going right and going down. R and C go up to 2000. [Reported] [3][53]
+52. Calculate board score: for every cell, add the length of the same-character run going right and going down. R and C go up to 2000. [Reported] [3][53][83] (Also reported as the problem in a full-time Airbnb ML tech phone screen [83].)
 53. Run-length encoding of an int array. Follow-ups: arithmetic-sequence RLE, and an iterator-based decoder for each encoding. [Reported] [25]
-54. Sum tree: leaves hold numbers and parents hold the sum of their children. Return any node's value, then support mutations (leaf to subtree, subtree to leaf) while keeping reads correct. [Reported] [29]
+54. Sum tree: leaves hold numbers and parents hold the sum of their children. Return any node's value, then support mutations (leaf to subtree, subtree to leaf) while keeping reads correct. [Reported] [29][86]
 55. Payment data store: `insert(ts, value, id)`, `get(id)` and `getValueInRange(start, end)`. [Reported] [33]
 56. Keyword tagging in reviews: wrap keywords as `[tag]{keyword}` case-insensitively. Overlapping matches go to the longer keyword. [Reported] [3][10]
 57. Replace text in a review using a replacement dictionary. [Reported] [3][10]
@@ -192,7 +192,7 @@
     - Memoized DFS or processing cells in height order: which is easier to test in 45 minutes?
 91. Accommodation allocation: requests and segments each have a start and an end, and segments cannot overlap. Return the maximum number of fulfilled requests and the allocation itself. [Reported] [66]
     - The reporter passed with brute force. When does the input size force something better?
-92. Wallet class: create a wallet, deposit, withdraw and check the balance, with one wallet per user. A withdrawal that would overdraw must fail and leave the balance unchanged. No `main` or test harness is provided, so you write it. [Reported] [70]
+92. Wallet class: create a wallet, deposit, withdraw and check the balance, with one wallet per user. A withdrawal that would overdraw must fail and leave the balance unchanged. No `main` or test harness is provided, so you write it. [Reported] [70] (A Senior+ team-match phone screen also asked the candidate to design an Airbnb wallet [87][88].)
     - Which invariants would you assert after every operation?
 93. Single-source distances in a weighted undirected graph (phone-screen problem-solving part). [Reported] [64]
     - The reporter proposed topological sort. Why does that not work here, and what does?
@@ -268,6 +268,46 @@ None of these were reported for Airbnb. They follow the same practical, "make it
 134. Your code fails one hidden test. How do you debug it in the remaining five minutes? [Likely] [17][34]
 135. A new requirement arrives, such as returning the path instead of the cost, or k columns instead of one. How much of your code has to change? [Reported] [3][4][27]
 136. If this ran in production behind an API endpoint, what would you validate, log or cache? [Likely] [18]
+
+## Deepening pass (October 2026): newly reported questions
+
+Searches in this pass were limited to result titles and snippets; 1point3acres thread bodies, PracHub question pages and Glassdoor reviews were not opened. Where two PracHub posts appeared in the same result set and the snippet did not say which one carried a detail, both are cited. Existing questions retagged or newly corroborated in place: 8, 32, 33, 44, 52 (now also reported for an ML phone screen), 54 and 92.
+
+137. ML tech phone screen (45 min): a graph problem solved with DFS and connected components. [Reported] [84]
+    - Is the graph given as an edge list, an adjacency map or a grid, and does it fit in memory?
+    - Would recursive DFS overflow the stack on the largest input, and when would you switch to iterative DFS or union-find?
+    - What follow-up would change the answer, for example edges arriving as a stream or edges being deleted?
+138. ML/DS tech phone screen: a Python data-processing segment alongside project discussion, causal inference, A/B testing and model evaluation questions. [Reported] [85]
+    - Given raw event rows, how do you dedupe, sessionize and aggregate them per user without loading everything into memory?
+    - How do you validate that your transformation did not silently drop or double-count users?
+139. Count the ways a positive integer N can be written as a sum of consecutive positive integers (LC 829 style; listed in a 2026 Airbnb question bank, dated April 2026). [Reported] [86]
+    - Why does brute force over start points fail for N up to 1e9, and what bound on the run length do you use?
+    - How do you return the actual sequences, not just the count?
+140. Implement an encoding that turns a collection of strings into one string and decodes it back (reported in a June 2025 San Francisco loop for a data scientist role). [Reported] [89]
+    - How does your encoding survive strings containing the delimiter, empty strings and non-ASCII text?
+    - Which round-trip tests prove the decoder is correct?
+
+### Additional [Likely] questions closing gaps for a senior MLE with experimentation scope
+
+141. Implement logistic regression trained with mini-batch SGD and L2 regularization in plain NumPy, then verify it against a known solution on a toy dataset. [Likely]
+    - How do you make the loss numerically stable for large logits?
+142. Write a function that returns the per-arm sample size needed to detect a given relative lift on a conversion metric at a given alpha and power. [Likely]
+    - How does the answer change for a ratio metric or for a two-sided versus one-sided test?
+143. Implement delta-method variance for a ratio metric (for example bookings per search with user-level randomization) and compare it with the bootstrap from question 122. [Likely]
+144. Implement Benjamini-Hochberg correction across a list of metric p-values from one experiment and return which metrics remain significant. [Likely]
+    - When would you prefer Bonferroni or a pre-declared primary metric instead?
+145. Implement a time-based train/validation split for booking events that prevents label leakage when features use lookback windows. [Likely]
+    - How do you test that no feature value was computed with information from after the label timestamp?
+146. Merge top-k candidate lists from several retrieval sources (each with its own score scale) into a single deduplicated top-k list. [Likely]
+    - How do you normalize scores across sources, and how do you break ties deterministically?
+147. Implement an LRU cache with per-entry TTL for an online feature store lookup, with `get`, `put` and expiry. [Likely]
+    - How would you make it safe under concurrent readers and writers?
+148. Given listing availability as sorted, possibly overlapping blocked intervals, support `is_available(listing, check_in, check_out)` and `block(listing, start, end)` efficiently. [Likely]
+    - Are dates half-open nights, and how does that change your boundary tests?
+149. Join an exposure stream with a conversion stream where conversions can arrive late, attributing each conversion to the first exposure within a 7-day window. [Likely]
+    - How do you bound state, and what happens to conversions that arrive after the window closes?
+150. Implement a heterogeneous-treatment-effect breakdown: compute the treatment effect and confidence interval per segment from experiment logs, flagging segments too small to trust. [Likely]
+    - Why is picking the best segment after the fact a multiple-comparisons problem?
 
 ## References
 
@@ -353,3 +393,10 @@ None of these were reported for Airbnb. They follow the same practical, "make it
 80. "Resolve Battles" (Diplomacy) problem statement. FlowSight/coding. https://github.com/FlowSight/coding/blob/main/company%20wise/airbnb/1p3a/Resolve%20Battles/qs.md
 81. "file_creation" problem statement with the `watch` follow-up. FlowSight/coding. https://github.com/FlowSight/coding/blob/main/company%20wise/airbnb/1p3a/file_creation/qs.md
 82. 1p3a post #11: senior IC loop; task scheduling and get/set/getSum coding rounds. https://github.com/FlowSight/coding/blob/main/company%20wise/airbnb/1p3a/11.md
+83. "Airbnb Fulltime Machine Learning Tech Phone Screen Experience" (board score calculation problem; search snippet only). 1point3acres. https://www.1point3acres.com/interview/thread/1168518
+84. "airbnb Machine Learning Tech Phone Screen Review" (45-minute graph problem using DFS and connected components; search snippet only). 1point3acres. https://www.1point3acres.com/interview/thread/1169233
+85. "Airbnb Machine Learning Data Science Interview Experience - Tech Phone Screen" (Python data processing, causal inference, A/B testing, model evaluation; search snippet only). 1point3acres. https://www.1point3acres.com/interview/thread/1124986
+86. "Airbnb Interview Questions" (PracHub question bank, 2026; snippets list Flatten a Nested Integer List and Count Consecutive Positive Integer Sums dated April 2026, Parse Query Parameters Into a Map dated March 2026, mutable sum-tree and minimal property set in neighborhood; the exact listing page was not identified). https://prachub.com/companies/airbnb
+87. "Airbnb Senior+ Software Engineer Interview Experience - Passed Every Round, Then the Role Was Filled". PracHub. https://prachub.com/interview-experiences/airbnb-seniorplus-software-engineer-interview-experience-passed-every-round-then-the-role-was-filled
+88. "Airbnb Senior+ Software Engineer Interview Experience - A Whiteboard OOD Screen With a Difficult Interviewer". PracHub. https://prachub.com/interview-experiences/airbnb-seniorplus-software-engineer-interview-experience-a-whiteboard-ood-screen-with-a-difficult-interviewer
+89. Glassdoor review RVW38727859 (data scientist, San Francisco, June 2025; string-collection encoding question; search snippet only). https://www.glassdoor.com.br/Entrevista/Airbnb-Entrevista-E391850-RVW38727859.htm

@@ -268,6 +268,37 @@
 95. How is the AI-assisted coding round scored: on the final product, or on how I direct and check the tool? [Likely]
 96. What separates Senior from Staff MLE here? [Likely]
 
+## Deepening pass (October 2026): newly reported questions
+
+> **Result of this pass.** Five targeted web searches (English and Chinese, covering Glassdoor, Blind, 1point3acres and PracHub) found no new Cresta question that a candidate reported, beyond those already in this chapter. The only new Cresta-specific excerpt is that PracHub tags its Cresta questions for both Machine Learning Engineer and Software Engineer roles [39]. That supports the existing PracHub-sourced items (questions 1 and 33-34), but the excerpt does not name any new prompt. A third-party prep guide also describes an ML deep-dive or paper-discussion stage. It reads as a generic template, so this pass does not cite it as a Cresta report. The questions below are therefore all [Likely]. They cover gaps for the senior level that sections A-J leave open.
+
+97. Write pseudocode for a ReAct-style agent loop that alternates reasoning and tool calls for a customer-service task, with a step limit and a fallback to a human. [Likely]
+    - How do you detect that the loop is stuck or repeating the same tool call?
+    - Where would you add structured-output validation for tool arguments?
+98. A new enterprise customer signs and wants a working intent or outcome model in two weeks, with almost no labels. How do you cold-start it? [Likely]
+    - Zero-shot LLM labels, active learning, or transfer from other tenants' models: which, in what order?
+    - How do you decide when the model is good enough to switch on in production?
+99. Your third-party LLM provider has an outage or a latency spike during peak call hours. Design the fallback path for real-time features. [Likely]
+    - Which features degrade gracefully, and which must fail closed?
+    - How do you test the fallback before you need it?
+100. Design per-customer cost controls for LLM features: token budgets, model routing by difficulty, and caching. [Likely]
+     - How do you route a request to a cheaper model without hurting quality on hard cases?
+     - What cost per conversation would make a feature unprofitable, and how would you show that to leadership?
+101. Design the expansion of an English-first voice agent and Agent Assist stack to Spanish and to code-switched calls. [Likely]
+     - How do you evaluate quality in a language that no one on the team speaks?
+     - Where do ASR errors and translation errors compound?
+102. Design end-to-end evaluation for a voice agent at the audio level: simulated callers with speech, noise and interruptions, not just text transcripts. [Likely]
+     - Which failures appear only with audio (barge-in, end-of-turn errors, misheard account numbers)?
+     - How do you score latency and naturalness alongside task success?
+103. Design versioning and staged rollout for per-tenant agent configurations (prompts, tools, knowledge sources), so that one customer's change can never break another's. [Likely]
+     - How do you diff two configuration versions in terms of behavior, not just text?
+104. Design memory for an AI agent that serves the same customer across several calls and channels. [Likely]
+     - What do you store, for how long, and how do you respect deletion requests?
+     - How do you stop stale memory from overriding the facts in the current conversation?
+105. You are asked to review another engineer's design doc for a new LLM feature. What do you look for first, and how do you push back on a weak evaluation plan? [Likely]
+106. What would you do differently from today's practice if you had to cut the latency of a real-time suggestion feature in half within one quarter? [Likely]
+     - How would you find the biggest contributor before changing anything?
+
 ## References
 
 1. Glassdoor, "Cresta (CA) Interview Questions" (Senior Machine Learning Engineer loop with vibe-coding and system design rounds; FDE reviews; CoderPad and Zoom Python round; rate limiter), 2024-2026. https://www.glassdoor.co.in/Interview/Cresta-CA-Interview-Questions-E3180909.htm
@@ -308,5 +339,6 @@
 36. Cresta Blog, "How Fine-Tuned LLMs Power Knowledge Assist, Summarization and Chat Suggestions", 2024. https://cresta.com/blog/how-fine-tuned-llms-power-knowledge-assist-summarization-and-chat-suggestions
 37. Fireworks AI Blog, "Story: Cresta Knowledge Assist", 2024. https://www.fireworks.ai/blog/story-cresta-knowledge-assist
 38. Fireworks AI Blog, "Multi-LoRA", 2024. https://fireworks.ai/blog/multi-lora
+39. PracHub, "Cresta Machine Learning Engineer Interview Questions" (position page; the excerpt says its Cresta questions are tagged for Machine Learning Engineer and Software Engineer roles), 2026. https://prachub.com/companies/cresta/positions/machine-learning-engineer
 
 *Removed in review:* the 1point3acres thread 1173094 (no search excerpt in this bank supported it; replaced by the company page, ref 7); the Blind company-posts page and the Scoutify guide (neither was cited, and Scoutify is a generic template).

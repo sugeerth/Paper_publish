@@ -271,6 +271,46 @@ These are not standalone questions. Expect a few of them after each story. [Like
 - How long ago was this? Do you have a more recent example?
 - What would have happened if you had not acted?
 
+## Deepening pass (October 2026): newly reported questions
+
+Method: five web searches (Blind/Reddit, 1point3acres/Chinese "面经", LeetCode Discuss, Glassdoor, vendor guides). Direct page fetches remained blocked, so everything below rests on search-engine excerpts only. Several Glassdoor excerpts did not state the role; those items are marked "role unstated" and should be treated as Amazon-wide LP prompts, not AS-specific ones. Where a summary did not tie a quote cleanly to one review page, the citation names the review page that dominated that result set.
+
+Format signals from this pass (not questions):
+- Recent reports (Seattle 2025 and London 2024 science-track loops per the search summaries; Vancouver April 2025 explicitly AS) again describe a Bar Raiser round made up only of LP questions, with about 2 LP questions inside each other round [24][25][26].
+- An AS II candidate (2026) said behavioral content took "maybe half the time or more" of each round and that interviewers pushed for specifics on their direct involvement [27].
+- A 2025-grad Blind timeline describes a loop containing a separate "Gen AI Fluency" round alongside a Bar Raiser round (role not AS-specific) [28].
+
+### Newly reported
+
+111. Tell me about a difficult conversation you had with your manager. [Reported] [27] (AS II behavioral phone screen, Luxembourg, asked in STAR format)
+     - What did you say first, and how did your manager react?
+     - What changed in your working relationship afterwards?
+112. Tell me about a time you had to compromise your standards in order to achieve a goal. [Reported] [29] (Amazon, role unstated; filed under Insist on the Highest Standards / Earn Trust)
+     - Which standard did you relax, and who did you tell that you were relaxing it?
+     - Would you make the same compromise today?
+113. Tell me about a time you had a plan for what to propose to a customer, and changed your approach after a deep dive with that customer. [Reported] [29] (Amazon, role unstated; Dive Deep / Customer Obsession)
+     - What did the deep dive show that your original plan had missed?
+     - How did you explain the change of plan to your own team?
+114. What feedback has your manager given you, and what did you do with it? [Reported] [25] (a candidate summary says many LP questions come back to the "feedback" part, for example feedback from your manager; this adds an AS source to Q58 and Q101)
+     - Give me an example where you disagreed with that feedback.
+
+### Gap-closing [Likely] questions for the L5 AS bar
+
+115. Tell me how you use generative-AI tools (coding assistants, LLM APIs) in your own day-to-day science work, and a time one led you astray. [Likely] (prompted by the reported "Gen AI Fluency" round [28])
+     - How did you verify the output before you relied on it?
+116. Tell me about a time you wrote a science document (a design doc, PR/FAQ or 6-pager) that changed a decision. [Likely]
+     - What was the strongest objection in the review, and how did you answer it?
+117. Tell me about a time you had to explain why an experiment showed no significant effect, and what you recommended next. [Likely] (Are Right, A Lot / Earn Trust)
+118. Tell me about a time you killed or deprioritized your own project because the data said it would not pay off. [Likely] (Ownership / Frugality)
+     - How long did it take you to admit it, and what did you salvage?
+119. Tell me about a time you had to reproduce or productionize research code written by someone else, and found it did not hold up. [Likely] (Dive Deep / Insist on the Highest Standards)
+120. Tell me about a time you worked across time zones or with a remote partner team to land a launch. [Likely] (Deliver Results / Earn Trust)
+121. Tell me about a time you had to choose between publishing a result and keeping it in-house or shipping it first. [Likely] (Think Big / Success and Scale)
+122. Tell me about a time an LLM-based or generative feature you worked on produced harmful, biased or wrong output for customers. What did you do? [Likely] (Success and Scale Bring Broad Responsibility)
+     - What guardrail or evaluation did you add afterwards?
+123. Tell me about a time you balanced a research-quality goal against an operational metric such as latency, cost or on-call load. [Likely] (Frugality / Customer Obsession)
+124. Tell me about a time you onboarded quickly to a team or codebase and delivered within your first few months. [Likely] (Learn and Be Curious / Deliver Results)
+
 ---
 
 ## References
@@ -297,3 +337,9 @@ These are not standalone questions. Expect a few of them after each story. [Like
 21. "interview_ds.md": Amazon AS/DS interview reports reposted from 1point3acres (AS loop with 30+ min LP per round and a "pure LP" BR; AWS AS phone screen tight-deadline BQ; "went above and beyond" BQs; fresh-PhD LP prompts), GitHub (goldin2008/Note). https://github.com/goldin2008/Note/blob/HEAD/interview_ds.md
 22. "interview_bq_ans.md": a candidate's compiled list of frequently asked Amazon LP questions, mapped to LPs, with recruiter advice on story reuse, GitHub (goldin2008/Note). https://github.com/goldin2008/Note/blob/HEAD/interview_bq_ans.md
 23. "Amazon Applied Scientist L5 Offer Eval", Blind, 2025. https://www.teamblind.com/post/amazon-applied-scientist-l5-offer-eval-c03bg14s
+24. Amazon interview review (Seattle, 2025: phone screen, LeetCode medium, six-round virtual onsite with an LP-only Bar Raiser), Glassdoor (search excerpt only). https://www.glassdoor.sg/Interview/Amazon-Interview-E6036-RVW99133644.htm
+25. Amazon Applied Scientist interview review (Vancouver, April 2025: Bar Raiser "heavy on examples for the leadership principles"), Glassdoor France (search excerpt only). https://www.glassdoor.fr/Entretien/Amazon-Entretien-E6036-RVW97603690.htm
+26. Amazon interview review (London, July 2024, referral: Bar Raiser round fully behavioral/LP, about 2 LP questions in each other round), Glassdoor Netherlands (search excerpt only). https://static.glassdoor.nl/Interview/Amazon-Interview-E6036-RVW99272421.htm
+27. Amazon Applied Scientist II interview review (Luxembourg STAR behavioral screen, "difficult conversation with a manager"; "half the time or more" behavioral), Glassdoor (search excerpt only; attribution to this review page inferred from the result set). https://www.glassdoor.com.ar/Entrevista/Amazon-Entrevista-E6036-RVW96627863.htm
+28. "Amazon interview experience timeline: almost a 1 year process (2025 grad)", Blind (search excerpt only). https://www.teamblind.com/post/amazon-interview-experience-timeline-almost-a-1-year-process-2025-grad-0fbl4cvy
+29. Amazon interview review ("compromise your standards to achieve a goal"; "changed the approach after deep dive with customer"; role unstated), Glassdoor (search excerpt only). https://www.glassdoor.co.uk/Interview/Amazon-Interview-E6036-RVW25065841.htm

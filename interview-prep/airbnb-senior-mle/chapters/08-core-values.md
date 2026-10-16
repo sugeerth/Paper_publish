@@ -197,6 +197,34 @@ Preparation signals from sources: prepare one or two stories per value, includin
 105. What do you need from a manager to do your best work? [Likely]
 106. What kind of team culture do you create when you are the most senior IC in the room? [Likely]
 
+## Deepening pass (October 2026): newly reported questions
+
+Five web searches were run for this pass (English and Chinese phrasing; Blind, Reddit, LeetCode Discuss, 1point3acres, PracHub and prep-guide sites). No search snippet quoted a specific core-values question that a candidate said they were asked, so **no new [Reported] questions** and no retags of existing [Likely] items were possible. The searches did add these format signals:
+
+- A 1point3acres thread is titled "Airbnb Senior MLE Core Value Interview Experience and Timeline". Its indexed summary says it covers focus areas, communication tips, how the round affects the result, and the post-interview timeline. The question text was not visible [22]. This confirms that a dedicated core-values round exists for the Senior MLE track.
+- A Blind thread on the core values round says it is not about technical expertise and that examples can come from work or personal life. Repliers suggested reading the values and watching the CEO's interviews, with an emphasis on how you help others [23].
+- A Blind SWE write-up reports passing the Core Values round and then entering team match. This fits the "values gate before team match" order in the format table [24].
+- Prep guides (not candidate reports) say the values interviewer usually has not seen your resume, and that one or two values rounds may be run by trained employees outside the hiring team [25][26].
+
+### Additional [Likely] questions closing gaps for Senior MLE
+
+107. What was the most difficult decision you have made, at work or in life, and how did you make it? [Likely] [25]
+     - What did you give up, and would you decide the same way today?
+108. Tell me about a time something did not go as planned and you had to rebuild the plan with the team. [Likely] [25]
+     - How did you keep morale and trust while you replanned?
+109. Tell me about a time you protected guests or hosts from harm, such as fraud, safety issues or a privacy risk, even though it slowed a launch. [Likely]
+     - How did you weigh false positives that hurt legitimate hosts?
+110. When have you pushed back on using personal or sensitive data in a model, and how did you resolve it? [Likely]
+111. Airbnb is adding AI and LLM features to support and trip planning. How would you make sure an AI feature feels like being hosted rather than being handled? [Likely]
+     - Tell me about a time automation made a user experience worse, and what you did.
+112. Tell me about a time you helped build a more diverse or inclusive team, for example through interviewing, hiring or mentoring. [Likely]
+     - How do you check your own bias as an interviewer?
+113. How do you build connection and belonging on a team that is mostly remote or spread across time zones? [Likely]
+114. Tell me about a time you tried to persuade people and failed. What did you learn about influence? [Likely]
+115. Tell me about a time you put your team's or company's goals ahead of your own project or credit. [Likely]
+     - How did you feel about it, and how did others notice?
+116. Which of Airbnb's four values is hardest for you personally, and when did you fall short of it? [Likely]
+
 ## References
 
 All URLs below were fetched or downloaded for this chapter, except where noted. The 1p3a mirror posts are English translations or original Chinese posts reposted on GitHub. The original 1point3acres threads were not reachable.
@@ -222,3 +250,8 @@ All URLs below were fetched or downloaded for this chapter, except where noted. 
 19. 1p3a post #84 (senior backend; project discussion on milestones, quality and user benefit after deployment, redesign). FlowSight/coding, GitHub. https://github.com/FlowSight/coding/blob/main/company%20wise/airbnb/1p3a/84.md
 20. 1p3a post #13 (HM round on current scope and TL versus IC expectations; deep dive challenged long-term plan, metrics and technical challenge). FlowSight/coding, GitHub. https://github.com/FlowSight/coding/blob/main/company%20wise/airbnb/1p3a/13.md
 21. 1p3a post #29 (Senior; HM interview with behavioral questions on the most interesting project). FlowSight/coding, GitHub. https://github.com/FlowSight/coding/blob/main/company%20wise/airbnb/1p3a/29.md
+22. "Airbnb Senior MLE Core Value Interview Experience and Timeline" (thread title and search-indexed summary only; question text not visible). 1point3acres, accessed via web search October 2026. https://www.1point3acres.com/interview/thread/1127994
+23. "Airbnb Core Values interview" (Blind thread; search snippet only). Blind, accessed via web search October 2026. https://www.teamblind.com/post/Airbnb-Core-Values-interview-KvNUPJbB
+24. "Airbnb SWE interview breakdown: the DP questions they asked, how I passed" (passed Core Values round, then team match; search snippet only). Blind, accessed via web search October 2026. https://www.teamblind.com/post/airbnb-swe-interview-breakdown-the-dp-questions-they-asked-how-i-passed-stpegz67
+25. "Airbnb interview process and top questions" (prep guide, not a candidate report; search snippet only). Educative, accessed via web search October 2026. https://educative.io/blog/airbnb-interview-process-and-questions
+26. "How Airbnb Interviews Engineers, from Screen to Core Values" (prep guide; search snippet only). techinterview.org, accessed via web search October 2026. https://www.techinterview.org/post/3233476842/airbnb-interview-guide/

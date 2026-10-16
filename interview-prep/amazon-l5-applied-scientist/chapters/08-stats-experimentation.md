@@ -57,6 +57,7 @@
     - What does a p-value of 0.03 NOT tell you?
     - What is a common misinterpretation of a 95% confidence interval?
     - Explain it to a product manager with no statistics background.
+    - (The same "what is the meaning of a p-value, and how would you interpret it?" wording is also reported from an Amazon London Data Scientist interview, a neighbouring role [27].)
 14. Walk through hypothesis testing end to end: which statistical tests would you use, and when? [Reported] [5][8][9]
     - When would you use a t-test, a z-test, a chi-squared test or a non-parametric test?
     - Welch's t-test or Student's t-test: which is the safer default, and why?
@@ -275,6 +276,34 @@
 121. Interpret a logistic-regression coefficient as an odds ratio, and give its confidence interval. [Likely] (logistic regression and its loss are reported in breadth and screens [22])
      - How do collinearity and separation change what the coefficients mean?
 
+## Deepening pass (October 2026): newly reported questions
+
+> Method: five web searches in October 2026, covering LeetCode Discuss, Blind/Reddit, Chinese-language 面经 queries, Glassdoor and prep sites. Most results were generic prep guides. Only snippets that tie a question to an Amazon Applied Scientist candidate are tagged [Reported]. Questions from neighbouring roles (Data Scientist, Economist) were used only as supporting citations, never as [Reported] AS questions.
+
+### Newly reported
+
+122. How would you perform an A/B test to measure whether a new ranking model improves user engagement on Amazon services? [Reported] [25] (Applied Scientist practice question, listed as asked once; medium difficulty; covers hypothesis testing and statistical significance)
+     - Which engagement metric is primary, and which guardrails (latency, revenue, returns) stop a launch?
+     - Ranking changes alter what users see, and so what they click. How do you keep position effects from contaminating the engagement comparison?
+     - The ranking model wins on clicks but is neutral on purchases. What do you recommend?
+123. Write a program that computes AUC. [Reported] [26] (Glassdoor Amazon review, February 2026, from a search aimed at Applied Scientist reports; the snippet ties it to an ML coding round with easy LeetCode problems; which review on the page it came from is not certain)
+     - Compute it from the rank-sum (Mann-Whitney) statistic rather than by integrating an ROC curve. How do you handle tied scores?
+     - How would you add a bootstrap confidence interval to the AUC you computed? [Likely]
+
+### Gap-closing questions [Likely]
+
+124. Show that L2 regularization is MAP estimation with a Gaussian prior, and L1 with a Laplace prior. What does the prior's scale correspond to? [Likely] (losses as likelihoods are reported [22]; the prior view is the natural follow-up)
+125. What is the expected number of fair-coin tosses until you see two heads in a row? Set it up as a Markov chain or a recurrence. [Likely] (coin-flip probability is reported [14])
+126. You only have a uniform random-number generator. How do you sample from an exponential distribution, or from an arbitrary discrete distribution over a million products? [Likely]
+     - How would you uniformly sample k orders from a stream of unknown length (reservoir sampling)?
+127. Compare the likelihood-ratio, Wald and score tests for whether a feature belongs in a logistic regression. When do they disagree? [Likely]
+128. You randomize by seller, but measure at the order level. What are the intra-cluster correlation and the design effect, and how do they change your sample size? [Likely] (follows the randomization-unit questions above; sellers are a distinct unit on the Amazon marketplace)
+129. Write a simulation that estimates the power of a test on a ratio metric such as revenue per session. When would you trust simulation over a closed-form power formula? [Likely] (power computation and bootstrap coding are reported [22][23])
+130. Two independent changes ship to the same page in the same quarter. How would a 2x2 factorial design estimate each main effect and their interaction, and what does it cost in power? [Likely]
+131. Product ratings come only from customers who chose to review. What kinds of missingness are there (MCAR, MAR, MNAR), and how does each bias an average rating? [Likely]
+132. Pearson correlation between two metrics is near zero. Can they still be strongly dependent? When would you use Spearman's rank correlation or mutual information instead? [Likely]
+133. Derive the EM updates for a two-component Gaussian mixture, for example to separate bot traffic from human session lengths. Why does EM increase the likelihood at every step, and why can it still fail? [Likely]
+
 ---
 
 ## References
@@ -303,3 +332,6 @@
 22. "Amazon Research Scientist Interview Process" (also covers Applied Scientist loops; based on about 20 candidate reports, mainly 2026 Q1 to Q3), TrueInterview, mirrored in kevin-2023-code/Tech-Interview-Questions, GitHub, 2026 (sync commit d7fc3db, 2026-10-14). Read in full from a local clone, 2026-10-14. https://github.com/kevin-2023-code/Tech-Interview-Questions/blob/main/companies/amazon/interview-process-research-scientist.md
 23. "Amazon Machine Learning Engineer Interview Process" (covers MLE and Applied Scientist loops, including Ads-team screens and ML design rounds), TrueInterview, mirrored in kevin-2023-code/Tech-Interview-Questions, GitHub, 2026 (sync commit d7fc3db). Read in full from a local clone, 2026-10-14. https://github.com/kevin-2023-code/Tech-Interview-Questions/blob/main/companies/amazon/interview-process-machine-learning-engineer.md
 24. "Amazon interview process, OA & interview questions" (candidate-reported question list with category, round and sighting date; role not given for every question), TrueInterview, mirrored in kevin-2023-code/Tech-Interview-Questions, GitHub, 2026 (sync commit d7fc3db). Read in full from a local clone, 2026-10-14. https://github.com/kevin-2023-code/Tech-Interview-Questions/blob/main/companies/amazon.md
+25. "How would you perform an A/B test to measure whether a new ranking model improves user engagement on Amazon services", Dataford (Amazon Applied Scientist practice question, listed as asked once), seen via web-search snippet, October 2026. https://dataford.io/questions/how-would-you-perform-an-ab-test-to-measure-whether-a-new-ranking-model-improves-user-engagement-on-amazon-services
+26. Amazon interview review RVW102987402, Glassdoor, 2026 (Seattle loop: science breadth, science depth, team-specific system design, coding and bar raiser; basic statistics and bias-variance). Seen via web-search snippet, October 2026; not fetched. https://www.glassdoor.ca/Interview/Amazon-Interview-E6036-RVW102987402.htm
+27. Amazon interview review RVW87535065, Glassdoor (London, Data Scientist role; "What is the meaning of P value? How would you interpret it?"). Seen via web-search snippet, October 2026; not fetched. https://www.glassdoor.co.in/Interview/Amazon-Interview-E6036-RVW87535065.htm

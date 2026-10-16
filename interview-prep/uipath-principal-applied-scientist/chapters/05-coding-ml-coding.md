@@ -155,7 +155,7 @@
     - How do you avoid running a non-idempotent action, such as sending a payment, twice?
 37. [Likely] Implement greedy, temperature, top-k and top-p (nucleus) sampling from a logits vector.
     - What breaks numerically with very low temperature, and how do you fix it?
-38. [Likely] Implement beam search for a toy sequence model.
+38. [Reported] [14] Implement beam search for a toy sequence model. (A September 2026 write-up of a UiPath Machine Learning Engineer loop for an agents team says beam search was asked in the technical round [14]. The report names the topic; asking you to implement it is still an inference.)
 39. [Likely] Write a token-budget manager that fits a system prompt, retrieved chunks and conversation history into a context limit, dropping or summarising the least useful parts.
 40. [Likely] Implement a simple planner that turns a task into a DAG of steps and runs independent steps in parallel.
     - How do you handle one failing branch?
@@ -199,12 +199,12 @@
 
 ### H. ML primitives from scratch
 
-57. [Likely] Implement scaled dot-product attention and multi-head attention in NumPy or PyTorch, including a causal mask.
+57. [Reported] [14][15] (topic reported: Transformer internals and basics came up in UiPath ML engineer technical and phone-screen rounds [14][15]; the from-scratch implementation is inferred) Implement scaled dot-product attention and multi-head attention in NumPy or PyTorch, including a causal mask.
     - What is the memory cost in sequence length, and how does it affect long documents?
     - Make the softmax numerically stable and fuse it with a cross-entropy loss; what overflows first in half precision?
 58. [Likely] Implement 2D sinusoidal or learned position embeddings for tokens with (x, y) layout coordinates, as in layout-aware document models.
     - How would you add bounding box information to a text transformer's input?
-59. [Likely] Implement a LoRA adapter layer that wraps a linear layer, with merge and unmerge methods.
+59. [Reported] [14] (topic reported: LoRA was asked in the technical round of a 2026 UiPath MLE agents loop [14]; the implementation is inferred) Implement a LoRA adapter layer that wraps a linear layer, with merge and unmerge methods.
 60. [Likely] Implement byte-pair encoding training on a small corpus and encoding of new text.
 61. [Likely] Implement a contrastive (InfoNCE) loss for training a retrieval embedding model with in-batch negatives.
     - What goes wrong with in-batch negatives when the batch has duplicates?
@@ -323,6 +323,49 @@
 103. [Likely] [11] Write an adapter layer so that one evaluation harness can run agents built with two different frameworks (for example LangGraph and LlamaIndex) behind one runtime interface.
     - What behaviour leaks through the adapter (streaming, interrupts, tool-call formats), and how do you keep the evaluation fair?
 
+## Deepening pass (October 2026): newly reported questions
+
+> **Sources for this pass.** Five web searches were run in October 2026. Only result titles and snippets could be read, not the full pages. The only ML-specific candidate reports found are a PracHub write-up of a UiPath Machine Learning Engineer loop for an agents team, dated September 2026 [14], and a 1point3acres thread about a UiPath ML engineering phone screen [15]. The other reports are for Glassdoor software engineer and intern loops [16]-[18][20], so treat them as evidence of UiPath's general coding bar, not of the Principal Applied Scientist loop. One third-party guide [19] describes a loop with a coding phone screen and two onsite coding rounds. It is an aggregator, so its claims are unverified. Questions 38, 57 and 59 above were retagged in place based on [14][15].
+
+### N. Newly reported questions
+
+104. [Reported] [14] A variant of LeetCode 837 (New 21 Game), which is probability dynamic programming, in a 25-minute coding segment of a one-hour phone interview for a UiPath ML engineer role on an agents team. The candidate was rejected because the role "needs strong coding skills."
+    - Can you write the O(n) sliding-window-sum version instead of the O(n * maxPts) DP, and explain why the window sum is valid?
+    - How would you check the DP's floating-point error against a Monte Carlo simulation?
+    - How would you recast it as the probability that an agent's tool-call loop ends within a step budget when each step's cost is random?
+105. [Reported] [14] How do you constrain an LLM's tool-call output so that it always matches the tool's argument format? (Asked as a discussion question in the technical round of [14]. In a coding round, expect to implement it.)
+    - Can you code a validator plus a repair loop, and say when you would switch to grammar-constrained decoding instead?
+    - How do you handle a call that names a tool which does not exist?
+106. [Reported] [14] How do you handle a tool-calling loop that runs for too long? (Asked in the technical round of [14].)
+    - Can you write the loop guard: a step limit, a token and cost budget, and detection of repeated identical calls?
+    - When the guard fires, what state does the agent return, and who does it escalate to?
+107. [Reported] [16] Print a matrix in spiral order, visiting each cell exactly once (LeetCode 54). It was reported as the "hard" problem in the algorithms round of a 2023 software engineer loop in Cluj-Napoca [16].
+    - How would you walk a table's grid of cells in a defined reading order when some cells are merged?
+108. [Reported] [17][18][20] Find the minimum element in a rotated sorted array, combined with a nearest-greater-element step (monotonic stack), from a 2025 UiPath software engineer coding interview. The search summary named this question but did not say which of the cited reviews it came from.
+    - Can you write both parts in O(log n) and O(n) time, and test the rotation boundaries (no rotation, a single element, duplicates)?
+109. [Reported] [17][18][20] Find the mistakes in a multithreaded Java code snippet (a code-review question from a UiPath software engineer loop).
+    - Can you do the same for Python: find the race condition in an asyncio or threaded batch-inference client that shares a cache and a counter?
+    - What test would make the race show up reliably?
+110. [Reported] [17][18][20] A timed online coding screen (about 30 minutes) whose solution needs more than 100 lines of code, and a DP problem in which brute force passes only 1 of 23 test cases.
+    - When the code is long and time is short, how do you decide which helper functions to stub out and which to finish first?
+
+### O. Additional [Likely] questions that close gaps for the level
+
+111. [Likely] [19] Write a UI element locator that tries a structural selector first, then falls back to fuzzy attribute matching, and then to OCR or image template matching. Each fallback should return a confidence score.
+    - How do you wait for an element that loads asynchronously without a fixed sleep, and how do you test that?
+112. [Likely] Implement the forward algorithm for a hidden Markov model, or any probability DP, in log space so that it does not underflow on long sequences.
+113. [Likely] Implement a KV cache for autoregressive decoding in a small transformer, and show the speed-up over recomputing attention at each step.
+    - How does the cache's memory grow with batch size and sequence length, and what would you evict?
+114. [Likely] Write a tool-call parser that handles streamed partial JSON. It should emit a tool call as soon as the arguments are complete and reject malformed fragments.
+115. [Likely] Implement speculative decoding with a draft model and a target model, including the accept and reject step that keeps the target model's distribution.
+116. [Likely] Implement the DPO loss, or a pairwise Bradley-Terry reward-model loss, from log-probabilities of chosen and rejected responses.
+    - What does the beta parameter control, and what goes wrong when the reference model is missing?
+117. [Likely] Implement a minimal k-means, or a Gaussian mixture model fitted with EM, to cluster Communications Mining-style message embeddings into topics, and choose k.
+118. [Likely] Implement weighted-sampling A/B analysis for an extraction model rollout: a per-tenant stratified difference in straight-through-processing rate, with a confidence interval.
+119. [Likely] Write a trajectory replay tool that re-runs a recorded agent trajectory against mocked tools and reports the first step at which the new model's behaviour diverges.
+120. [Likely] Implement a Trie-based autocomplete over a vocabulary of field names or UI labels, with top-k suggestions ranked by frequency.
+    - How would you make it tolerate one OCR character error per query?
+
 ## References
 
 Sources marked "fetched" were read in this review (October 2026). Sources marked "not retrieved" are official pages that could not be reached because DNS lookups failed. They are listed only for product context and support no question.
@@ -340,3 +383,10 @@ Sources marked "fetched" were read in this review (October 2026). Sources marked
 11. UiPath, "uipath-integrations-python" README: agent runtime integrations for LangChain, LlamaIndex, Google ADK, OpenAI Agents and more, with human-in-the-loop through Action Center (official; fetched). https://raw.githubusercontent.com/UiPath/uipath-integrations-python/main/README.md
 12. UiPath, "uipath-dev-python" README: developer console for running and debugging runtimes, with OpenTelemetry traces (official; fetched). https://raw.githubusercontent.com/UiPath/uipath-dev-python/main/README.md
 13. PyPI, "uipath" package metadata (version 2.14.37 at the time of this review; fetched). https://pypi.org/pypi/uipath/json
+14. PracHub, "UiPath Machine Learning Engineer Interview Experience: LLM Agent Q&A, a LeetCode 837 Variant, and a Coding Reject" (candidate report, September 2026; search snippet only). https://prachub.com/interview-experiences/uipath-machine-learning-engineer-interview-experience-llm-agent-qanda-a-leetcode-837-variant-and-a-coding-reject
+15. 1point3acres, "UiPath Machine Learning Engineering Phone Screen Interview Experience" (candidate report covering transformer basics, behavioural questions and coding; undated; search snippet only). https://www.1point3acres.com/interview/thread/1140358
+16. Glassdoor, UiPath interview review, Cluj-Napoca, March 2023 (software engineer loop; spiral matrix; search snippet only). https://static.glassdoor.com.au/Interview/UiPath-Interview-E1102519-RVW104635339.htm
+17. Glassdoor, UiPath interview review RVW98689509 (software engineer coding screen; search snippet only). https://static.glassdoor.com.au/Interview/UiPath-Interview-E1102519-RVW98689509.htm
+18. Glassdoor, UiPath interview review RVW97464057 (search snippet only). https://www.glassdoor.co.nz/Interview/UiPath-Interview-E1102519-RVW97464057.htm
+19. techinterview.org, "UiPath Interview Guide (2026): RPA and Automation Engineering" (third-party aggregator; unverified; search snippet only). https://www.techinterview.org/companies/uipath-interview-guide/?format=md
+20. Taro, UiPath software engineer interview experience, September 14, 2025 (search snippet only). https://www.jointaro.com/interviews/companies/uipath/work-experiences/software-engineer-september-14-2025-5-d7191eb4

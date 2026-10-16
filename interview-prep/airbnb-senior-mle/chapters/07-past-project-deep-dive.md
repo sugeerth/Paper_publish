@@ -32,7 +32,7 @@ How to use this chapter: choose **one** flagship ML project that touched an expe
    - Which teams outside yours had to change something for it to ship?
 5. Walk me through the projects on your resume. What were you responsible for on each? [Reported] [13]
    - You wrote one line about this older project. Tell me about it in detail. [Reported] [12]
-6. Walk through one ML project end to end, covering the decisions that were yours and the impact you measured. [Reported] [1]
+6. Walk through one ML project end to end, covering the decisions that were yours and the impact you measured. [Reported] [1][40]
    - Who used its output, and how many users, listings or dollars did it touch? [Likely] [1]
    - Which metric moved, and which teams did you have to align with? [Likely] [1]
 7. If you had to describe the project's scope in one sentence (problem size, your ownership, outcome), what would it be? [Likely] [1]
@@ -98,13 +98,13 @@ How to use this chapter: choose **one** flagship ML project that touched an expe
     - What did you give up, and how did you decide it was acceptable?
 39. What alternatives did you consider and reject? [Reported] [2][3]
     - What evidence made you reject each one?
-40. Why this model family (for example GBDT versus a neural network)? [Likely] [1][30]
+40. Why this model family (for example GBDT versus a neural network)? Why not a more complex model? [Reported] [38] (retagged October 2026; context [1][30])
     - When did you decide to move to something more complex, and what convinced you?
     - Why this feature set and this serving path rather than the alternatives? [Likely] [1]
 41. What was the single modeling change that gave the biggest gain? [Likely]
     - What did you try that did not work? [Likely] [30]
 42. How did you tune the model, and how did you avoid overfitting to your validation set? [Likely]
-43. How did you trade model quality against latency, cost or interpretability? [Likely]
+43. How did you trade model quality against latency, cost or interpretability? [Reported] [38] (retagged October 2026)
 44. Did downstream consumers depend on calibrated scores? How did you check calibration, and did it hold after launch? [Likely]
 45. If the project used embeddings or an LLM, how did you evaluate output quality, and how did you control inference cost? [Likely] [34]
 46. If the interviewer cannot follow your domain, how would you simplify the core idea in two minutes? [Reported] [8][14]
@@ -134,7 +134,7 @@ How to use this chapter: choose **one** flagship ML project that touched an expe
     - What was the randomization unit, and why?
     - How long did it run, and how did you choose the sample size?
 61. What were the confidence intervals on the main result? Were any segments surprising? [Likely]
-62. Did offline gains ever fail to show up online? How did you debug it? [Likely] [30]
+62. Did offline gains ever fail to show up online? How did you debug it? [Reported] [38] (retagged October 2026; context [30])
 63. Did your experiment face interference effects (for example a two-sided marketplace or shared inventory)? How did you handle it? [Likely] [31][34]
     - Would cluster-level or market-level randomization have changed the answer? [Likely] [34]
 64. Did you consider faster methods such as interleaving for a ranking change? Why or why not? [Likely] [32]
@@ -180,7 +180,7 @@ How to use this chapter: choose **one** flagship ML project that touched an expe
 
 89. How did you plan the project? [Reported] [15]
     - How did you set and deliver milestones? [Reported] [17][11][1]
-90. Describe the project's milestones, a conflict over scope, and how it was resolved. [Reported] [1]
+90. Describe the project's milestones, a conflict over scope, and how it was resolved. [Reported] [1][39]
 91. Describe a conflict during the project, and which of the rejected alternatives you would choose now. [Reported] [2]
 92. How did you scope the project to fit a deadline? [Reported] [2]
     - When requirements changed mid-project, how did you re-plan and rescope? [Reported] [2][3]
@@ -239,6 +239,34 @@ These are the push-back styles candidates describe. Practise staying concise and
 125. "Let's switch: how would you design an ML system for X?" (the experience round turns into ML design) [Reported] [7]
 126. "Give me the specific API and database design of your system." (a detail-level probe instead of scaling talk; reported in an Airbnb system design round, not the deep dive) [Likely] [28]
 
+## Deepening pass (October 2026): newly reported questions
+
+Five web searches were run on 2026-10-16. Only result titles and search-engine summaries were readable (the pages themselves are blocked or login-gated), so each [Reported] tag below rests on that summary of the cited report. The same pass retagged questions 40, 43 and 62 to [Reported] [38] and added citations to questions 6 [40] and 90 [39].
+
+### Newly reported
+
+127. How did you choose the decision threshold for your model's output, and how would you decide between several candidate thresholds? [Reported] [38]
+     - Would you settle the threshold offline, or with an A/B test on business metrics?
+128. How did you trade off precision against recall for this use case, and how did that interact with latency and infrastructure cost? [Reported] [38]
+     - Which error was more expensive for the business, a false positive or a false negative?
+129. What do you do when the offline metric and the online metric disagree? Which one do you trust for the launch decision? [Reported] [38]
+130. How did you detect and handle bias in the project's data or model? [Reported] [38]
+     - Was this a live system in production, and what did bias look like there rather than in the offline dataset?
+131. Can we just talk through one of your past ML projects informally: what it was, what you did and why it mattered? [Reported] [40]
+
+### Gap-closing questions for the senior bar
+
+132. Walk me through the design doc you wrote for this project. Who reviewed it, and what changed because of the review? [Likely]
+133. With limited experiment traffic on the surface, how did you decide which model variants or ideas to test first? [Likely]
+134. Were other teams running experiments on the same surface at the same time? How did you manage interactions between concurrent tests? [Likely]
+135. How did you translate the metric lift into a dollar or bookings figure for leadership, and what assumptions sat behind that number? [Likely]
+136. Did you analyse heterogeneous treatment effects (who benefited and who did not)? Did that change the launch or targeting decision? [Likely]
+137. How did the model behave under a sudden distribution shift, such as a travel shock, a holiday peak or a new market launch? How would you know it had stopped working? [Likely]
+138. Did a launch ever hurt a guardrail such as latency or page load, even though the model was better? How did you find and fix it? [Likely]
+139. How did you explain the model's decisions to non-ML consumers such as hosts, operations or policy reviewers? [Likely]
+140. If you rebuilt this project today with embeddings or an LLM, what would change in the data, the evaluation and the cost? [Likely]
+141. Which parts of this project would you hand to a more junior engineer, and how would you review their work? [Likely]
+
 ## References
 
 [1]-[29] and [34]-[37] were fetched from GitHub; the subset listed in the research note was re-fetched on 2026-10-14. [6]-[29] and [35]-[37] are English or Chinese 1point3acres posts mirrored on GitHub. The mirror does not keep original post dates, though several posts carry 2025 timestamps. [30]-[33] could **not** be fetched (DNS failure on 2026-10-14) and are cited from prior knowledge. Verify them before relying on them.
@@ -280,3 +308,6 @@ These are the push-back styles candidates describe. Practise staying concise and
 35. 1p3a post #16: onsite round 2 "BQ and past experience deep dive"; notes that senior candidates are usually pushed on scaling. FlowSight/coding, GitHub. https://github.com/FlowSight/coding/blob/main/company%20wise/airbnb/1p3a/16.md
 36. 1p3a post #75: a senior manager walked through the candidate's project experience step by step and gave feedback afterwards. https://github.com/FlowSight/coding/blob/main/company%20wise/airbnb/1p3a/75.md
 37. 1p3a post #21: experience round on the candidate's project, mostly trade-offs, conflicts and standard behavioral questions. https://github.com/FlowSight/coding/blob/main/company%20wise/airbnb/1p3a/21.md
+38. "Airbnb Senior Machine Learning Engineer Interview Experience: Four ML System Design Rounds, Rejected on Calibration" (April 2026; first round on past projects with follow-ups on model choice, precision/recall/latency/infra cost, offline versus online metric disagreement, threshold tuning and handling bias). PracHub. Seen via search summary on 2026-10-16; page not fetched. https://prachub.com/interview-experiences/airbnb-senior-machine-learning-engineer-interview-experience-four-ml-system-design-rounds-rejected-on-calibration
+39. "Airbnb Senior+ Machine Learning Engineer Interview Experience: Search Ranking and Team Matching" (September 2026; project interview focused on milestones, conflict and scope). PracHub. Seen via search summary on 2026-10-16; page not fetched. https://prachub.com/interview-experiences/airbnb-seniorplus-machine-learning-engineer-interview-experience-search-ranking-and-team-matching
+40. "ML experience round at Airbnb" (Blind thread; the MLE loop has a non-standard ML experience round that was mostly a casual conversation about a past project). Seen via search summary on 2026-10-16; page not fetched. https://www.teamblind.com/post/ml-experience-round-at-airbnb-sorv1g3x

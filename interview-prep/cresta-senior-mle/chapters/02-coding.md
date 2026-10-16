@@ -81,7 +81,7 @@ Tag legend: [Reported] means a source reports the question or a very close varia
     - How do you handle job failures and retries with backoff?
     - How do you support priorities, or cancellation of a queued job?
     - How do you guarantee at-least-once versus exactly-once execution?
-25. [Reported] Implement an API client exercise: call a public API (reported as a Wikipedia API task in an SWE phone screen) and process the results [2].
+25. [Reported] Implement an API client exercise: call a public API (reported as a Wikipedia API task in an SWE phone screen) and process the results [2]. A separate 1point3acres full-time tech phone screen report is likewise titled as focusing on API implementation with practical coding exercises [20].
     - How do you handle pagination, rate limits and transient errors?
     - How would you parallelize requests and cap concurrency?
 26. [Likely] Implement an inference request batcher (dynamic batching): collect requests until either batch size B or wait time T, then call the model once and route results back to callers.
@@ -220,6 +220,42 @@ Tag legend: [Reported] means a source reports the question or a very close varia
 89. [Likely] Write unit tests for the streaming transcript aggregator from question 12, including out-of-order and duplicate events.
     - How would you property-test it?
 
+## Deepening pass (October 2026): newly reported questions
+
+Search coverage was thin. The three new sources below confirm the format, but none of their snippets names an MLE onsite problem. Items tagged [Reported] are supported by result titles and snippets only.
+
+### Newly reported
+
+90. [Reported] Complete Cresta's online assessment for a full-time SDE role: mid-hard to hard coding problems on a custom platform. Each question comes with an animated demo and has its own time limit, and a question you run out of time on cannot be revisited. One retake with the same questions is reportedly allowed at the recruiter's discretion, and the score comes back immediately [18][19].
+    - How do you budget time across questions when unfinished ones are forfeited?
+    - Given that a retake uses the same questions, what would you change on the second attempt?
+
+### Gap-closing [Likely] questions for a Senior MLE
+
+91. [Likely] Implement the verification step of speculative decoding: given draft-model tokens and the draft and target probabilities, accept or reject each token and sample the correction token.
+    - Why does the acceptance rule preserve the target model's output distribution?
+    - How does the expected speedup depend on the acceptance rate and the draft length?
+92. [Likely] Implement a LoRA-adapted linear layer in PyTorch (frozen base weight plus a trainable low-rank A/B with scaling), and a function that merges the adapter into the base weight for serving.
+    - How would you serve many per-customer adapters on one base model?
+93. [Likely] Write an incremental parser for a streamed LLM tool call whose JSON arguments arrive in arbitrary chunks. Emit each field as soon as it is complete, and surface malformed output.
+    - How do you recover when the model emits invalid JSON halfway through?
+94. [Likely] Implement rotary position embeddings (RoPE) and apply them to Q and K in your attention function from question 60.
+    - Why does RoPE make attention scores depend only on relative position?
+95. [Likely] Implement an InfoNCE contrastive loss with in-batch negatives for fine-tuning a retrieval embedding model on (query, knowledge-article) pairs.
+    - How do false negatives in the batch hurt training, and how would you mitigate them?
+    - What role does the temperature play?
+96. [Likely] Implement the DPO loss given policy and reference log-probabilities for chosen and rejected responses.
+    - What does beta control, and what happens when the reference model is dropped?
+97. [Likely] Implement an end-of-turn detector for a voice agent. It takes a stream of per-frame VAD probabilities plus partial-transcript events, and declares the end of a turn after a configurable hangover. (This builds on Cresta's real-time voice latency focus [15].)
+    - How do you trade false barge-ins against added response latency?
+98. [Likely] Implement a fair request scheduler for a shared LLM inference service: per-tenant queues with weighted round-robin (or deficit round-robin) and a global concurrency cap.
+    - How do you stop one large tenant from starving the others while still meeting priority SLOs?
+99. [Likely] Implement retrieval evaluation metrics (recall@k, MRR, nDCG@k) and reciprocal rank fusion to combine two ranked lists.
+    - Why is RRF robust to differences in score scale between retrievers?
+100. [Likely] Convert BIO-tagged token predictions into entity spans and compute span-level precision, recall and F1, for example for PII or slot extraction from transcripts.
+     - How do you handle invalid tag sequences, such as an I- tag with no preceding B-?
+     - Exact versus partial span matching: which would you report, and why?
+
 ## References
 
 1. "Cresta MLE面经" / "Cresta Machine Learning Engineer Tech Phone Interview Experience" (MLE, AI Agent direction; greedy and beam search decoding). 1point3acres, 2025. https://www.1point3acres.com/interview/thread/1140481 (also https://www.1point3acres.com/bbs/thread-1140481-1-1.html)
@@ -239,3 +275,6 @@ Tag legend: [Reported] means a source reports the question or a very close varia
 15. "Engineering for Real-Time Voice Agent Latency". Cresta blog. https://cresta.com/blog/engineering-for-real-time-voice-agent-latency
 16. "Senior Machine Learning Engineer (Chat Agent)". Cresta job posting, Lever. https://jobs.lever.co/cresta/172fe276-9415-4bae-9b0b-af72cf7cf014
 17. "Senior Machine Learning Engineer" (agentic assistance and agent-quality tracks). Cresta posting via ZeroG Talent. https://zerogtalent.com/ai-jobs/cresta/senior-machine-learning-engineer-4249943008
+18. "Cresta Online Test for Fulltime SDE General Position" (mid-hard and hard online test questions). 1point3acres. https://www.1point3acres.com/interview/thread/1094884
+19. 2026 (April-June) Cresta full-time general-track online assessment post (custom platform with animated demos, per-question time limits, one retake with the same questions; details paywalled). 1point3acres, 2026. https://www.1point3acres.com/bbs/thread-1184378-1-1.html
+20. "Cresta Fulltime Tech Phone Screen Experience Report" (API implementation with practical coding exercises). 1point3acres. https://www.1point3acres.com/interview/thread/1124211

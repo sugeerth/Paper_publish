@@ -59,7 +59,7 @@
    - How does the causal mask enter the equation?
 3. What happens if you set Wq = Wk = Wv in a Transformer? [Reported] [6]
    - What does that do to the attention matrix's symmetry, and what expressiveness do you lose?
-4. Explain the difference between LSTMs and Transformers mathematically. [Reported] [12]
+4. Explain the difference between LSTMs and Transformers mathematically. [Reported] [12][37]
    - How does each handle long-range dependencies, and what are the parallelism and compute trade-offs?
    - Why did transformers replace RNNs for language modeling? [Likely] (an Amazon-focused question list that says it is synthesized, not reported [26])
 5. Why do Transformers need positional information? Compare sinusoidal, learned, RoPE and ALiBi encodings. [Reported] (Amazon RS aggregate: RoPE and ALiBi in a generative-AI phone screen) [22]
@@ -77,7 +77,7 @@
 
 ### A2. Model families
 
-11. How do BERT and GPT differ in objectives, architecture and use cases? [Reported] [7]
+11. How do BERT and GPT differ in objectives, architecture and use cases? [Reported] [7][37]
     - How is BERT trained (MLM and NSP), and why did RoBERTa drop NSP?
     - When would an encoder-only model still beat a decoder-only LLM for an Amazon task, such as product classification?
 12. What is an encoder-decoder model such as T5, and how would you optimize it for inference? [Reported] [5]
@@ -133,7 +133,7 @@
     - Explain LoRA. Which matrices do you adapt, and how do you choose the rank and alpha?
     - What is the memory cost of an adapter compared with full fine-tuning, counting optimizer states? [Reported] (Amazon MLE aggregate) [23]
     - Compare LoRA variants (QLoRA, DoRA, adapters, prefix tuning). [Reported] (Amazon RS aggregate) [22]
-31. You need a domain-specialized model with limited compute. Do you use prompting, RAG, LoRA, full fine-tuning or continued pretraining? [Likely]
+31. You need a domain-specialized model with limited compute. Do you use prompting, RAG, LoRA, full fine-tuning or continued pretraining? [Reported for RAG vs fine-tuning] (Seattle Applied Scientist report, September 2025: "why RAG architecture is used instead of fine-tuning LLM models") [37]; the full option set is [Likely]
     - What evidence would make you move from one option to the next?
     - How does the answer change if the base model is only reachable as a hosted endpoint, for example through Bedrock? [Likely]
 32. If you used knowledge distillation from an LLM, what exactly was distilled, and why? [Reported] [20]
@@ -337,6 +337,35 @@
 
 ---
 
+## Deepening pass (October 2026): newly reported questions
+
+> Source note: this pass ran five web searches. Only Glassdoor review pages came back (no Blind, Reddit, LeetCode Discuss, 1point3acres, Prepfully, interviewing.io or IGotAnOffer threads), and the pages themselves were not opened. Tags below rest on search-result extracts only. Existing questions 4, 11 and 31 were updated in place with reference [37].
+
+### Newly reported
+
+1. Why would you use a RAG architecture instead of fine-tuning an LLM? [Reported] (Seattle Applied Scientist report, September 2025) [37]
+   - What kinds of knowledge (fresh, proprietary, fast-changing) push you toward retrieval, and what kinds (style, format, task behavior) push you toward fine-tuning?
+   - When would you combine both, for example fine-tuning the generator to use retrieved context?
+2. Which evaluation metrics would you use for an LLM, and what does each miss? [Reported] (same September 2025 report: "evaluation metrics for LLMs") [37]
+   - How do reference-based metrics (BLEU, ROUGE, exact match) compare with model-based and human pairwise evaluation for open-ended generation?
+   - Which metric would you put on a launch dashboard, and which only in offline analysis?
+3. Design an end-to-end pipeline that translates a set of multimodal objects (for example, listings with text and images) into another language. [Reported] (Hyderabad Applied Scientist report, system-design segment; mapping of this snippet to reference [38] comes from a search summary and should be re-verified) [38]
+   - Which parts would you hand to an LLM or vision-language model, and which to a dedicated MT model?
+   - How do you evaluate translation quality for text embedded in images, and how do you keep product attributes (units, sizes, brand names) unchanged?
+
+### Gap-closing questions [Likely]
+
+4. How would you build an LLM-based query-understanding or intent classifier for Alexa that must answer in under 100 ms? Compare prompting a large model, distilling into a small encoder, and fine-tuning a small decoder. [Likely]
+5. Derive the memory needed to fully fine-tune a 7B-parameter model with AdamW in mixed precision (weights, gradients, optimizer states, activations). Which techniques (gradient checkpointing, ZeRO, LoRA) cut which term? [Likely]
+6. Explain how in-context learning differs from fine-tuning. Why does few-shot performance depend on example order and format, and how would you choose demonstrations automatically? [Likely] (Alexa postings name In-Context Learning alongside SFT [27])
+7. How do you write and version prompts as production artifacts? How would you regression-test a prompt change before rolling it out to a high-traffic assistant? [Likely]
+8. Your LLM is fine-tuned on Amazon-specific data and now refuses or degrades on general questions. How do you measure and recover lost general capability (replay data, model merging, regularization toward the base model)? [Likely]
+9. How would you detect and handle data drift for a production LLM feature, such as new product categories, seasonal queries or newly launched devices? What triggers re-training versus re-indexing the retrieval store? [Likely]
+10. A reward model scores 90% pairwise accuracy on held-out preferences, but the policy trained against it gets worse in human evaluation. What explains the gap, and what would you check? [Likely]
+11. How do you choose an embedding dimension and index type (HNSW, IVF-PQ) for a billion-item product catalog, and how do you measure the recall lost to approximate search? [Likely]
+12. Compare autoregressive LLM decoding with a non-generative approach (extractive QA, classification with a fixed label set) for an Amazon task. When does the generative model's flexibility justify its cost and hallucination risk? [Likely]
+13. How would you protect customer privacy when fine-tuning on conversation logs (PII scrubbing, differential privacy, memorization tests)? How would you test whether the model can regurgitate a customer's data? [Likely]
+
 ## Coverage notes for prep
 
 - **Highest-yield set across reports:**
@@ -397,3 +426,5 @@
 34. Blind, "Amazon AS L4 vs L5" and "Amazon Applied Scientist L4 vs Applied Scientist II L5" (level-bar discussion). https://www.teamblind.com/post/amazon-as-l4-vs-l5-n0zunqgt ; https://www.teamblind.com/post/amazon-applied-scientist-l4-vs-applied-scientist-ii-l5-aasmppdi
 35. "FAANG Recent Questions" (Amazon section, 2025-2026 trends: AI-assisted OA repository task; August 2026 new-grad screens asking candidates to walk through an AI-assisted engineering workflow), ombharatiya/FAANG-Coding-Interview-Questions, GitHub (aggregator). Fetched October 2026. https://github.com/ombharatiya/FAANG-Coding-Interview-Questions/blob/main/FAANG-Recent-Questions.md
 36. "Amazon interview process, OA & interview questions" (company question list of about 320 reported questions with types and sighting dates, including "Handwrite Sigmoid, Softmax, and Attention", "Bucket Batching DP (Applied Scientist Phone Screen)", "Design an LLM quality validation system", "Explain parallelism and collectives in training" and "Measure PMF for Alexa Shopping"), kevin-2023-code/Tech-Interview-Questions, GitHub (aggregator adapted from trueinterview.io). Fetched October 2026. https://github.com/kevin-2023-code/Tech-Interview-Questions/blob/main/companies/amazon.md
+37. Amazon interview review RVW100110012 (Applied Scientist, Seattle, September 2025), Glassdoor (LLM evaluation metrics; why RAG instead of fine-tuning; LSTM vs Transformer; BERT vs GPT). Captured from search-result extracts, October 2026; page not opened. https://www.glassdoor.fr/Entretien/Amazon-Entretien-E6036-RVW100110012.htm
+38. Amazon interview review RVW101867612 (Applied Scientist, Hyderabad), Glassdoor (general data-science questions plus a system design to "model a pipeline end-to-end for translating one set of multimodal objects to another language"). Attribution of the snippet to this review comes from a search summary and was not confirmed by opening the page, October 2026. https://www.glassdoor.it/Colloquio/Amazon-Colloquio-E6036-RVW101867612.htm

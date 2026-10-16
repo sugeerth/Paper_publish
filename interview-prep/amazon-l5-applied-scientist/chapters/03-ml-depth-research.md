@@ -281,7 +281,7 @@
 95. Rufus (shopping assistant): how would you build retrieval-augmented answers to "What do I need for cold weather golf?" over the catalog and reviews? [Likely] (see [32][33])
     - How do you ground answers in product facts and avoid hallucinated specs?
     - How do you evaluate it offline before an A/B test?
-96. How would you summarize thousands of customer reviews into a short "customers say" blurb? [Likely]
+96. How would you summarize thousands of customer reviews into a short "customers say" blurb? [Reported] (Science Application round, framed as "summarize product reviews with key concepts"; Luxembourg, Nov 2023) [47]
     - How do you measure faithfulness and coverage of minority opinions?
 97. Fraud and abuse: how would you detect fake reviews or abusive sellers with heavily imbalanced and adversarial labels? [Likely]
     - How do you handle adversaries adapting to your model?
@@ -322,6 +322,35 @@
 119. Tell me about the most ambiguous problem you worked on, and how you scoped it. [Likely]
 120. Tell me about a time you traded scientific purity for customer impact, or refused to. [Likely] (Customer Obsession)
 121. How do you use AI tools in your work? Tell me about a time an AI tool gave you a wrong answer, and how you caught it. [Reported] (Amazon behavioral, 2025-2026) [43]
+
+## Deepening pass (October 2026): newly reported questions
+
+Five web searches (Blind, Glassdoor, LeetCode Discuss and Chinese-language "面经" phrasing) mostly returned Glassdoor reviews already summarized above. Only snippet text was available. Format confirmations: a Blind L5 virtual onsite listed five rounds (science breadth, science depth, "Science Application: propose a model and implementation to a business problem", coding, and a hiring-manager fit round) [45]. An L5 Blind post says depth is "usually" built on one of your publications or resume projects, and that the motivation behind each choice matters most [46]. A Luxembourg loop paired one tech talk with coding, depth, breadth and application rounds, each with 10-15 minutes of LPs [47]. Item 96 above was retagged [Reported] on the strength of [47]. A 2025 Vancouver snippet described a depth round that unexpectedly focused on statistics, and a Hyderabad AS II snippet described a design prompt about multimodal translation. Neither snippet could be tied to a specific URL, so the related items below are tagged [Likely].
+
+122. In the context of your own project, explain the bias-variance trade-off. Where did your model sit, and how did you know? [Reported] (Applied Scientist II depth round, Seattle) [13]
+     - Which change you made reduced variance, and which reduced bias?
+123. What is the difference between bagging and boosting? Which suits your project's data, and why? [Reported] (Applied Scientist II depth round, Seattle) [13]
+     - Why does boosting tend to overfit noisy labels more than bagging does?
+124. For one of your publications, what was the problem, which choices did you make, and why does the solution make sense? [Reported] (L5 depth round) [46]
+     - What motivated each design choice over the obvious alternative?
+125. What research directions would you pursue to improve a CLIP-style model? [Reported] (Applied Scientist review, Italy) [48]
+     - Which of CLIP's weaknesses (compositionality, fine-grained attributes, text in images) matters most for Amazon product data?
+
+### Gap-closing [Likely] questions for L5
+
+126. Statistics-heavy depth: how did you quantify uncertainty in your project's main result, and what assumptions does that test make? [Likely] (a 2025 snippet reports a statistics-focused depth round; no URL could be tied to it)
+     - When would you use MLE vs. MAP estimation for a parameter in your model?
+     - How would you correct for multiple comparisons across the many ablations or metrics you report?
+127. Design an end-to-end pipeline that translates multimodal content (for example, a product listing's text and images) into another language. [Likely] (a Hyderabad AS II snippet reports a similar prompt; no URL could be tied to it)
+     - How would you evaluate translation quality when the image and the text must stay consistent?
+128. Were your model's predicted probabilities calibrated? How did you check, and did a downstream decision depend on it? [Likely]
+129. Could another scientist reproduce your headline result from your code and data? What would they most likely get wrong? [Likely] (Insist on the Highest Standards)
+130. How did performance scale with more data or a larger model? Did you plot learning curves, and what did they tell you about where to invest next? [Likely]
+131. How did you make sure your offline evaluation set matched what the model would see in production? [Likely]
+132. Did you check performance across sensitive or under-served groups (locales, device types, new sellers)? What did you find? [Likely] (responsible AI)
+133. Would a prompted large language model have solved your problem? How would you compare it with your model on quality, latency and cost? [Likely]
+134. Pick a recent paper outside your area that you think matters for Amazon. What is its key idea, and what is its weakest assumption? [Likely]
+135. Suppose your project had to run in a new marketplace with a different language and different customer behavior. Which parts of your method transfer, and which would you have to rebuild? [Likely]
 
 ---
 
@@ -371,3 +400,7 @@
 42. "Amazon Machine Learning Engineer Interview Process" (includes the project deep-dive and ML system design rounds), TrueInterview, mirrored in kevin-2023-code/Tech-Interview-Questions, GitHub, 2026; fetched and read 2026-10-14. https://github.com/kevin-2023-code/Tech-Interview-Questions/blob/main/companies/amazon/interview-process-machine-learning-engineer.md
 43. "Amazon Interview Process" (all tracks; GenAI-usage behavioral question; time split between LPs and technical work), TrueInterview, mirrored in kevin-2023-code/Tech-Interview-Questions, GitHub, 2026; fetched and read 2026-10-14. https://github.com/kevin-2023-code/Tech-Interview-Questions/blob/main/companies/amazon/interview-process.md
 44. "Amazon interview process, OA & interview questions" (320 candidate-reported questions with format, round and sighting date; role not given per question), TrueInterview, mirrored in kevin-2023-code/Tech-Interview-Questions, GitHub, 2026; fetched and read 2026-10-14. https://github.com/kevin-2023-code/Tech-Interview-Questions/blob/main/companies/amazon.md
+45. amazon as2 interview loop, Blind (five-round AS virtual onsite: science breadth, science depth, science application, coding, hiring-manager fit). https://www.teamblind.com/post/amazon-as2-interview-loop-ry5amdu4
+46. amazon applied scientist l5 virtual onsite, Blind (depth round built around one publication or resume project). https://www.teamblind.com/post/amazon-applied-scientist-l5-virtual-onsite-navwesml
+47. Amazon interview review RVW99133644 (Applied Scientist, Luxembourg, Nov 2023; Science Application round: summarize product reviews with key concepts), Glassdoor. https://www.glassdoor.sg/Interview/Amazon-Interview-E6036-RVW99133644.htm
+48. Amazon interview review RVW101056902 (Applied Scientist; research directions for improving CLIP), Glassdoor Italy, 2026. https://www.glassdoor.it/Colloquio/Amazon-Colloquio-E6036-RVW101056902.htm

@@ -73,7 +73,7 @@
     - What would a multi-task model with heads for clicks, long views, wishlist and booking look like? How do you weight the heads?
 12. How do you handle flexible-date or flexible-location searches ("I'm flexible", category browsing)? [Likely] [11]
 13. How would you incorporate host-side outcomes (acceptance, cancellations, host earnings) into guest-facing ranking? [Likely] [1]
-14. Offline NDCG went up but the online A/B test showed flat bookings. Walk me through your debugging plan. [Likely] [1][2]
+14. Offline NDCG went up but the online A/B test showed flat bookings. Walk me through your debugging plan. [Reported] [39] [1][2]
     - How would you check for training-serving skew, feature leakage and a mismatch between offline and online candidate sets?
 15. What offline evaluation set would you build, and how do you avoid leakage from future data or from repeat sessions by the same guest? [Likely] [1]
 16. Rank home-page search results when the guest has typed no text query, for example on app open or a logged-in home feed. [Reported] [23][29]
@@ -121,7 +121,7 @@
 33. Design a system that helps hosts set prices for each future date, taking market demand into account. [Reported] [24][25]
     - What is the objective: booking probability, expected host revenue, or marketplace occupancy?
     - Why can't you train directly on "the optimal price" as a label?
-34. Predict the nightly price a listing should command (price prediction), including for a brand-new listing with no booking history. [Reported] [25]
+34. Predict the nightly price a listing should command (price prediction), including for a brand-new listing with no booking history. [Reported] [25][41]
     - Which comparable-listing, location, amenity and seasonality features would you use?
     - How do you avoid learning hosts' mispricing as the target?
 35. How would you predict booking probability as a function of price, lead time and listing quality? [Likely] [4]
@@ -301,6 +301,45 @@
 123. Design a "price drop" or "rare find" badge. How would you verify that badges are accurate and actually help guests? [Likely]
 124. The interviewer scheduled a project deep dive but instead gives you an unfamiliar ML design prompt. How do you scope it in the first five minutes? [Reported] [25]
 
+## Deepening pass (October 2026): newly reported questions
+
+> Method. Five web searches were run on 2026-10-16. Pages themselves were not opened; tags rest only on search-result titles and snippets. The 1point3acres threads [40][41] are login-gated, so only their teaser text was visible. Mapping each teaser to a thread relies on the search snippet. In place, Q14 was retagged [Reported] from the April 2026 senior-MLE write-up [39], and [41] was added to Q34 (pricing prediction). A third-party guide says trust-and-safety prompts (for example fraudulent-listing detection, Q49) make up a large share of Airbnb MLE design rounds [45]. It is a guide rather than a candidate report, so Q49 keeps its [Likely] tag.
+
+### N. Newly reported prompts
+
+125. Design an ML system for property damage claims, for example scoring or triaging host damage claims after a stay. [Reported] [40]
+     - What is the label: an approved claim, a paid amount, or a claim found fraudulent on review? How do you handle the delay before it resolves?
+     - How do you split the work between automated decisions and human review, and where do you set the thresholds?
+     - How do you keep the system fair to both the host filing the claim and the guest being charged?
+126. In the same loop, the design round also covered pricing. How would you connect the damage-risk model to pricing or to security-deposit decisions? [Reported] [40]
+127. You trained a classifier for a ranking or marketplace problem. How do you choose its decision threshold? [Reported] [39]
+     - Which candidates would you shortlist offline from ROC and PR curves, and how would an A/B test pick between them?
+     - How do you trade off precision, recall, latency and infrastructure cost when choosing the threshold? [Reported] [39]
+128. Why did you choose this modeling approach over the alternatives? For example, factorization machines versus embeddings plus a DNN for sparse, high-cardinality features. [Reported] [39]
+     - When does a factorization machine win on cost and latency, and what does an embedding-DNN buy you?
+129. Your offline metrics and online metrics disagree. Which do you trust, and what decision do you make for the launch? [Reported] [39]
+     - What business judgment would you apply when the evidence is mixed? (The write-up reports that the panel weighted business sense and decision-making over memorized answers.) [Reported] [39]
+130. Design a system for real-time monitoring of cloud infrastructure. This prompt was listed for the Airbnb MLE role; it is a non-ML system design question. [Reported] [42]
+     - What would you change if the monitored signals were ML model metrics (drift, score distributions) rather than host metrics?
+131. ML practitioner round: propose an ML solution to a real, current Airbnb product or engineering problem chosen by the interviewer. [Reported] [43]
+     - How do you size the problem and agree on the success metric before naming any model?
+132. ML experience round: walk through a past ML project end to end. [Reported] [44]
+     - Expect it to turn into a design discussion, as in [25]. Which trade-offs from your own project could you defend in depth?
+
+### O. Gap-closing questions for the senior level
+
+133. Design a model that predicts the risk that a booking leads to a damage claim or a safety incident, to be used before the stay begins (deposit, verification, host warning). [Likely] [18][19]
+     - How do you avoid proxy discrimination, and how do you audit the model's false positives by guest segment?
+134. How would you calibrate the probabilities of a ranking or risk model, and why does calibration matter when its scores feed thresholds, auctions or a multi-objective blend? [Likely]
+135. Your multi-objective ranker combines booking, cancellation and host-acceptance predictions. How do you set the blend weights, and how do you re-tune them after one head is retrained? [Likely] [6]
+136. Your experiment shows +0.3% bookings with a wide confidence interval, and the change adds 20 ms of latency and new infrastructure cost. Do you ship? How do you make the case to leadership? [Likely] [17]
+137. How would you design the feature store and the point-in-time-correct training-data pipeline your ranking and trust models share? [Likely]
+138. A trust model's precision drops sharply after a new fraud pattern appears. Walk through the first 48 hours: detection, mitigation with rules, relabeling and retraining. [Likely] [18]
+139. How would you estimate the dollar value of a 1% improvement in search ranking, so that it can be compared with a trust or pricing project for roadmap planning? [Likely] [17]
+140. Hosts and guests both react to your model (hosts change prices, guests change search behavior). How would you detect and measure these equilibrium effects after launch? [Likely] [8]
+141. How would you mentor a junior engineer through their first ranking launch, and which design-review checkpoints would you insist on? [Likely]
+142. When would you choose a contextual bandit over a supervised model plus an A/B test, for example for photo selection, badge display or category ordering? [Likely] [9]
+
 ## References
 
 Sources [22]-[25] and [36] were fetched and read on GitHub on 2026-10-14. Sources [26]-[35] are TrueInterview question pages linked from [22] and [23]; their host could not be reached directly. The remaining sources could not be reached from this environment, because the proxy could not resolve arxiv.org, dl.acm.org, medium.com, glassdoor.com or igotanoffer.com. They are listed from prior knowledge. Entries marked "URL not verified" give a title and an index page rather than a guessed article URL. Confirm every link before relying on it.
@@ -343,3 +382,10 @@ Sources [22]-[25] and [36] were fetched and read on GitHub on 2026-10-14. Source
 36. A. Dirafzoon, "ML System Design" sample questions (lists "Rental recommendation (Airbnb)" among common MLE design prompts). alirezadir/AIMLInterviews, GitHub. Fetched 2026-10-14. https://github.com/alirezadir/AIMLInterviews/blob/main/src/MLSD/ml-system-design.md
 37. Airbnb product release announcements: Guest Favorites (2023), Photo Tour (2023), Co-Host Network (2024), and the Services and Experiences relaunch (2025). Airbnb Newsroom. URL not verified. Search via https://news.airbnb.com
 38. "Learning to Rank for Maps at Airbnb", Airbnb search team, KDD 2024. URL not verified. Search the title on arXiv or https://medium.com/airbnb-engineering
+39. "Airbnb Senior Machine Learning Engineer Interview Experience — Four ML System Design Rounds, Rejected on Calibration" (April 2026; ranking and marketplace scenarios; threshold tuning; precision, recall, latency and cost trade-offs; offline-online metric disagreement; FM versus embedding-DNN). PracHub. Search-result snippet only, 2026-10-16. https://prachub.com/interview-experiences/airbnb-senior-machine-learning-engineer-interview-experience-four-ml-system-design-rounds-rejected-on-calibration
+40. "Airbnb Machine Learning Fulltime Onsite Interview Experience and Insights" (teaser: coding, project discussion, and system design for property damage claims and pricing). 1point3acres, login-gated. Search-result snippet only, 2026-10-16. https://www.1point3acres.com/interview/thread/1162455
+41. "Airbnb Fulltime Machine Learning Engineering Onsite Interview Overview" (teaser: ML design with pricing prediction). 1point3acres, login-gated. Search-result snippet only, 2026-10-16. https://www.1point3acres.com/interview/thread/1114733
+42. Prepfully, "Airbnb Machine Learning Engineer interview questions" (lists "design a system for real-time monitoring of cloud infrastructure"). Search-result snippet only, 2026-10-16. https://prepfully.com/interview-questions/airbnb/machine-learning-engineer?page=8
+43. "Airbnb senior MLE interview prep", Blind (the recruiter said the ML practitioner round targets Airbnb-specific technical challenges and real product or business problems). Search-result snippet only, 2026-10-16. https://www.teamblind.com/post/airbnb-senior-mle-interview-prep-n1mdsd3b
+44. "ML experience round at Airbnb", Blind (the loop is LeetCode, a standard ML design round and a non-standard ML experience round on past projects). Search-result snippet only, 2026-10-16. https://www.teamblind.com/post/ml-experience-round-at-airbnb-sorv1g3x
+45. DataInterview, "Airbnb Machine Learning Engineer" guide (third-party guide; says trust-and-safety systems are a large share of MLE prompts; gives "detect fraudulent listings" and "Experiences search ranking" as examples, not as candidate reports). Search-result snippet only, 2026-10-16. https://www.datainterview.com/blog/airbnb-machine-learning-engineer-interview

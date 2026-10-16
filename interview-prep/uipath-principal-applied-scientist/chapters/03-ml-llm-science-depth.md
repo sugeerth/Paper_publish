@@ -7,7 +7,7 @@
 > - **[Likely]**: an inference from the role, the level and UiPath's AI products (agentic automation and Agent Builder, Document Understanding, Communications Mining, Autopilot, the AI Trust Layer, and computer vision for UI automation). No candidate has reported it.
 > - Indented sub-bullets are follow-up probes an interviewer may use to push a strong first answer toward the principal bar.
 >
-> **Research limits (please read).** Two runs have now tried to research this chapter, and neither could reach a source. In the first run, the shared web-search budget (200 searches) was used up and fetches of glassdoor.com, uipath.com and arxiv.org failed DNS lookup. In the review run (2026-10-14), the search budget was still used up, and the network proxy rejected direct fetches of glassdoor.com, uipath.com, docs.uipath.com, arxiv.org and reddit.com. So **no question below is tagged [Reported]**. None could be checked against a candidate write-up, and this chapter does not invent reports. Every question is **[Likely]**. The review run removed two duplicates and added 27 new principal-level [Likely] questions on gaps in the first draft: agent protocols and process conformance, credit assignment, line items and field normalisation, VLM image-token budgets, screen tokenisation and timing, taxonomy discovery, simulated-user evaluation, label noise and privacy-preserving training. The format notes are inferred from how principal-scientist loops usually run at enterprise AI companies; they are not a confirmed UiPath process. A later run with network access can upgrade tags to [Reported] where sources support them.
+> **Research limits (please read).** Two runs have now tried to research this chapter, and neither could reach a source. In the first run, the shared web-search budget (200 searches) was used up and fetches of glassdoor.com, uipath.com and arxiv.org failed DNS lookup. In the review run (2026-10-14), the search budget was still used up, and the network proxy rejected direct fetches of glassdoor.com, uipath.com, docs.uipath.com, arxiv.org and reddit.com. So the first two runs tagged no question [Reported]. None could be checked against a candidate write-up, and this chapter does not invent reports. Every question is **[Likely]**. The review run removed two duplicates and added 27 new principal-level [Likely] questions on gaps in the first draft: agent protocols and process conformance, credit assignment, line items and field normalisation, VLM image-token budgets, screen tokenisation and timing, taxonomy discovery, simulated-user evaluation, label noise and privacy-preserving training. The format notes are inferred from how principal-scientist loops usually run at enterprise AI companies; they are not a confirmed UiPath process. A later run with network access can upgrade tags to [Reported] where sources support them. **Update (October 2026 deepening pass):** three web searches found search-result snippets of UiPath ML interview reports (an ML Engineer, Agents team, 2026 report on prachub, and two Glassdoor Research Scientist, London, 2025 reviews). Questions 5, 12 and 93 are now tagged [Reported] on that basis, and new reported questions are in the deepening-pass section at the end. None of these reports is for the Principal Applied Scientist title, so treat them as signals of topic, not of level.
 
 ## Format notes (inferred, not confirmed)
 
@@ -61,7 +61,7 @@
    - How would you evaluate tool-selection accuracy separately from argument-filling accuracy?
 4. [Likely] Compare chain-of-thought prompting, self-consistency, tree search and trained reasoning models for agent planning. Which would you ship under a fixed cost per run?
    - How would you show that extra test-time compute actually improves task success in your domain?
-5. [Likely] How do you make an agent recover from a failed tool call without looping or hallucinating success?
+5. [Reported] [4] How do you make an agent recover from a failed tool call without looping or hallucinating success? (A 2026 UiPath MLE (Agents) report lists stopping a tool-calling loop that runs too long and fixing a model that calls tools badly.)
    - How would you detect "fake completion", where the agent says it finished but the system state disagrees?
 6. [Likely] What memory architecture would you use for an agent that runs the same business process thousands of times a day?
    - What should be stored as episodic memory versus distilled into prompts, rules or fine-tuning data?
@@ -79,7 +79,7 @@
     - How would you red-team this before release?
 11. [Likely] How would you decide which agent actions need human approval, and how would you set that threshold from data?
     - How would you calibrate the agent's confidence so that the approval policy is trustworthy?
-12. [Likely] How do structured outputs, constrained decoding and function calling change error rates in agents? Where do they fail?
+12. [Reported] [4] How do structured outputs, constrained decoding and function calling change error rates in agents? Where do they fail? (The same report lists keeping tool-call formats and calling stable.)
 13. [Likely] How would you blend deterministic RPA robots with LLM agents so that the robot does the reliable parts and the agent handles exceptions?
     - How would the agent hand control back to a robot mid-process?
 14. [Likely] What are the main open research problems in enterprise agents today? If you joined UiPath and could fund one science bet across agents, document understanding and screen understanding, which would it be?
@@ -296,7 +296,7 @@
 
 ### G. Principal-level depth on your own work
 
-93. [Likely] Pick the most complex model you shipped. Draw the system, and tell me which design decision you would reverse today and why.
+93. [Reported] [4] Pick the most complex model you shipped. Draw the system, and tell me which design decision you would reverse today and why.
     - What experiment told you it was the wrong decision?
 94. [Likely] Tell me about a time an offline evaluation misled you. What did you change in your evaluation practice afterwards?
 95. [Likely] Describe a research result you chose not to ship. How did you make that call?
@@ -310,10 +310,52 @@
     - Which missing experiment would change your decision?
 100. [Likely] What standards for reproducibility, baselines and ablations would you require before a result from your team reaches a product roadmap?
 
+## Deepening pass (October 2026): newly reported questions
+
+These come from search-result snippets only (the pages themselves could not be fetched). The reports are for adjacent UiPath roles (ML Engineer on the Agents team; Research Scientist in London), not for the Principal Applied Scientist title. At principal level, expect the same topics followed by deeper probes.
+
+### Newly reported
+
+101. [Reported] [4] [6] How does a transformer work? Walk through its internals in detail.
+     - Why is attention scaled by the square root of the key dimension?
+     - Where does the quadratic cost come from, and what would you do about it for 40-page documents?
+102. [Reported] [4] How does beam search work, and when would you use it instead of greedy decoding or sampling?
+     - Why can beam search make LLM outputs worse for open-ended generation but better for structured extraction?
+103. [Reported] [4] How does LoRA work?
+     - How do you choose the rank and the layers to adapt?
+     - When does LoRA fall short of full fine-tuning?
+104. [Reported] [4] How does an LLM call tools? Explain the mechanism from the training data to the decoded call.
+     - How would you keep the tool-call format and calling behaviour stable across model versions?
+     - A model calls tools badly. How would you diagnose and fix it: prompt, constrained decoding or fine-tuning?
+     - How would you stop a tool-calling loop that runs too long?
+105. [Reported] [6] How does FSDP (fully sharded data parallel) work?
+     - What exactly is sharded, and what communication happens in the forward and backward passes?
+     - When would you choose FSDP over tensor or pipeline parallelism?
+106. [Reported] [5] What is the time complexity of matrix multiplication, and how would you parallelise it across GPUs?
+     - How does that choice interact with memory bandwidth and inter-GPU communication?
+
+### Gap-closing [Likely] questions for the principal bar
+
+107. [Likely] Estimate the GPU memory needed to serve a 70B-parameter model with a 32k context at batch size 16. Where does the KV cache dominate, and which techniques (grouped-query attention, paged attention, quantised KV cache) would you use?
+108. [Likely] Compare RLHF with PPO, DPO and RL from verifiable rewards for aligning an agent model to enterprise process outcomes. Which would you choose, and why?
+     - How would you detect over-optimisation against the reward or preference model?
+109. [Likely] Compare mixture-of-experts with dense models for a UiPath workload that mixes documents, emails and screens. What are the serving and fine-tuning consequences?
+110. [Likely] How do tokenisation choices affect numbers, dates, codes and non-Latin scripts in documents, and how would you measure the damage?
+111. [Likely] How would you choose between full fine-tuning, LoRA, continued pretraining and prompting for a new domain, given a fixed compute and data budget? Which scaling evidence would guide you?
+112. [Likely] Explain how speculative decoding works and when it does not speed things up. Would it help an agent whose outputs are mostly short tool calls?
+113. [Likely] Mixed-precision training diverged at step 40k. How would you debug it (loss scaling, bf16 versus fp16, learning-rate schedule, data issues)?
+114. [Likely] How would you decide the training data mixture (documents, UI traces, code, general text) for a UiPath foundation model, and how would you test the mixture cheaply before a full run?
+115. [Likely] How would you explain the difference between in-context learning and fine-tuning in terms of what the model learns, and what does that imply for per-customer adaptation?
+116. [Likely] Take-home follow-up: you submitted a statistics-heavy solution. Defend your modelling assumptions, and show how your conclusion changes if one key assumption is wrong.
+
 ## References
 
-No source page could be retrieved in either run (see "Research limits" above), so no question cites a source and every question is tagged [Likely]. The official pages below are the right places to check product context (Agents, Maestro, Document Understanding, Communications Mining and the AI Trust Layer). On 2026-10-14 the network proxy blocked every fetch to them, so they are listed as unverified starting points. No question relies on them.
+The first two runs retrieved no source page. References 4-7 were added in the October 2026 deepening pass from search-result snippets. The official pages below are the right places to check product context (Agents, Maestro, Document Understanding, Communications Mining and the AI Trust Layer). On 2026-10-14 the network proxy blocked every fetch to them, so they are listed as unverified starting points. No question relies on them.
 
 1. UiPath Careers, uipath.com (official careers page; unverified, fetch blocked). https://www.uipath.com/company/careers
 2. UiPath Blog, uipath.com (official product and AI announcements; unverified, fetch blocked). https://www.uipath.com/blog
 3. UiPath Documentation portal, docs.uipath.com (product documentation; unverified, fetch blocked). https://docs.uipath.com
+4. Prachub, "UiPath Machine Learning Engineer Interview Experience — LLM Agent Q&A, a LeetCode 837 Variant, and a Coding Reject" (Agents team, 2026; seen as a search-result snippet only). https://prachub.com/interview-experiences/uipath-machine-learning-engineer-interview-experience-llm-agent-qanda-a-leetcode-837-variant-and-a-coding-reject
+5. Glassdoor, UiPath interview review, Research Scientist, London, April 2025 (seen as a search-result snippet only). https://www.glassdoor.co.nz/Interview/UiPath-Interview-E1102519-RVW96319156.htm
+6. Glassdoor, UiPath interview review, Research Scientist, London, June 2025 (seen as a search-result snippet only). https://www.glassdoor.co.nz/Interview/UiPath-Interview-E1102519-RVW98010961.htm
+7. Principal Applied Scientist job posting, UiPath (via remotivated.com; product context only, not an interview report). https://remotivated.com/jobs/principal-applied-scientist-e786c87c

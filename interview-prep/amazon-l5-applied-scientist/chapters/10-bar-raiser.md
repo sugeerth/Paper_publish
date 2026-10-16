@@ -333,11 +333,55 @@ Indented bullets are follow-up probes. In a BR round, expect at least two of the
 106. (Extra round after a split debrief) Let's revisit coding with a follow-up problem. [Reported] [17]
 107. (Downlevel conversation) We think your scope maps to L4. Would you consider that level? [Likely] (BR-driven downleveling reported in [11][15])
      - What evidence from your past work would change our assessment?
-108. Why Amazon, and why this team? [Reported] [28]
+108. Why Amazon, and why this team? [Reported] [28][33]
      - Which LP do you find hardest to live by?
 109. Is there anything the earlier interviewers did not ask that you want me to know? [Reported] [32]
      - Which LP does that story show?
 110. What questions do you have for me about how Amazon hires and develops scientists? [Likely]
+
+## Deepening pass (October 2026): newly reported questions
+
+> Method: five web searches (Blind/Reddit, 1point3acres in Chinese, Glassdoor/Prepfully, LP-phrase search, PracHub). Page fetches were not attempted; every tag below rests only on the search-result title or snippet. Blind, Reddit and 1point3acres returned almost nothing specific to the AS II Bar Raiser. Format signals from the snippets: a 2025 Seattle PhD candidate said their Bar Raiser "only focused on Leadership Principles" while the other rounds were technical, alongside a separate tech-talk round [35]. A 2025 Vancouver AS candidate summarized the BR as "a lot of examples for the leadership principles" [36]. A 2025 new-grad Blind post (role not stated) reported a BR of about 22 minutes [33]. Existing question 108 (Why Amazon) now also cites [33].
+
+### New [Reported] questions
+
+111. Introduce yourself. [Reported] [33] (BR opener in a 2025 new-grad loop, role not stated)
+     - Which part of that background is most relevant to this team?
+112. Give me an example that shows Dive Deep. [Reported] [33] (the LP was named in the snippet; exact wording not given)
+     - What was the lowest level of detail you personally checked?
+113. Give me an example that shows Learn and Be Curious. [Reported] [33] (LP named only; compare question 69)
+     - What did you learn that changed how you work today?
+114. Give me an example that shows Earn Trust. [Reported] [33] (LP named only; compare question 71)
+     - How did you rebuild trust after it had been damaged?
+115. Tell me about a time you showed leadership in a challenging situation and had to make a key decision. [Reported] [34] (Data Scientist onsite, Bar Raiser behavioral loop)
+     - What options did you reject, and why?
+     - How did you communicate the decision to people who disagreed?
+116. How did you keep a team's morale up while it was under heavy pressure? [Reported] [34] (Data Scientist onsite, Bar Raiser behavioral loop)
+     - How did you know morale was slipping?
+     - What did you do that cost you something personally?
+
+### New [Likely] questions (gap closers for the L5 bar)
+
+117. Tell me about a time new data made you change your mind on a science decision you had argued for. [Likely] (Are Right a Lot)
+     - How quickly did you change course, and who did you tell?
+118. Tell me about a time a customer or partner team asked for a model feature you thought was the wrong solution. [Likely] (Customer Obsession vs. what the customer asked for)
+     - What did you build instead, and did they agree afterwards?
+119. Tell me about a time you had to deliver after a key teammate or collaborator left mid-project. [Likely] (Deliver Results)
+     - What did you drop, and who agreed to that?
+120. Tell me about a time you wrote a six-pager or science document that changed a team's plan. [Likely] (written narrative culture)
+     - What was the hardest question in the review, and how did you answer it?
+121. Tell me about a time you deliberately chose not to pursue a promising research idea because of cost or scale. [Likely] (Frugality, Think Big trade-off)
+     - How did you estimate the cost?
+122. Tell me about a time you made a fast, reversible decision on a model or experiment and later had to undo it. [Likely] (Bias for Action, two-way doors)
+     - What did undoing it cost?
+123. Tell me about a time you interviewed or helped hire a scientist, and how you judged the bar. [Likely] (Hire and Develop the Best)
+     - What signal made you vote no?
+124. Tell me about a time a launch you owned created an unintended effect for customers or employees outside your team. [Likely] (Success and Scale Bring Broad Responsibility)
+     - How did you find out, and what did you change?
+125. Tell me about a time you made your team's work easier or more enjoyable, beyond your own deliverables. [Likely] (Strive to be Earth's Best Employer)
+     - How did you know it helped?
+126. Pick the story you would least like me to probe. Walk me through it now. [Likely] (BR stress probe on story consistency)
+     - Which detail in it would you most like to restate?
 
 ---
 
@@ -375,3 +419,7 @@ Indented bullets are follow-up probes. In a BR round, expect at least two of the
 30. "Amazon Machine Learning Engineer Interview Process", kevin-2023-code/Tech-Interview-Questions, GitHub (MLE and AS loops; Bar Raiser and project deep-dive sections). Read in full in this pass. https://github.com/kevin-2023-code/Tech-Interview-Questions/blob/main/companies/amazon/interview-process-machine-learning-engineer.md
 31. "Amazon Software Engineer Interview Process", kevin-2023-code/Tech-Interview-Questions, GitHub (Bar Raiser and hiring-manager sections; disagree-and-commit grading, GenAI questions). Read in full in this pass. https://github.com/kevin-2023-code/Tech-Interview-Questions/blob/main/companies/amazon/interview-process-software-engineer.md
 32. "Amazon Frontend Engineer Interview Process", kevin-2023-code/Tech-Interview-Questions, GitHub (Bar Raiser section: separate-day BR, backend-background BR, closing "anything else" invitation). Read in full in this pass. https://github.com/kevin-2023-code/Tech-Interview-Questions/blob/main/companies/amazon/interview-process-frontend-engineer.md
+33. "Amazon interview experience timeline, almost a 1 year process, 2025 grad", Blind (BR about 22 minutes: introduction, Why Amazon, Dive Deep, Learn and Be Curious, Earn Trust; role not stated). Search snippet only, October 2026. https://www.teamblind.com/post/amazon-interview-experience-timeline-almost-a-1-year-process-2025-grad-0fbl4cvy
+34. Amazon Interview Questions (page 14), PracHub ("Demonstrate Leadership in Challenging Situations and Decision-Making", Amazon Data Scientist Onsite, Bar-Raiser Behavioral Loop; morale-under-pressure prompt). Search snippet only, October 2026. https://prachub.com/companies/amazon?page=14
+35. Amazon interview review RVW96903377, Glassdoor (2025 Seattle PhD Applied Scientist candidate: tech talk round plus a Bar Raiser that "only focused on Leadership Principles"). Search snippet only, October 2026. https://www.glassdoor.fr/Entretien/Amazon-Entretien-E6036-RVW96903377.htm
+36. Amazon interview review RVW97603690, Glassdoor (2025 Vancouver Applied Scientist: "Bar-Raiser: A lot of examples for the leadership principles"). Search snippet only, October 2026. https://www.glassdoor.fr/Entretien/Amazon-Entretien-E6036-RVW97603690.htm

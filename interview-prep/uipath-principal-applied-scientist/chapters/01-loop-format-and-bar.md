@@ -104,7 +104,7 @@ Use this layout to structure any prompt below, so the interviewer can see every 
    - Where do you put guardrails, and what happens when a tool call fails halfway through?
 10. [Likely] Design an orchestration layer that coordinates several agents and robots across a multi-step business process (for example, order-to-cash).
    - How do you make the process recoverable and auditable after a crash?
-   - How do you stop an agent from looping forever or spending too much?
+   - How do you stop an agent from looping forever or spending too much? (A close variant, stopping runaway tool-calling loops, is [Reported] [3] from a 2026 UiPath MLE agents-team screen.)
 11. [Likely] Design an evaluation system for enterprise agents whose prompts, tools and underlying LLMs change often.
    - How do you build test sets when customer data is private and differs per tenant?
    - How would you calibrate an LLM-as-judge against human labels, and what agreement level would you accept?
@@ -291,9 +291,57 @@ Use this layout to structure any prompt below, so the interviewer can see every 
 92. [Likely] How does UiPath evaluate agents today, and what is the biggest gap?
 93. [Likely] What constraints from on-prem and regulated customers most shape model and architecture choices?
 
+## Deepening pass (October 2026): newly reported questions
+
+> **What changed.** This pass used 5 web searches. Glassdoor, Blind and Reddit pages were not fetched directly; tags rest only on search-result titles and snippets. The closest match to this role is a September 2026 PracHub account of a UiPath **Machine Learning Engineer** loop on an agents team [3]: recruiter call, hiring-manager chat, then a one-hour technical round on LLM and agent fundamentals plus coding, where the candidate was rejected on coding. That is a mid-level loop, not a principal one, so expect these as screen-level probes; a principal loop will push them further. Aggregator pages also say UiPath loops can include presentations and system design rounds depending on role [6], and that the number of rounds can grow past what HR first states. No staff- or principal-level applied scientist report was found. Reported questions from adjacent roles (data scientist, software engineer) are labelled with that role.
+
+### L. Newly reported questions (adjacent UiPath roles)
+
+94. [Reported] [3] Explain the Transformer architecture's internals (UiPath MLE, agents team, 2026).
+    - Where does compute and memory go at inference time for long agent contexts?
+95. [Reported] [3] How does beam search work, and when would you use it instead of sampling?
+    - Why is beam search rarely used for open-ended agent generation but still useful for constrained extraction?
+96. [Reported] [3] What is LoRA, and why does it work?
+    - How do you pick rank and target modules, and what do you lose compared with full fine-tuning?
+97. [Reported] [3] How does an LLM actually call a tool? Walk through it from the tool schema in the prompt to the executed call.
+98. [Reported] [3] How do you enforce a tool-call format so the model's output always parses?
+    - When would you use constrained decoding versus validate-and-retry?
+99. [Reported] [3] How do you stop an agent from getting stuck in a runaway tool-calling loop?
+    - What budgets, loop detectors or planner changes would you put in place, and how would you test them?
+100. [Reported] [3] Coding: solve a variant of LeetCode 837 (New 21 Game), a probability dynamic-programming problem with a sliding-window sum.
+    - What are the time and space complexity, and how do you avoid the O(N*K) solution?
+101. [Reported] [4] (UiPath data scientist) Write a SQL query that computes a rolling average over the last 30 days using window functions.
+102. [Reported] [5] (UiPath software engineer onsite) Given documents, find pairs of words that occur within a distance threshold of each other.
+    - How does your solution scale to a large corpus?
+
+### M. Gap-closing questions for the principal bar
+
+103. [Likely] Design a RAG pipeline for document processing that limits hallucinated field values. (A prep-site guide for UiPath AI Engineer lists this theme [7]; no candidate report confirms it.)
+    - How do you verify that every extracted value is grounded in a specific span of the source document?
+104. [Likely] How would you choose an embedding model for long technical documents such as contracts or manuals? (Theme from the same prep-site guide [7].)
+    - How do you trade chunk size, context length and retrieval cost, and how would you evaluate the choice?
+105. [Likely] Design a structured-output service that guarantees schema-valid tool calls across several LLM providers, some of which do not support constrained decoding.
+    - Which metric (for example, parse-failure rate per provider and per schema) would you alert on?
+106. [Likely] Your agent benchmark has 200 tasks and two candidate models differ by 3 points. How do you decide whether the difference is real?
+    - How do you compute confidence intervals with repeated non-deterministic runs, and how many tasks would you need?
+107. [Likely] For 300-page contracts, when would you rely on a long-context model and when would you retrieve? Design the decision and the evaluation.
+108. [Likely] Design a training loop that improves a computer-use agent from its own trajectories (reward models, verifiable rewards or preference data).
+    - How do you stop reward hacking against your task checker?
+109. [Likely] Coding: implement a minimal agent loop with a tool registry, JSON argument validation, retries, a step budget and loop detection.
+    - How would you unit-test it with a mocked LLM?
+110. [Likely] Coding: implement beam search for a toy language model given a next-token probability function.
+    - How would you add length normalisation and a constraint that output must match a schema?
+111. [Likely] Design interoperability so that third-party agents (for example, agents speaking MCP or an agent-to-agent protocol) can be orchestrated alongside UiPath agents and robots.
+    - How do you apply governance, identity and audit to an agent you did not build?
+
 ## References
 
-No source pages could be retrieved in this run (see "Research limits" above), so no question cites a source. The official pages below are the right starting points for checking the format notes and product context. They are listed for verification and were not read in this run. A fetch of each was tried again on 2026-10-14 and blocked by the network (DNS failure or proxy 403), so whether they are live could not be confirmed. Both are long-standing official UiPath URLs and are kept only as starting points; no question relies on them.
+References 1 and 2 come from the original run, when no source pages could be retrieved (see "Research limits" above). References 3 to 7 were added in the October 2026 deepening pass from search-result snippets; the pages themselves were not fetched. The official pages below are the right starting points for checking the format notes and product context. They are listed for verification and were not read in this run. A fetch of each was tried again on 2026-10-14 and blocked by the network (DNS failure or proxy 403), so whether they are live could not be confirmed. Both are long-standing official UiPath URLs and are kept only as starting points; no question relies on them.
 
 1. UiPath Careers, uipath.com (official careers page; not retrieved in this run). https://www.uipath.com/company/careers
 2. UiPath Blog, uipath.com (official product and AI announcements; not retrieved in this run). https://www.uipath.com/blog
+3. PracHub, "UiPath Machine Learning Engineer Interview Experience — LLM Agent Q&A, a LeetCode 837 Variant, and a Coding Reject" (candidate report, September 2026; known from search snippet only). https://prachub.com/interview-experiences/uipath-machine-learning-engineer-interview-experience-llm-agent-qanda-a-leetcode-837-variant-and-a-coding-reject
+4. Interview Query, "UiPath Data Scientist Interview Questions + Guide in 2025" (third-party guide; known from search snippet only). https://www.interviewquery.com/interview-guides/uipath-data-scientist
+5. 1point3acres, "uipath Software Engineer Onsite Interview Process and Coding Problems" (candidate report; known from search snippet only). https://www.1point3acres.com/interview/thread/1089797
+6. Hyring, "UiPath Interview Process & Experience (2026)" (aggregator of public candidate reports; known from search snippet only). https://hyring.com/jobseeker-toolkit/interview-questions/company/uipath
+7. Dataford, UiPath AI Engineer interview guide (prep-site guide, not a candidate report; known from search snippet only). https://dataford.io/interview-guides/uipath/ai-engineer

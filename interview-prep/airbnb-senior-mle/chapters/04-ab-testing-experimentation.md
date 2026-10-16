@@ -1,6 +1,6 @@
 # 04. A/B Testing and Experimentation Deep Dive: ERF, Marketplace Interference, Variance Reduction, Interleaving and Sequential Testing
 
-> Research note (read first). This chapter went through an adversarial review on 2026-10-14. During that review the egress proxy blocked medium.com, arxiv.org, igotanoffer.com, glassdoor.com, dl.acm.org, airbnb.tech, teamblind.com, 1point3acres.com, leetcode.com and reddit.com, and the shared web-search budget was already used up. Only raw.githubusercontent.com was reachable. Five GitHub-hosted sources were fetched and read: two curated indexes of company engineering posts [23][24], which confirm the title, URL and year of the Airbnb posts cited here; the community Airbnb question list [22]; and two general ML/DS interview question banks. None of them contains a candidate report of an Airbnb experimentation or A/B-testing question. **Every question is therefore tagged [Likely].** No question is tagged [Reported], and none could honestly be. The 2024-2026 candidate reports the review set out to find (Glassdoor, Blind, 1point3acres, LeetCode Discuss) could not be reached. Citations such as "[Likely; 3]" point to the publication that makes a topic a plausible probe. They do not mean the question was asked. The References section marks each entry as **confirmed via index** (title, URL and year confirmed from [23] or [24], page itself not opened), **verified** (page fetched and read) or **unverified** (from prior knowledge only). To close the gap, rerun with web access and look for real candidate reports.
+> Research note (read first). This chapter went through an adversarial review on 2026-10-14. During that review the egress proxy blocked medium.com, arxiv.org, igotanoffer.com, glassdoor.com, dl.acm.org, airbnb.tech, teamblind.com, 1point3acres.com, leetcode.com and reddit.com, and the shared web-search budget was already used up. Only raw.githubusercontent.com was reachable. Five GitHub-hosted sources were fetched and read: two curated indexes of company engineering posts [23][24], which confirm the title, URL and year of the Airbnb posts cited here; the community Airbnb question list [22]; and two general ML/DS interview question banks. None of them contains a candidate report of an Airbnb experimentation or A/B-testing question. **Every question is therefore tagged [Likely].** No question is tagged [Reported], and none could honestly be. The 2024-2026 candidate reports the review set out to find (Glassdoor, Blind, 1point3acres, LeetCode Discuss) could not be reached. Citations such as "[Likely; 3]" point to the publication that makes a topic a plausible probe. They do not mean the question was asked. The References section marks each entry as **confirmed via index** (title, URL and year confirmed from [23] or [24], page itself not opened), **verified** (page fetched and read) or **unverified** (from prior knowledge only). To close the gap, rerun with web access and look for real candidate reports. **Update (2026-10-16):** a deepening pass found aggregator snippets of candidate reports. Questions 47, 65 and 112 are now tagged [Reported], and new reported questions are in the "Deepening pass" section near the end; see refs [41]-[45].
 
 ## Format notes
 
@@ -125,7 +125,7 @@
 45. Airbnb Experiences has far smaller inventory than Homes, with fixed time slots that sell out. How would interference and power differ from a Homes ranking test, and how would you design an Experiences ranking experiment? [Likely; 38]
 46. How would you use a market-level holdout ("launch everywhere except these N cities") to validate the global effect of a ranking system after launch? [Likely]
     - How do you choose holdout markets, and how do you analyze them (difference-in-differences, synthetic control)?
-47. When randomization at the right level is impossible, how would you estimate the causal effect of a marketplace-wide change? [Likely; 14]
+47. When randomization at the right level is impossible, how would you estimate the causal effect of a marketplace-wide change? [Reported (Data Scientist loop: "estimate the impact of a global launch without a holdout"); 43][14]
     - How does a counterfactual model (predict what would have happened without the change) work, and how do you validate it?
     - What assumptions does synthetic control rely on, and how would you check them?
 
@@ -164,7 +164,7 @@
 
 ### F. Offline-online gap and ML-specific experimentation
 
-65. Your new ranking model improves offline NDCG by 2%, but the A/B test shows no booking lift. What are the possible reasons, and how do you debug? [Likely; 2][5]
+65. Your new ranking model improves offline NDCG by 2%, but the A/B test shows no booking lift. What are the possible reasons, and how do you debug? [Reported (Senior MLE onsite, April 2026: pushed on offline versus online metric disagreement); 41][2][5]
     - Could position bias or feedback loops in the training data explain it?
     - How would you tell a modeling problem apart from an experiment-sensitivity problem?
 66. Airbnb's deep-learning search papers describe many launches that improved offline metrics but failed online. How would you build an offline metric that better predicts online wins? [Likely; 2][5]
@@ -250,7 +250,7 @@
 
 ### K. Pricing, Smart Pricing and host-side experiments
 
-112. Design an experiment for a change to a host price-suggestion model. What is randomized, and what is measured? [Likely; 7][12]
+112. Design an experiment for a change to a host price-suggestion model. What is randomized, and what is measured? [Reported (Data Scientist question list: "A/B test a pricing suggestion tool for hosts"); 43][7][12]
     - Hosts may ignore suggestions. How does adoption affect your estimand (intent-to-treat versus compliers)?
     - How do you prevent treatment hosts' price changes from affecting control hosts' bookings?
 113. How would you estimate the price elasticity of demand from experiments without running illegal or unfair price discrimination on guests? [Likely]
@@ -285,6 +285,40 @@
 131. What is the difference between relative and absolute lift, and how do you build a confidence interval for relative lift? [Likely]
 132. What is the difference between a cluster-randomized design's unit of randomization and its unit of analysis, and how do you compute the standard errors? [Likely]
 133. What is Twyman's law, and how does it apply to experiment review? [Likely]
+
+## Deepening pass (October 2026): newly reported questions
+
+Five web searches were run on 2026-10-16. Direct Glassdoor, Blind and LeetCode Discuss threads still did not surface; the hits were interview-experience aggregators (PracHub, Codemia) and search snippets of their pages. Pages were not opened, so wording is paraphrased from snippets. Most reported experimentation items come from Airbnb **Data Scientist** loops, and the role is named on each tag; treat them as strong signals for an MLE role that names experimentation, not as MLE reports. Three existing questions were retagged in place: 47, 65 and 112.
+
+### Newly reported
+
+134. A model scores bookings or listings, and the business needs a decision threshold. How do you tune that threshold: what do you choose offline from ROC/PR curves, and what must you settle with an online A/B test on business metrics? [Reported (Senior MLE onsite, April 2026: probed on threshold tuning); 41]
+    - Offline precision improves at the new threshold, but the A/B test shows a guardrail drop. Which do you trust?
+    - Would you test several thresholds as arms at once, and how does that change the power and multiple-testing picture?
+135. Design an experiment to test new pricing tiers. Include the sample-size calculation, the metrics and the analysis plan. [Reported (Data Scientist onsite, aggregator); 42]
+    - What are your primary and guardrail metrics?
+    - How do novelty, network effects and interference change the design?
+136. A new guest booking feature will run as a 14-day test. Choose the primary and guardrail metrics, and work out whether 14 days gives enough power. [Reported (Data Scientist question list, posted October 2025); 43]
+    - If 14 days is underpowered, what would you change: the metric, the allocation, variance reduction or the duration?
+137. Walk me through an experiment you designed or analyzed, from design to decision: the unit, the metrics, the result and a trade-off you managed. [Reported (Data Scientist HR screen); 44]
+    - How did you check for sample-ratio mismatch, broken instrumentation, novelty and interference?
+    - Which segments did you look at, and how did you avoid fishing?
+138. Design ranking for a search surface with no text query, such as map browsing, flexible-destination or home-page browsing. How would you evaluate it offline, and how would you design the online test? [Reported (Senior+ MLE loop, September 2026: "search ranking without text queries"; the experimentation follow-ups are [Likely]); 45]
+    - With no query, what is the analysis unit and what counts as a "successful" session?
+    - How would you debug a production regression found after launch?
+
+### Gap-closing [Likely] questions
+
+139. Plan the ramp for a new ranking model from 1% to 100%. What do you check at each stage, and when can you reuse an earlier stage's data in the final analysis? [Likely]
+140. Users in this experiment's buckets were in another experiment last month. How could carryover from that earlier experiment bias your result, and how does the platform prevent it (re-salting, cool-down periods)? [Likely; 3]
+141. You find a meaningful pre-period imbalance between arms on bookings after the test has started. Do you re-randomize, adjust with CUPED or regression, or carry on? [Likely]
+142. You randomize by market-and-date clusters. Show how the intra-cluster correlation (design effect) enters the sample-size calculation, and what that means for duration. [Likely; 13]
+143. Several candidate ranking models are ready, but search traffic is limited. How do you allocate traffic and prioritize experiments to maximize learning velocity without underpowering each test? [Likely; 8]
+144. How would you measure the online impact of a listing-photo-quality or listing-quality model whose outputs only change ranking indirectly and affect hosts' behaviour over months? [Likely; 43]
+145. A team proposes a new metric for the experiment scorecard. How do you validate its sensitivity and directionality against a corpus of past experiments before adopting it? [Likely]
+146. How would you A/B test an LLM-powered search or trip-planning feature where answers are non-deterministic and quality is hard to log? Which online metrics and which offline evaluations would gate the launch? [Likely]
+147. A model update changes calibration but not ranking order. Which downstream experiments and systems (pricing, fraud thresholds, guardrails) could still be affected, and how would you test for that? [Likely]
+148. Treatment hosts receive a feature, and some never adopt it. How do you estimate the effect on adopters (complier average causal effect), and when is that the number leadership should see instead of the intent-to-treat effect? [Likely; 7]
 
 ## References
 
@@ -330,3 +364,8 @@ Status key: **verified** = fetched and read during the 2026-10-14 review. **Conf
 38. "Machine Learning-Powered Search Ranking of Airbnb Experiences", Airbnb Engineering (Medium), 2019. https://medium.com/airbnb-engineering/machine-learning-powered-search-ranking-of-airbnb-experiences-110b4b1a0789 (confirmed via index [23][24])
 39. "Building Airbnb Categories with ML and Human-in-the-Loop", Airbnb Engineering (Medium), 2022. https://medium.com/airbnb-engineering/building-airbnb-categories-with-ml-and-human-in-the-loop-e97988e70ebb (confirmed via index [23])
 40. "How AI Text Generation Models Are Reshaping Customer Support at Airbnb", Airbnb Engineering (Medium), 2022. https://medium.com/airbnb-engineering/how-ai-text-generation-models-are-reshaping-customer-support-at-airbnb-a851db0b4fa3 (confirmed via index [24])
+41. "Airbnb Senior Machine Learning Engineer Interview Experience: Four ML System Design Rounds, Rejected on Calibration", PracHub (candidate report, April 2026 onsite). https://prachub.com/interview-experiences/airbnb-senior-machine-learning-engineer-interview-experience-four-ml-system-design-rounds-rejected-on-calibration (search snippet only, 2026-10-16)
+42. "Design an A/B test for a pricing model", Codemia (Airbnb Data Scientist onsite practice item). https://codemia.io/practice/design-an-a-b-test-for-a-pricing-model-48 (search snippet only, 2026-10-16)
+43. "Airbnb Interview Questions", PracHub company question list (pages 2-3). https://prachub.com/companies/airbnb?page=2 and https://prachub.com/companies/airbnb?page=3 (search snippets only, 2026-10-16; the snippets did not say which page holds each question; much of the content is paywalled)
+44. "Walk through an experiment from design to decision", PracHub (tagged Airbnb Data Scientist HR screen). https://prachub.com/interview-questions/walk-through-an-experiment-from-design-to-decision (search snippet only, 2026-10-16)
+45. "Airbnb Senior+ Machine Learning Engineer Interview Experience: Search Ranking and Team Matching", PracHub (candidate report, September 2026). https://prachub.com/interview-experiences/airbnb-seniorplus-machine-learning-engineer-interview-experience-search-ranking-and-team-matching (search snippet only, 2026-10-16)

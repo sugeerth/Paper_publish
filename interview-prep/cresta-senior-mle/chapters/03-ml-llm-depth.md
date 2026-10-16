@@ -198,7 +198,7 @@
 99. Design a conversation analytics or "AI analyst" system that answers natural-language questions over millions of conversations. [Likely] [18][21]
     - How do you keep aggregate statistics accurate when an LLM produces them?
 100. Design per-customer model customization (adapters, prompts, policies) with safe rollout and rollback. [Likely] [10][14]
-101. Design an evaluation platform for AI agents that catches regressions across prompt and model changes. Go deep on the metrics, judges and statistical gates. [Reported] [7]
+101. Design an evaluation platform for AI agents that catches regressions across prompt and model changes. Go deep on the metrics, judges and statistical gates. [Reported] [7][28]
 102. Design a feedback loop that turns agent accept/reject actions and supervisor reviews into training data. [Likely] [17]
 
 ## Research, papers and ML foundations
@@ -208,6 +208,29 @@
 105. Explain backpropagation through attention. Why does layer normalization placement matter for training stability? [Likely]
 106. How do you explain to a customer why an AI suggestion or score was produced? [Likely]
 107. How do you handle data privacy, retention and consent when you train on customer conversations? [Likely] [27]
+
+## Deepening pass (October 2026): newly reported questions
+
+Search notes: five targeted searches (Glassdoor/Blind/PracHub/1point3acres/interviewing.io, English and Chinese phrasing) found no new MLE-specific onsite report. Two adjacent Cresta reports surfaced, both from Software Engineer loops, so treat them as signals of shared rounds rather than confirmed MLE content. Q101 now also cites the September 2026 PracHub onsite report [28].
+
+108. In the "evaluation platform for AI agents" design round, the users are teams building agents that analyze contact-center conversations. Beyond task accuracy, how would the platform measure tool usage and response speed when a system prompt or model changes? [Reported] [28] (Software Engineer onsite, system design round)
+     - How would you show a team, per change, which conversations regressed and why?
+     - How do you compare latency and tool-call counts fairly across models with different output lengths?
+109. Which AI trends are you following right now, and which do you think matter most for contact-center products? [Reported] [29] (Software Engineer tech phone screen, alongside a coding task)
+     - Which recent trend would you not bet on for Cresta, and why?
+
+### Gap-closing questions for the senior level
+
+110. A fine-tuning run's loss spikes and then diverges midway through training. How would you debug it (data batch, learning rate schedule, precision, gradient norms), and how would you decide whether to restart from a checkpoint? [Likely] [23]
+111. Your eval set is built from past conversations, and the base model may have seen similar public data. How do you detect test-set contamination or leakage between training transcripts and evaluation transcripts? [Likely] [7]
+112. How would you design constrained or structured decoding (JSON schema, grammar) for extraction at scale? What does it cost in latency and quality compared with free generation plus validation and retry? [Likely] [22]
+113. How would you estimate uncertainty for an LLM-generated answer or extracted field (self-consistency, token log-probs, a verifier model), so the product can abstain or route to a human? [Likely] [18]
+114. Labeling budget is limited. How would you use active learning to choose which conversations human reviewers label next for a per-customer model or an LLM judge? [Likely] [16][17]
+115. Compliance rules (required disclosures, forbidden promises) must hold on every call. Would you enforce them with a separate guardrail classifier, with rules, or inside the agent prompt? How do you measure the guardrail's miss rate when violations are rare? [Likely] [19][26]
+116. Explain mixture-of-experts models. What do they change for serving cost, latency and multi-LoRA adaptation compared with a dense model of similar quality? [Likely] [10]
+117. Explain FlashAttention and why attention is memory-bound. How does it change what context lengths are practical for real-time assist on long calls? [Likely]
+118. Can acoustic and prosodic signals (tone, pace, interruptions) improve sentiment or escalation prediction over transcript-only models? How would you fuse audio and text features, and prove the gain is worth the extra latency? [Likely] [14][24]
+119. You must migrate every customer from one base model to a newer one. How would you plan the migration (re-training adapters, re-calibrating judges and thresholds, staged rollout) and decide which customers move first? [Likely] [10][17]
 
 ## References
 
@@ -238,5 +261,7 @@
 25. Cresta on Greenhouse, "Senior Machine Learning Engineer (ASR)". https://job-boards.greenhouse.io/cresta/jobs/5101011008
 26. Built In Vancouver, "Senior Machine Learning Engineer, Cresta" (Agentic Assist track). https://builtinvancouver.org/job/senior-machine-learning-engineer/8619914
 27. CX Today, "Cresta CEO Ping Wu: Many Contact Centers Misunderstand the Value of LLMs". https://www.cxtoday.com/contact-center/cresta-ceo-ping-wu-many-contact-centers-misunderstand-the-value-of-llms/
+28. PracHub, "Cresta Software Engineer Interview Experience — System Design Round: Build an Eval Platform for AI Agents" (September 2026 onsite; measure how prompt or model changes affect agent performance, including tool usage and response speed), 2026. https://prachub.com/interview-experiences/cresta-software-engineer-interview-experience-system-design-round-build-an-eval-platform-for-ai-agents
+29. 1point3acres, "Cresta Software Engineer Tech Phone Screen Overview" (implementing Wikipedia API calls and discussing AI trends; candidate advanced to the virtual onsite). https://www.1point3acres.com/interview/thread/1173094
 
 *Removed or replaced in review:* the Blind Cresta AI SWE AMA thread (it no longer supported any question here). The Blind company-posts page (its "know GenAI/RAG stuff" quote could not be confirmed, and chapter 01 had already dropped it). The Scoutify guide (a generic template, not candidate reports). The startup.jobs and Built In Bristol reposts, replaced by the original Greenhouse postings (refs 24 and 25). The opaque `cresta.com/?p=30805` link, replaced by the canonical voice-stack post (ref 15). Generic filler was removed: "implement logistic regression or k-means from scratch" (a coding item covered in chapter 02), "design an ML pipeline with a feature store" (too generic), and "walk through a project you led" (covered in chapter 05). The bias-variance question was rewritten into a senior-level overfitting and leakage question (Q19).

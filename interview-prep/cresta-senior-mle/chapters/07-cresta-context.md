@@ -323,6 +323,45 @@ These questions draw on public background that is not sourced in this guide. Cre
 97. What is the current state of the Ocean model family, and how does it relate to the per-customer adapters? [Likely] [7]
 98. Which parts of Conductor and AI agent building are owned by ML engineers, and which by product engineers? [Likely] [25]
 
+## Deepening pass (October 2026): newly reported questions
+
+> Five web searches were run for this pass: English and Chinese ("面经") queries, plus queries scoped to PracHub, Glassdoor/Blind/1point3acres and Reddit/LeetCode. None turned up a new Cresta ML system design or product-context question for the Senior MLE onsite. Search snippets confirm that PracHub has a Cresta machine learning category page, but the snippets did not show its question text, so nothing was added from it. One new candidate report from an adjacent round was found and is listed below with that round named. No existing [Likely] question was supported strongly enough by a snippet to be retagged.
+
+### Newly reported (adjacent round)
+
+99. Implement a client that calls the Wikipedia API, then discuss current AI trends. Extend it for this chapter: how would that external-API client become a tool an AI Agent calls during a live conversation? [Reported] [29] (reported in a Software Engineer technical phone screen; the AI Agent tool extension is [Likely])
+    - How do you handle timeouts, rate limits and pagination when the caller is a real-time voice agent?
+    - Which current AI trends do you think matter most for Cresta's products, and how would they change one of the designs in this chapter?
+
+### Gap-closing questions for the senior level
+
+100. An AI Agent prompt change ships and, within an hour, the agent starts promising refunds that policy does not allow for one large customer. Design the kill switch and incident response: how do you limit the blast radius, roll back for one tenant, and find the affected conversations? [Likely] [23] (extends question 34)
+     - Sketch: per-tenant feature flags and config pins, policy-violation alerting, rollback service, affected-conversation query over traces, and customer notification workflow.
+     - What should the system do automatically, and what needs a human decision?
+101. Customers edit their AI Agent prompts and flows, and Cresta also upgrades the base prompts and models underneath. Design config versioning so a platform upgrade does not overwrite or break a customer's customizations. [Likely] [25]
+     - Sketch: layered config (platform base, vertical template, tenant overrides), version graph, three-way merge, per-tenant regression run, and a staged opt-in.
+     - How do you tell a customer that their override is now the cause of a regression?
+102. Should Cresta's voice agent use a cascaded pipeline (ASR, LLM, TTS) or an end-to-end speech-to-speech model? Draw both and compare latency, controllability, tool use, evaluation and compliance logging. [Likely] [19]
+     - What would you need to see in an offline evaluation before switching one customer to speech-to-speech?
+103. Cresta wins its first customer in a new vertical (for example, healthcare scheduling) with no historical conversations it may use. How would you bootstrap Agent Assist or an AI Agent for them? [Likely]
+     - Sketch: synthetic conversation generation from SOPs and KB, cross-vertical transfer, simulated testing, a human-reviewed pilot, and a data collection plan.
+     - How do you keep synthetic data from teaching patterns that real customers never show?
+104. You must upgrade the embedding model behind Knowledge Assist and conversation search for every tenant. Design the re-indexing and cutover so retrieval quality does not drop and the live product has no downtime. [Likely] [21]
+     - Sketch: dual-write or shadow index per tenant, backfill scheduler with cost limits, offline retrieval evaluation per tenant, index alias swap, and rollback.
+     - Which tenants do you migrate first, and why?
+105. A support call lasts 75 minutes. Design how Insights and summarization handle conversations longer than the model's useful context: long-context models, hierarchical summarization or turn-level extraction. [Likely] [21]
+     - How do you evaluate whether facts from the middle of the call are lost?
+106. LLM judges show position bias, length bias and a preference for outputs from their own model family. Design an evaluator pipeline that measures and reduces these biases when judges gate AI Agent releases. [Likely] [14]
+     - Sketch: swapped-order pairwise runs, length-controlled comparisons, cross-family judge panel, expert calibration set, and bias dashboards.
+107. Callers to a bank's voice agent may use synthetic or cloned voices to pass authentication. Design fraud and spoofing detection inside the voice agent's authentication step. [Likely] [12]
+     - Sketch: audio anti-spoofing model, behavioral and metadata signals, risk score, step-up verification (one-time code), and escalation to a human.
+     - How do you set the false-positive rate when every false alarm adds friction for a real customer?
+108. A third-party frontier model that several AI Agent customers depend on is announced for deprecation in 90 days. Plan the migration across all affected tenants. [Likely]
+     - Sketch: dependency inventory per tenant, candidate replacement models, per-tenant regression and simulation runs, prompt adaptation, staged cutover, and a fallback.
+     - How do you handle a tenant whose agent regresses on the replacement and cannot be fixed in time?
+109. As the senior engineer, you disagree with a product manager who wants to launch an AI Agent feature for a customer before its evaluation metrics meet the agreed launch bar. How would you use data and the system design to resolve the disagreement? [Likely] [9][11]
+     - What would you offer instead: a narrower scope, shadow mode, or human-in-the-loop launch?
+
 ## References
 
 1. Glassdoor, "Cresta (CA) Interview Questions" (Senior Machine Learning Engineer review: recruiter call, LeetCode-medium, vibe-coding and system design rounds; "How would you deploy a model in production?"), 2025-2026. https://www.glassdoor.co.in/Interview/Cresta-CA-Interview-Questions-E3180909.htm
@@ -353,5 +392,6 @@ These questions draw on public background that is not sourced in this guide. Cre
 26. Cresta Blog, "Grounding Reality: How Cresta Tackles LLM Hallucinations in Enterprise AI". https://cresta.com/blog/grounding-reality---how-cresta-tackles-llm-hallucinations-in-enterprise-ai
 27. Glassdoor, "Cresta (CA) Interview Experience and Questions" (Forward Deployed Engineer technical screen: "What is RAG, and how do you prevent hallucination?"), 2026. https://www.glassdoor.com/Interview/Cresta-CA-Interview-Questions-E3180909.htm
 28. PracHub, "Cresta Interview Questions" (company page; "Design sequence decoding with greedy and beam search"), 2025. https://prachub.com/companies/cresta
+29. 1point3acres, "Cresta Software Engineer Tech Phone Screen Overview" (full-time SWE phone screen: implementing Wikipedia API calls and discussing AI trends; candidate moved to the virtual onsite). https://www.1point3acres.com/interview/thread/1173094
 
 *Changed in review:* No cited page could be opened (proxy refusals and DNS failures for every domain), and no web search was possible, so citations were checked against the search-result excerpts already reviewed in chapters 01-05. Removed as uncited or unsupported: the second Glassdoor regional mirror (glassdoor.ca), the Blind "Cresta senior backend SWE interview" thread (its excerpt supports only an online assessment), the Blind AMA thread (no excerpt in this guide supports it), the 1point3acres company page (uncited here) and the Scoutify guide (a generic template, not a candidate report). The 1point3acres thread title was corrected. Two references were added: the Glassdoor FDE report and the PracHub company page. Both [Reported] tags in the original chapter (agent evaluation platform; deploying a model in production) match reviewed excerpts and were kept. Four [Reported] variants from adjacent Cresta rounds were added, each naming its round. Two questions were removed as duplicates: "extract top agents' behaviors and generalize them" (same as the top-performer coaching design) and "human-in-the-loop assist-then-automate" (same as the assist-to-AI-Agent transition design). All other added questions are [Likely].

@@ -15,7 +15,7 @@
 
 ### A. Booking and reservation system
 
-1. Design Airbnb's booking system: guests search for available listings and book them, and the system must never double-book a listing. [Reported] [1][3][5][25][27][29]
+1. Design Airbnb's booking system: guests search for available listings and book them, and the system must never double-book a listing. [Reported] [1][3][5][25][27][29][46][51]
    - What functional requirements would you commit to in the first few minutes, and what would you explicitly leave out?
    - Is a booking request a strongly consistent write? Which parts of the flow can be eventually consistent?
    - How do you guarantee two guests cannot book overlapping dates on the same listing at the same moment?
@@ -74,7 +74,7 @@
 
 ### C. Search and discovery backend
 
-23. Design the Airbnb home page: search, availability and ranking. [Reported] [1][3]
+23. Design the Airbnb home page: search, availability and ranking. [Reported] [1][3][48]
     - What are the latency budgets for retrieval, filtering and ranking?
     - How does the page behave when the ranking service is slow or down?
 24. Design ranking for home search results when the user has typed no text query (only location, dates and guests). [Reported] [3]
@@ -116,7 +116,7 @@
 37. Design guest-host messaging on Airbnb: messages tied to a listing or reservation, with read receipts and translation. [Likely]
     - How do you store the conversation so it is linked to the reservation and visible to support agents?
     - Where would you hook in fraud or off-platform-payment detection without adding latency to sending?
-38. Design a unified notification platform for guests, hosts and employees, covering event-triggered sends (an email when a guest books, a door lock code by SMS on check-in morning) and batch campaigns (promotions to prospective hosts). [Reported] [1][3][4][26][40]
+38. Design a unified notification platform for guests, hosts and employees, covering event-triggered sends (an email when a guest books, a door lock code by SMS on check-in morning) and batch campaigns (promotions to prospective hosts). [Reported] [1][3][4][26][40][46]
     - How do you prioritize transactional notifications over marketing?
     - How do you de-duplicate, rate-limit per user and respect quiet hours across time zones?
     - What happens when a downstream provider (APNs, FCM, an SMS gateway) is slow or failing?
@@ -145,9 +145,9 @@
 48. Design host payouts: scheduling, splits among co-hosts, multiple currencies and payout methods. [Likely] [1]
 49. Design refunds across multiple payment methods and dates, honoring a priority order. [Likely] [10]
 50. How do you make refunds idempotent when the refund request, the provider callback and an agent's manual action can all arrive more than once? [Likely] [1]
-51. Design a double-entry ledger for Airbnb's payments platform. [Likely]
+51. Design a double-entry ledger for Airbnb's payments platform. [Reported] [46]
     - How do you reconcile your ledger against the payment processor's settlement files?
-52. Design a banking-like service with deposit, withdraw, transfer and balance-history queries by time. How would you turn it into a distributed service that handles concurrent transactions? [Likely] [1][16]
+52. Design a banking-like service with deposit, withdraw, transfer and balance-history queries by time. How would you turn it into a distributed service that handles concurrent transactions? [Reported] [1][16][46]
 53. Design a currency-conversion and price-display service that shows consistent prices from search through checkout. [Likely]
     - How do you lock an exchange rate for a quote?
 54. Design a retryer or retry library for calls to unreliable downstream services. [Likely] [1][19]
@@ -226,7 +226,8 @@
     - Which subset of SQL (select, where, join, group by) do you commit to, and why?
 86. Design an online two-player chess game. [Reported] [3][4][38]
     - What does the API look like? How do you sync game state in real time and handle disconnects and clocks?
-87. Design a rate limiter for Airbnb's public APIs and internal services. [Likely]
+87. Design a rate limiter for Airbnb's public APIs and internal services. [Reported] [47]
+    - How do you handle millions of requests per second, and which consistency, availability and performance trade-offs do you accept for a distributed limiter? [47]
 88. A partner API complains that your service calls it too often. Redesign the integration to batch the calls without breaking freshness guarantees. [Likely] [19][41]
 89. Design a distributed cache in front of the listing service, and explain invalidation when a host edits a listing. [Likely]
 90. Design account merge and user de-duplication for people who create multiple accounts. [Likely] [1]
@@ -249,7 +250,7 @@
 
 98. What are your back-of-the-envelope numbers for this design (QPS, storage, peak-to-average ratio)? [Likely] [1][17]
 99. You have 45 minutes. Which two components would you deep-dive, and why those? [Likely] [1]
-100. Write out the API and the core tables before you draw any boxes. Which queries does each index serve? [Likely] [1][16][19]
+100. Write out the API and the core tables before you draw any boxes. Which queries does each index serve? [Reported] [1][16][19][49]
 101. How do you deploy a schema change to the reservations table with zero downtime? [Likely]
 102. How would you run this system across multiple regions? What happens during a region failover in the middle of a booking? [Likely] [17]
 103. What metrics, alerts and SLOs would you define for this service? [Likely] [11]
@@ -258,6 +259,57 @@
 106. If traffic grew 10x tomorrow, what breaks first? [Likely]
 107. What would you simplify if you had to ship a first version in two weeks? [Likely] [1]
 108. How do you secure personal data (addresses, IDs, payment details) in this design, and who can access it? [Likely]
+
+
+## Deepening pass (October 2026): newly reported questions
+
+This pass used five web searches on 2026-10-16. Only search-result titles and snippets were read, because the pages themselves could not be fetched. As a result, the round, level and date are known only as far as a snippet states them. Several sources are question aggregators (PracHub, Codemia, Prepfully), not first-hand reports. They count as [Reported] only where the snippet ties the prompt to an Airbnb interview. The pass also moved these existing questions from [Likely] to [Reported]: Q51 and Q52 (banking-ledger designs [46]), Q87 (rate limiter, Airbnb technical screen, August 2025 [47]) and Q100 (a separate DB-design round in a senior onsite [49]). It added citations to Q1 [46][51], Q23 [48] and Q38 [46].
+
+### Newly reported
+
+109. Design a system whose main focus is caching strategy. [Reported] [50]
+    - Which data would you cache at each layer (client, CDN, service, database), and with which eviction and invalidation policies?
+    - How do you prevent a cache stampede when a hot key expires?
+    - How do you keep cached prices and availability correct enough for checkout?
+110. Design a system for real-time content personalization. [Reported] [51]
+    - Which signals must be fresh within seconds, and which can be computed in batch?
+    - How do you combine the streaming session features with precomputed user embeddings at request time?
+    - How do you degrade gracefully when the real-time feature path is late or down?
+111. Design a property damage claims system: hosts file claims after a stay, and the system collects evidence, assesses the claim and pays it out. [Reported] [52][53]
+    - What are the claim states, and how do you make each transition auditable?
+    - Where would an ML model score fraud or claim severity, and what does a human reviewer see?
+    - How do you tie the claim to the reservation, the payments ledger and messages between guest and host?
+112. Design an ML system that identifies family-friendly listings. [Reported] [54]
+    - Where do labels come from, and how do you handle sparse or noisy signals?
+    - Offline metrics improve but online metrics do not. How do you investigate the disagreement? [54]
+    - How do you trade off precision, recall and serving latency for this classifier? [54]
+113. Design the search and ranking architecture for Airbnb end to end, covering scalability, data storage, caching and real-time updates. [Reported] [48]
+    - Before you draw anything, what QPS, storage and bandwidth estimates do you commit to?
+    - Where in the retrieval and ranking cascade do fresh availability and price updates enter?
+
+### Additional [Likely] questions for the senior MLE bar
+
+114. Design the client-side event logging SDK for web, iOS and Android, used for ranking training data and experiment exposures. [Likely]
+    - How do you batch, buffer offline and de-duplicate events without losing exposures?
+    - How do you version the event schema so downstream pipelines do not break?
+115. Design a training-data pipeline in which labels arrive late or are revised, for example bookings later cancelled or reviews posted weeks after a stay. [Likely]
+    - How do you choose the label window, and how do you rebuild training sets when labels change?
+116. Design a model registry with lineage that links each deployed model to its feature definitions, data snapshots, code version and experiment results. [Likely]
+    - How would you use lineage to find every model affected by a broken upstream table?
+117. Design a shared GPU and CPU training scheduler for many ML teams, with quotas, priorities and preemption. [Likely]
+    - How do you keep large backfills and retraining jobs from starving interactive experimentation?
+118. Design near-real-time experiment health monitoring that detects sample ratio mismatch, logging gaps and guardrail breaches within an hour of launch. [Likely]
+    - Which checks run in streaming and which in batch? Who gets paged, and what is stopped automatically?
+119. Design user-data deletion (a right-to-be-forgotten request) across the feature store, training datasets, logs and model artifacts. [Likely]
+    - Do you need to retrain models after a deletion? How do you prove the deletion happened?
+120. Design the serving infrastructure for an LLM-based assistant that drafts replies for guests, hosts or support agents. [Likely]
+    - How do you control cost and latency (caching, smaller models, routing), and what is the fallback when the provider is slow?
+    - How do you log prompts and outputs for evaluation without storing personal data you should not keep?
+121. A pricing model writes nightly price suggestions for millions of listing-nights. Design the bulk write path so it does not overload the availability and pricing databases or conflict with host edits. [Likely]
+    - How do you roll back a bad model's prices across all listings quickly?
+122. Design the geo-indexing service behind map and location search, including how it is updated when hosts create, move or deactivate listings. [Likely]
+    - How do you handle very dense cities alongside sparse rural areas within one index?
+123. Your ranking service's p99 latency doubled after a model launch. Walk through how you find the cause across the feature fetch, model inference and candidate retrieval, and what you change in the architecture. [Likely]
 
 ## References
 
@@ -308,3 +360,12 @@ All sources were fetched on 2026-10-14 except [9], which could not be reached (m
 43. Airbnb MLE report: two ML design rounds, on listing recommendation and price prediction, FlowSight/coding (1p3a #79). https://github.com/FlowSight/coding/blob/main/company%20wise/airbnb/1p3a/79.md
 44. Airbnb infrastructure report: coding on updating a cache with dependent entries (a DAG), FlowSight/coding (1p3a #35). https://github.com/FlowSight/coding/blob/main/company%20wise/airbnb/1p3a/35.md
 45. Airbnb onsite report: "classic design group chat", approached like a WhatsApp design, FlowSight/coding (1p3a #3). https://github.com/FlowSight/coding/blob/main/company%20wise/airbnb/1p3a/3.md
+46. "Airbnb Interview Questions" (PracHub company question listing, page 2: says booking-system and banking-ledger designs recur for Software Engineer roles; lists "Design a scalable notification system", last seen November 2025). Search-snippet only, fetched 2026-10-16. https://prachub.com/companies/airbnb?page=2
+47. "Design a Rate Limiting Service" (Codemia practice problem tagged as an Airbnb technical screen question, August 2025). Search-snippet only, 2026-10-16. https://codemia.io/practice/design-a-rate-limiting-service-12
+48. "Design Airbnb Search and Ranking" (Codemia practice problem tagged as an Airbnb Machine Learning Engineer onsite system design question, updated July 2025). Search-snippet only, 2026-10-16. https://codemia.io/practice/design-airbnb-search-and-ranking
+49. "Airbnb Senior Software Engineer Onsite Interview Experience and Questions" (rounds include DB design, coding, code review and system design), 1point3acres. Search-snippet only, 2026-10-16. https://www.1point3acres.com/interview/thread/1130049
+50. "Airbnb Software Engineer Onsite Interview Experience and Technical Questions" (undated; system design round focused on caching strategies), 1point3acres. Search-snippet only, 2026-10-16. https://www.1point3acres.com/interview/thread/737164
+51. Prepfully, Airbnb Machine Learning Engineer interview questions (listing pages 2, 4 and 8 returned; past prompts include an accommodation booking system for Airbnb and a system for real-time content personalization). Search-snippet only, 2026-10-16. https://prepfully.com/interview-questions/airbnb/machine-learning-engineer?page=2
+52. "Airbnb Fulltime Machine Learning Engineering Onsite Interview Overview", 1point3acres. Together with [53], the search snippets mention a pricing-prediction ML design round and a property damage claims system design round, without saying which thread contains which. Search-snippet only, 2026-10-16. https://www.1point3acres.com/interview/thread/1114733
+53. "Airbnb Machine Learning Fulltime Onsite Interview Experience and Insights", 1point3acres. See [52]. Search-snippet only, 2026-10-16. https://www.1point3acres.com/interview/thread/1162455
+54. "Airbnb Senior Machine Learning Engineer Interview Experience — Four ML System Design Rounds, Rejected on Calibration" (April 2026; family-friendly ML design round; follow-ups on offline versus online metric disagreement and precision, recall and latency trade-offs), PracHub. Search-snippet only, 2026-10-16. https://prachub.com/interview-experiences/airbnb-senior-machine-learning-engineer-interview-experience-four-ml-system-design-rounds-rejected-on-calibration

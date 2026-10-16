@@ -238,13 +238,13 @@
 95. Explain LoRA. [Reported] [10]
     - Compare parameter-efficient fine-tuning with full fine-tuning. Which parameters and optimizer states are trained? [Likely] (see [22])
 96. Which modern LLM training techniques do you know (pretraining, SFT, preference optimization)? [Likely] (see [34]: a 2026 Glassdoor review for an AGI-team role, not confirmed as an Applied Scientist report)
-    - Compare RLHF and DPO. What does the DPO beta control? [Likely] (Alexa postings list SFT, DPO, RLHF and RLAIF [31])
+    - Compare RLHF and DPO. What does the DPO beta control? [Reported] [38] (DPO vs RLHF reported in an April 2025 Seattle loop; Alexa postings also list SFT, DPO, RLHF and RLAIF [31])
 97. How do decoding strategies differ (greedy, beam, top-k, top-p, temperature)? [Likely]
 98. What is an encoder-decoder model such as T5, and how do you optimize it for inference? [Reported] [11]
 99. What is a mixture-of-experts layer? What do you gain in compute per token, and what problems does routing introduce (load balancing, expert collapse, serving memory)? [Likely]
 100. What do scaling laws say about splitting a fixed compute budget between model size and training tokens? When would you deliberately train a smaller model on more data? [Likely]
 101. How would you reduce hallucination in an LLM-powered assistant? Where does retrieval-augmented generation (RAG) help, and where does it not? [Likely] (Amazon's shopping assistant uses LLMs including Amazon Nova, built on Bedrock [30])
-102. How would you evaluate an LLM-based feature before launch? Compare reference-based metrics, LLM-as-a-judge and human evaluation, and name the biases of an LLM judge (position, length, self-preference). [Likely] (see [30])
+102. How would you evaluate an LLM-based feature before launch? Compare reference-based metrics, LLM-as-a-judge and human evaluation, and name the biases of an LLM judge (position, length, self-preference). [Reported] [39] (a September 2025 Seattle report extract mentions LLM evaluation metrics; see also [30])
 
 ---
 
@@ -285,6 +285,33 @@
 - **Rising in 2025-2026:** KV caching, long-context attention, cross-encoder vs bi-encoder, LoRA, and LLM training techniques (90-96).
 - **Expect derivations:** loss functions, regularization as MAP, EM, LSTM vs Transformer in math, and RNN shapes in matrix form (10, 24, 40, 78, 80).
 - **Team-dependent L5 extras (unverified, [Likely]):** calibration and counterfactual evaluation for Ads and Search (36, 38), forecasting for supply chain (115), and distillation or quantization for serving cost (75, 76).
+
+## Deepening pass (October 2026): newly reported questions
+
+Five additional web searches (Glassdoor mirrors, Blind, Reddit; LeetCode Discuss and 1point3acres returned no hits) surfaced the reports below. Glassdoor results came back as localized mirrors of the same few reviews, so the number of independent reports is smaller than the URL count suggests. Format signals from this pass: an Applied Scientist 2 candidate on r/leetcode (August 2024) said the breadth round covered a wide range of topics "with heavy emphasis on math" [40]; a 2026 Italy-mirrored review described two coding rounds plus separate ML application, ML breadth and ML depth rounds [41]; and a 2026 Santa Monica review described a job talk, ML breadth, ML coding and LeetCode [42]. In place, the RLHF-vs-DPO follow-up (96) and LLM evaluation (102) were retagged [Reported].
+
+### Newly reported
+
+118. Explain the attention mechanism in depth. How does BERT differ from GPT? [Reported] [38][39]
+     - How do the training objectives (masked LM versus next-token prediction) and the attention masks (bidirectional versus causal) differ?
+     - Which would you use for classification or retrieval embeddings, and which for generation? Why?
+119. Why would you use retrieval-augmented generation (RAG) instead of fine-tuning? [Reported] [39]
+     - When is fine-tuning the better choice, and when would you combine both?
+     - How do freshness, attribution, cost and hallucination risk factor into the decision?
+
+### Gap-closing additions for L5
+
+120. Compare collaborative filtering with content-based filtering. When would you build a hybrid, and how does each handle new items and new users? [Likely] (a May 2025 Seattle review extract surfaced in search mentions this question, but it could not be matched to a specific URL)
+121. Derive the gradient of softmax cross-entropy with respect to the logits. Why does it reduce to (p - y)? [Likely]
+122. What is the difference between generative and discriminative classifiers? Compare Naive Bayes and logistic regression in terms of data efficiency and asymptotic error. [Likely]
+123. Write the SVM primal with hinge loss. What does the dual give you, and how does the kernel trick work? [Likely]
+     - Which training points end up as support vectors, and why?
+124. What is the curse of dimensionality? How does it affect distance-based methods, density estimation and nearest-neighbor retrieval? [Likely]
+125. How do you handle missing data? Distinguish MCAR, MAR and MNAR. When does imputation bias your model, and when should missingness itself be a feature? [Likely]
+126. Why is the sample variance divided by n - 1? What makes an estimator unbiased versus consistent, and when would you accept a biased estimator with lower variance? [Likely]
+127. How does teacher forcing work when training a decoder? What is exposure bias, and how does it show up at inference time? [Likely]
+128. Distinguish covariate shift, label shift and concept drift. How would you detect each, and how would you correct covariate shift with importance weighting? [Likely]
+129. When does multi-task learning help, and what causes negative transfer between tasks (for example, jointly predicting click and purchase)? How would you weight the task losses? [Likely]
 
 ---
 
@@ -327,3 +354,8 @@
 35. Salinas, Flunkert, Gasthaus and Januschowski (Amazon), "DeepAR: Probabilistic Forecasting with Autoregressive Recurrent Networks", arXiv:1704.04110, 2017 (published in International Journal of Forecasting, 2020). https://arxiv.org/abs/1704.04110
 36. Ansari et al. (Amazon), "Chronos: Learning the Language of Time Series", arXiv:2403.07815, 2024. https://arxiv.org/abs/2403.07815
 37. Linden, Smith and York, "Amazon.com Recommendations: Item-to-Item Collaborative Filtering", IEEE Internet Computing 7(1), 2003. https://doi.org/10.1109/MIC.2003.1167344
+38. Glassdoor, Amazon interview review, Seattle, April 2025 (Applied Scientist loop: attention mechanism, BERT vs GPT, DPO vs RLHF; told to review transformers and GenAI post-training; tech talk and Bar Raiser rounds), surfaced via search snippets; page not fetched. https://www.glassdoor.fr/Entretien/Amazon-Entretien-E6036-RVW96903377.htm (mirrors: https://fr.glassdoor.ch/Entretien/Amazon-Entretien-E6036-RVW96903377.htm ; https://www.glassdoor.es/Entrevista/Amazon-Entrevista-E6036-RVW96903377.htm)
+39. Glassdoor, Amazon interview review, Seattle, September 2025 (LLM evaluation metrics, BERT vs GPT, why RAG instead of fine-tuning), surfaced via search snippets; the match between this extract and this review ID comes from the search tool and could not be confirmed by fetching the page. https://www.glassdoor.fr/Entretien/Amazon-Entretien-E6036-RVW100110012.htm (mirror: https://www.glassdoor.nl/Sollicitatiegesprek/Amazon-Sollicitatiegesprek-E6036-RVW100110012.htm)
+40. Reddit r/leetcode, Amazon Applied Scientist 2 interview experience, August 2024 (breadth round with heavy math emphasis; separate resume-project round), via a Redlib mirror. https://redlib.hbubli.cc/r/leetcode/s/PljCbbdntj
+41. Glassdoor Italia, Amazon interview review (five rounds: two coding, ML application, ML breadth, ML depth). https://www.glassdoor.it/Colloquio/Amazon-Colloquio-E6036-RVW101056902.htm
+42. Glassdoor, Amazon interview review, Santa Monica, 2026 (job talk, ML breadth, ML coding, LeetCode). https://www.glassdoor.co.nz/Interview/Amazon-Interview-E6036-RVW102987402.htm

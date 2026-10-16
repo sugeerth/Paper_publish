@@ -163,7 +163,7 @@ Tag legend: **[Reported]** means a cited source attributes the question, or a cl
 71. Rufus runs on several LLMs, including Amazon Nova, on Bedrock. How would you route each query between a small and a large model? [Likely] [27]
 72. How would you personalize answers with a customer's purchase and browse history while respecting privacy? [Likely] [27]
 73. You have one latency budget for an assistant answer (say, first token in under one second). How do you split it across retrieval, reranking, generation and safety filters? [Likely] [22]
-74. How would you summarize thousands of reviews into a short "Customers say" blurb, and measure faithfulness and coverage of minority opinions? [Likely]
+74. How would you summarize thousands of reviews into a short "Customers say" blurb, and measure faithfulness and coverage of minority opinions? [Reported] (Science Application round, Luxembourg, reported as "summarize product reviews into key concepts") [70]
 75. Personalized autocomplete for a chat interface: how would you rank candidate completions, and would you report saved-keystrokes@k or acceptance-rate@k? [Likely] (amazon-science personalized chat autocomplete experiments [49])
 76. How would you red-team a shopping assistant for unsafe, biased or policy-violating answers? [Likely]
 
@@ -267,6 +267,36 @@ These are [Likely] prompts. HMs often ask "What do you think of X?" about their 
 132. How would you hand this system to engineering for long-term ownership, with monitoring and retraining triggers? [Likely]
 133. Tell me about a time you influenced a team outside your own with your science. How would that look here? [Likely] (L5 scope: influence on peers and sister teams; see chapter 01)
 
+## Deepening pass (October 2026): newly reported questions
+
+Method: five web searches (English and Chinese phrasing; Blind, LeetCode Discuss and 1point3acres filters). Every useful hit was an anonymous Glassdoor review, read only as a search-result extract and not opened. The Rufus/reviews item (74) was retagged [Reported] in place from [70]. No Prime Video, Pricing, SCOT or Ads-specific reports turned up, so those sections stay [Likely].
+
+134. (Science Application round, AGI Data Services, Bellevue, April 2025.) Devise three metrics for picking high-quality data out of crowdsourced submissions. [Reported] [71]
+    - Which metric needs gold labels, and which can be computed without them?
+    - How would you detect annotators who are fast but careless, or who collude?
+    - How would you prove that filtering on your metrics improves the downstream model rather than only the metric?
+135. (System design round, Hyderabad, April 2026.) Outline an end-to-end pipeline that translates multimodal inputs (text, speech and images) into another language. [Reported] [72]
+    - Would you use a cascade (ASR/OCR, then MT, then TTS) or an end-to-end multimodal model, and why?
+    - How would you evaluate translation quality per modality when references are scarce?
+    - Where do errors compound in the cascade, and how would you localize them?
+136. (Same Hyderabad loop, a dedicated round.) Go into depth on your own projects. [Reported for the format] [72]
+    - Which decision in that project would you reverse with what you know now?
+
+### Added [Likely] questions closing gaps for the L5 team round
+
+137. Our team's data comes with noisy, weak labels (implicit feedback, LLM labels, vendor annotations). How would you estimate label noise and decide whether to invest in cleaner labels or a noise-robust loss? [Likely]
+138. Walk me through the 6-pager or design doc you would write in your first 90 days on this team. What is the customer problem, the baseline, and the decision you need from leadership? [Likely]
+139. Our production model was trained two years ago and has drifted. How would you decide between retraining, fine-tuning, or replacing it with an LLM-based approach? [Likely]
+    - What evidence would you collect before proposing a rewrite?
+140. You have one marketplace with rich data and a new marketplace with almost none. How would you launch the team's model in the new marketplace? [Likely]
+141. How would you size the business impact of your proposed model before building it (expected lift, traffic, cost to serve)? [Likely]
+    - What would make you kill the project after the first A/B test?
+142. An LLM-based component in our pipeline costs more per request than the margin it creates. How would you cut cost (distillation, caching, routing, batching) while protecting quality? [Likely]
+143. How would you set up an offline evaluation set for our team's problem that stays trustworthy as the product changes (versioning, leakage checks, refresh cadence)? [Likely]
+144. A senior engineer on the team disagrees with your modeling choice and wants a simpler heuristic. How would you settle it with data? [Likely] (Have Backbone; Disagree and Commit)
+145. Our model affects sellers or advertisers as well as customers. How would you check for unfair or unintended impact on a subgroup (small sellers, new brands, a locale)? [Likely]
+146. Which of our team's metrics do you think is the wrong north star, and what would you replace it with? [Likely]
+
 ---
 
 ## References
@@ -340,3 +370,6 @@ These are [Likely] prompts. HMs often ask "What do you think of X?" about their 
 67. amazon-science/ALoDLM, "Adaptively Looped Diffusion Language Models" (arXiv 2610.04198, 2026), GitHub; fetched and read. https://github.com/amazon-science/ALoDLM
 68. amazon-science/webie, "WebIE: Faithful and Robust Information Extraction on the Web" (ACL 2023), GitHub; fetched and read. https://github.com/amazon-science/webie
 69. amazon-science/carbon-assessment-with-ml, "CaML: Carbon Footprinting of Household Products with Zero-Shot Semantic Text Similarity" (WWW 2023 Web4Good), GitHub; fetched and read. https://github.com/amazon-science/carbon-assessment-with-ml
+70. Amazon interview review RVW99133644 (Applied Scientist, Luxembourg; Science Application round: summarize product reviews into key concepts), Glassdoor, circa 2023-2024; search-result extract only. https://www.glassdoor.sg/Interview/Amazon-Interview-E6036-RVW99133644.htm
+71. Amazon interview review RVW103552813 (Applied Scientist, AGI Data Services, Bellevue, April 2025; Science Application round: three metrics for selecting high-quality crowdsourced data), Glassdoor; search-result extract only. https://www.glassdoor.de/Vorstellungsgespräch/Amazon-Vorstellungsgespräch-E6036-RVW103552813.htm
+72. Amazon interview review RVW96903377 (Applied Scientist, Hyderabad, April 2026; system design: end-to-end pipeline translating multimodal inputs into another language; project deep-dive round), Glassdoor; search-result extract only. https://www.glassdoor.com.ar/Entrevista/Amazon-Entrevista-E6036-RVW96903377.htm

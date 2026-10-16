@@ -10,7 +10,7 @@ This chapter turns Airbnb's public ML record into questions you could be asked. 
 >
 > **Tags.** **[Reported]** means a fetched source [1]-[5] says a candidate was asked this at Airbnb, or something very close to it. **[Likely]** means an inference from Airbnb's published work, the role and the senior bar. A citation on a [Likely] question only gives context.
 >
-> **Retagging in this review.** Six questions were moved from [Reported] to [Likely] because their only sources (PracHub, Blind, CleverPrep) could not be opened: FM vs. DNN, offline-NDCG-up-but-A/B-flat, precision/recall/latency/cost, host fairness, the "family friendly" classifier and the ML-platform code review. The topics are plausible but unconfirmed.
+> **Retagging in this review.** Six questions were moved from [Reported] to [Likely] because their only sources (PracHub, Blind, CleverPrep) could not be opened: FM vs. DNN, offline-NDCG-up-but-A/B-flat, precision/recall/latency/cost, host fairness, the "family friendly" classifier and the ML-platform code review. The topics are plausible but unconfirmed. In the October 2026 deepening pass, PracHub search snippets supported three of them (FM vs. DNN, offline-up-but-A/B-flat, precision/recall/latency/cost), and those three are now [Reported] again on snippet evidence [52].
 
 ## Format notes (how this material surfaces in the loop)
 
@@ -39,11 +39,11 @@ This chapter turns Airbnb's public ML record into questions you could be asked. 
 3. [Reported] In your ranking design, the interviewer pushes on latency, feature freshness, cold start for new listings and monitoring. Which of these sets your architecture, and what would you give up first? [1]
 4. [Likely] In Airbnb search ranking, how do you balance relevance, personalization and host fairness?
    - How would you measure fairness or exposure for hosts, and which guardrail would you set on it?
-5. [Likely] Compare a factorization machine with an embedding + DNN ranker for this problem. Which would you ship, and why? [52]
+5. [Reported] Compare a factorization machine with an embedding + DNN ranker for this problem. Which would you ship, and why? Retagged in the October 2026 deepening pass: the PracHub search snippet (Senior MLE, Apr 2026) lists FM vs. embedding + DNN among the discussed topics. [52]
    - Explain the tradeoffs in interaction modeling, serving latency and debuggability.
-6. [Likely] Your new ranker improves offline NDCG, but the online A/B test is flat or negative. What do you do? [1][52]
+6. [Reported] Your new ranker improves offline NDCG, but the online A/B test is flat or negative. What do you do? Retagged in the October 2026 deepening pass: the PracHub search snippet (Senior MLE, Apr 2026) says the interviewer asked what to do when offline and online metrics disagree. [1][52]
    - Possible causes include position bias in training logs, label leakage, distribution shift, a metric mismatch with bookings, and set-level effects.
-7. [Likely] How do you trade off precision, recall, latency and infrastructure cost in a production ranking system? [52]
+7. [Reported] How do you trade off precision, recall, latency and infrastructure cost in a production ranking system? Retagged in the October 2026 deepening pass: the PracHub search snippet (Senior MLE, Apr 2026) quotes this trade-off as a past-project probe. [52]
 
 ### 1.2 Moving from GBDT to neural ranking ("Applying Deep Learning to Airbnb Search")
 
@@ -329,6 +329,47 @@ This chapter turns Airbnb's public ML record into questions you could be asked. 
 105. [Likely] A host claims their listing "disappeared" from search. How would you explain the ranking change to them?
     - What tooling (ranking dashboards, explanations) would you build for internal teams? [11]
 
+## Deepening pass (October 2026): newly reported questions
+
+> Five web searches were run on 2026-10-16. Pages themselves could not be opened, so every [Reported] tag below rests on the search-result title or snippet only. The 1point3acres threads are login-gated: only their titles and summaries are visible. [58] comes from data-science / analytics loops, not MLE loops, and is included because this role covers experimentation.
+
+### Newly reported
+
+106. [Reported] Design an ML system for property damage claims at Airbnb, for example triaging or pricing a host's damage claim after a stay. Reported in a full-time MLE onsite alongside a pricing question. [55]
+    - Is the target fraud likelihood, claim validity, payout amount, or routing priority? Can one model serve all of them?
+    - What evidence does the model see (photos, messages, check-in/out timing, guest and host history), and how do you label claims that were settled without investigation?
+    - How does this claims model relate to a booking-time risk model (question 50), and should they share features or labels?
+107. [Reported] In an ML design round on price prediction, compare tree-based models with neural networks. Which would you choose, and why? Reported in a 2022 PhD MLE loop and again in onsite overviews listing pricing prediction among ML design topics. [56][59]
+    - How does your answer change with feature types (categorical location, sparse amenities, photos and text)?
+    - How would you check that the model's price response is monotonic where it should be?
+108. [Reported] How would you choose the decision threshold for a production classifier, and when would you settle it with an A/B test instead of offline curves? [52]
+    - What business cost do you assign to false positives and false negatives, and who owns that number?
+109. [Reported] Design a system for real-time content personalization at Airbnb. Listed among candidate-submitted Airbnb MLE questions. [57]
+    - What does "real-time" mean here: in-session re-ranking, a refreshed home feed, or push notifications?
+    - Which signals must be fresh within seconds, and which can be computed daily?
+110. [Reported] Design an accommodation booking system for Airbnb. Listed among candidate-submitted Airbnb MLE questions. [57]
+    - How do you prevent double bookings for the same listing-night under concurrent requests?
+    - Where would ML plug into the booking flow (risk check, Instant Book eligibility, price display)?
+111. [Reported] Which loss functions have you used, and why did you choose each one? Listed among candidate-submitted Airbnb MLE questions. [57]
+    - When would you choose a ranking loss (pairwise, listwise) over a pointwise loss for search?
+    - When is an asymmetric or custom loss justified, as in Airbnb's pricing work? [35]
+112. [Reported] How would you control for seasonality in an A/B test? Reported in Airbnb data-science / analytics loops (Nov 2023, Nov 2024). [58]
+    - What is your experience with experimentation, and which test of yours had the most surprising result?
+    - Would you extend the test, use a pre-period covariate, or use a holdback, and why?
+
+### Gap-closing questions (inferred for the senior bar)
+
+113. [Likely] How would you use CUPED or another pre-experiment covariate to reduce variance in a booking-conversion test, and which covariate would you choose for guests who have never booked?
+114. [Likely] Product managers check experiment dashboards daily. How do you prevent peeking from inflating false positives (sequential tests, always-valid p-values, fixed horizons)?
+115. [Likely] Your ranking experiment shows a sample ratio mismatch between treatment and control. How do you find the cause, and can any of the results be trusted?
+116. [Likely] The average treatment effect of a ranker is flat, but you suspect it helps new guests and hurts repeat guests. How do you estimate heterogeneous treatment effects without p-hacking across segments?
+117. [Likely] Bookings arrive days or weeks after the search that caused them. How do you handle label delay when training a ranker daily, and when reading out an experiment that ran for two weeks?
+118. [Likely] A ranker trained on its own logged results learns a feedback loop in which top listings stay on top. How do you detect this, and what exploration or counterfactual correction would you use?
+119. [Likely] Your model's predicted booking probabilities feed pricing and ads decisions downstream. How do you check and keep calibration after each retrain?
+120. [Likely] How would you evaluate AI-generated filters or answers in natural-language search before launch, given that there is no ground-truth label for most free-text queries?
+121. [Likely] A newly launched ranker causes a drop in bookings in one region over a weekend. Walk through the incident: detection, rollback decision, root cause and the process change you would make.
+122. [Likely] As a senior engineer, how would you settle a disagreement with data science or product over whether a launch with mixed guardrail results should ship?
+
 ---
 
 ## References
@@ -386,6 +427,11 @@ Status key: **verified** = fetched and read on 2026-10-14; **URL confirmed** = t
 49. "Airbnb Adds AI-Powered Search and Social Features," Let's Data Science, 2026. Unverified. https://letsdatascience.com/news/airbnb-adds-ai-powered-search-and-social-features-dd4ce7ea
 50. "Airbnb's AI Strategy for 2026 Is Already Taking Shape," Rental Scale-Up, 2026. Unverified. https://www.rentalscaleup.com/airbnbs-ai-strategy-2026/
 51. "Airbnb Is Building an AI Agent to Preserve Customer Traffic," AltexSoft, 2025. Unverified. https://www.altexsoft.com/travel-industry-news/airbnb-is-building-an-ai-agent-to-preserve-customer-traffic
-52. "Airbnb Senior Machine Learning Engineer Interview Experience — Four ML System Design Rounds, Rejected on Calibration," PracHub, 2026. Unverified (host unreachable); its topics are used only as [Likely] context. https://prachub.com/interview-experiences/airbnb-senior-machine-learning-engineer-interview-experience-four-ml-system-design-rounds-rejected-on-calibration
+52. "Airbnb Senior Machine Learning Engineer Interview Experience — Four ML System Design Rounds, Rejected on Calibration," PracHub, Apr 2026. Page still unreachable, but search-result snippets seen on 2026-10-16 (October 2026 deepening pass) confirm four ML system / ranking / marketplace rounds, past-project probes on precision vs. recall vs. latency vs. infra cost, offline/online metric disagreement, threshold tuning via A/B test, and FM vs. embedding + DNN; questions 5-7 are retagged [Reported] on that basis. https://prachub.com/interview-experiences/airbnb-senior-machine-learning-engineer-interview-experience-four-ml-system-design-rounds-rejected-on-calibration
 53. "Airbnb senior MLE interview prep," Blind. Unverified (host unreachable). https://www.teamblind.com/post/airbnb-senior-mle-interview-prep-n1mdsd3b
 54. "Interviewing for Airbnb ML platform role," Blind, 2025. Unverified (host unreachable). https://www.teamblind.com/post/interviewing-for-airbnb-ml-platform-role-8in7czso
+55. "Airbnb Machine Learning Fulltime Onsite Interview Experience and Insights" (title and summary only: coding, project discussions, and a system design on property damage claims and pricing; details login-gated). 1point3acres, 2025. Search snippet only, 2026-10-16. https://www.1point3acres.com/interview/thread/1162455
+56. "Airbnb Fulltime Machine Learning Engineering Onsite Interview Overview" (title and summary only: ML design, pricing prediction, coding, project discussion; details login-gated). 1point3acres, 2025. Search snippet only, 2026-10-16. https://www.1point3acres.com/interview/thread/1114733
+57. "Airbnb Machine Learning Engineer interview questions" (candidate-submitted list: design an accommodation booking system, real-time content personalization, loss functions you have used). Prepfully. Search snippet only, 2026-10-16. https://prepfully.com/interview-questions/airbnb/machine-learning-engineer?page=4
+58. Airbnb interview reviews (analytics / data-science loops, Nov 2023 and Nov 2024: experimentation case study, "What is your experience with experimentation?", controlling seasonality in an A/B test). Glassdoor UK. Search snippet only, 2026-10-16. https://www.glassdoor.co.uk/Interview/Airbnb-Interview-E391850-RVW84022306.htm ; https://www.glassdoor.co.uk/Interview/Airbnb-Interview-E391850-RVW96180524.htm
+59. "2022(7-9月) MachineLearningEng 博士 全职@airbnb" (PhD full-time MLE loop: price prediction system design, comparing tree models with neural networks). 1point3acres, 2022. Search snippet only, 2026-10-16. https://www.1point3acres.com/bbs/thread-934565-1-1.html

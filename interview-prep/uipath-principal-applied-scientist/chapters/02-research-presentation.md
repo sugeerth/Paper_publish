@@ -7,7 +7,7 @@
 > - **[Likely]**: an inference from the role, the principal level and UiPath's AI products (agentic automation, Document Understanding, Communications Mining, Autopilot, the AI Trust Layer, computer vision for UI automation, process mining). No candidate has reported it.
 > - Indented sub-bullets are follow-up probes, phrased as questions.
 >
-> **Research limits (please read).** Two runs have now tried to source this chapter, and neither could do live research. In the first run the workflow's shared web-search budget (200 searches per turn) was already used up. In the second (review) run the search budget was again exhausted, and direct fetches of glassdoor.com, teamblind.com, uipath.com, docs.uipath.com and arxiv.org all failed with DNS errors (ENOTFOUND). No cited URL could be verified, and no new candidate-reported question could be found. So **no question below is tagged [Reported]**. Every question is **[Likely]**, and the format notes describe how principal-scientist job talks usually run at enterprise AI companies; they are not a confirmed UiPath process. Ask your recruiter for the presentation format, the length and who sits on the panel. A follow-up run with working search could upgrade tags to [Reported].
+> **Research limits (please read).** Two runs have now tried to source this chapter, and neither could do live research. In the first run the workflow's shared web-search budget (200 searches per turn) was already used up. In the second (review) run the search budget was again exhausted, and direct fetches of glassdoor.com, teamblind.com, uipath.com, docs.uipath.com and arxiv.org all failed with DNS errors (ENOTFOUND). No cited URL could be verified, and no new candidate-reported question could be found. So **no question below is tagged [Reported]**. Every question is **[Likely]**, and the format notes describe how principal-scientist job talks usually run at enterprise AI companies; they are not a confirmed UiPath process. Ask your recruiter for the presentation format, the length and who sits on the panel. A follow-up run with working search could upgrade tags to [Reported]. *Update (October 2026):* a deepening pass with limited search added Sections N and O; see "Deepening pass" below.
 >
 > **Review changes.** The review run removed generic and duplicate questions (for example, separate PII, mentoring and "what would you do differently" questions that repeated others). It also added principal-level stress tests that probe specific arrows on your architecture diagram (Section L) and moved general agent-design questions that Chapter 04 already covers out of this chapter.
 
@@ -257,9 +257,55 @@ Panels at this level often skip the model and ask about this loop: how the sampl
 95. [Likely] How does UiPath move applied science results into products today, and where does that stall?
 96. [Likely] What does success look like for this role after one year?
 
+## Deepening pass (October 2026): newly reported questions
+
+> **What this pass found.** Five web searches (Glassdoor, 1point3acres, Blind, PracHub, interview guides, Chinese "面经" phrasing) found no candidate report of a formal job-talk round for a UiPath principal or applied scientist. They did find nearby reports. A September 2026 PracHub write-up of a UiPath machine learning engineer process for an agent-focused team describes a 30-minute hiring-manager call about past projects, with no textbook trivia, and a technical screen on LLM and agent fundamentals [3]. A Glassdoor report for a UiPath Research Scientist role (London, April 2025) mentions a matrix-multiplication and multi-GPU question [5]. Third-party guides [4][6][7] describe a final-stage project or case presentation and LLM design topics; they are question banks, not first-hand reports. The questions below are tagged [Reported] only for what those snippets state. The role and round differ from this one, so use them as probes you could get while presenting an agent or LLM project. The format notes above stay unconfirmed.
+
+### N. Newly reported (adjacent roles and rounds)
+
+97. [Reported] [3] Walk us through the projects you have done. (Hiring-manager round, about 30 minutes, project discussion with no textbook trivia; MLE, agent-focused team, 2026.)
+    - Which of these projects is closest to the agent work this team is doing?
+    - What did you personally build, as opposed to what the team built?
+98. [Reported] [4] Present a previous project, or a hypothetical scenario relevant to UiPath's work. (Final-stage presentation or case study, per a third-party data scientist guide.)
+    - If you chose the hypothetical, which UiPath product problem did you pick, and why?
+99. [Reported] [3] How does an LLM invoke tools in your system?
+    - How do you keep the tool-call format consistent across calls and model versions?
+    - What happens when the model emits a malformed tool call?
+100. [Reported] [3] How do you stop a tool-calling loop that runs too long?
+    - What budget (steps, tokens, time, cost) ends the loop, and what does the user see when it ends?
+101. [Reported] [3] Explain Transformer internals, beam search and LoRA, and say where each one appears in the system you presented.
+    - Why did you choose LoRA (or full fine-tuning, or prompting only) for your adaptation step?
+102. [Reported] [5] What is the time complexity of matrix multiplication, and how would you parallelise it across multiple GPUs? (Research Scientist, London, 2025.)
+    - Which layers of your model would you shard, and what communication cost does that add?
+103. [Reported] [6] Design an LLM-based document-processing pipeline with guardrails. (Listed in a third-party UiPath interview guide.)
+    - Which guardrails are deterministic validators and which are model-based checks?
+104. [Reported] [7] Walk us through a RAG pipeline, an LLM system design, or a multi-agent orchestration you built. (Topics listed in a third-party UiPath AI engineer guide.)
+    - How did agents hand off state to each other, and where did that break?
+
+### O. Gap-closing questions for the principal bar
+
+105. [Likely] How did you check that your evaluation data, or your benchmark, was not already in the pretraining data of the foundation models you compared against?
+106. [Likely] For a computer-use or UI agent, which benchmark or internal suite would you trust, and how well does it predict success on real enterprise applications?
+    - How do you score partial task completion on long workflows?
+107. [Likely] How would you defend the tool-calling part of your system against prompt injection from documents, emails or web pages it reads?
+    - Which tools would you sandbox, and which would need a human approval step?
+108. [Likely] Could you train on the agent's own execution traces (successes, failures, human corrections), for example with preference optimisation or reinforcement learning? How would you stop it learning from bad traces?
+109. [Likely] How did you use LLM-generated synthetic data, and how did you show it did not narrow the model to the generator's own style or errors?
+110. [Likely] How would you attribute business value (hours saved, straight-through rate, cost per transaction) to your model rather than to process or product changes made at the same time?
+111. [Likely] What is the human-in-the-loop experience in your system: what does the reviewer see, how long does a review take, and how did you measure reviewer fatigue or over-trust?
+112. [Likely] How does your approach handle many languages and scripts, including right-to-left text and handwriting, and where does quality drop?
+113. [Likely] What did you open-source, patent or publish from this work, and how did that decision affect product advantage and hiring?
+114. [Likely] Summarise this talk for a UiPath executive in three slides: problem, bet and ask. What resources would you ask for?
+
 ## References
 
-No source page could be retrieved in either run (see "Research limits" above), so no question cites a source. The official pages below are the right places to check the format notes and product context. They were not read in either run; the review run's fetch of uipath.com failed with a DNS error, so the links are given as unverified.
+No source page could be retrieved in the first two runs (see "Research limits" above). References 3-8 come from search-result snippets in the October 2026 deepening pass; the pages themselves were not fetched. The official pages below are the right places to check the format notes and product context. They were not read in either run; the review run's fetch of uipath.com failed with a DNS error, so the links are given as unverified.
 
 1. UiPath Careers, uipath.com (official careers page; unverified, fetch failed). https://www.uipath.com/company/careers
 2. UiPath Blog, uipath.com (official product and AI announcements; unverified, fetch failed). https://www.uipath.com/blog
+3. PracHub, "UiPath Machine Learning Engineer Interview Experience: LLM Agent Q&A, a LeetCode 837 Variant, and a Coding Reject" (candidate report, Sept 2026; seen as a search snippet, page not fetched). https://prachub.com/interview-experiences/uipath-machine-learning-engineer-interview-experience-llm-agent-qanda-a-leetcode-837-variant-and-a-coding-reject
+4. Interview Query, "UiPath Data Scientist Interview Questions + Guide in 2025" (third-party guide; seen as a search snippet). https://www.interviewquery.com/interview-guides/uipath-data-scientist
+5. Glassdoor, UiPath interview review RVW98010961 (Research Scientist, London, April 2025, as described in the search summary; the URL-to-review match comes from the search summary and was not opened). https://www.glassdoor.co.nz/Interview/UiPath-Interview-E1102519-RVW98010961.htm
+6. techinterview.org, "UiPath Interview Guide (2026): RPA and Automation Engineering" (third-party guide; seen as a search snippet). https://www.techinterview.org/companies/uipath-interview-guide/?format=md
+7. Dataford, UiPath AI Engineer interview guide (third-party guide, 2026; seen as a search snippet). https://dataford.io/interview-guides/uipath/ai-engineer
+8. 1point3acres, "UiPath Machine Learning Engineering Phone Screen Interview Experience" (candidate report covering Transformer basics, behavioural questions and coding; seen as a search snippet; background only, not cited by a question). https://www.1point3acres.com/interview/thread/1140358

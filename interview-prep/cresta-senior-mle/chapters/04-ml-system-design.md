@@ -360,6 +360,48 @@
 100. How would you explain a quality regression in this system to an enterprise customer's VP of operations? [Likely]
 101. What are the top three ways this system fails in production, and how would you detect each? [Likely]
 
+## Deepening pass (October 2026): newly reported questions
+
+> **Search outcome.** Five web searches (English and Chinese 面经 phrasing; Glassdoor, Blind, Reddit, 1point3acres and PracHub) found no new first-hand Cresta MLE system design report. The only Cresta-specific candidate report in the results was the PracHub eval-platform write-up already cited as [6]. Its snippet adds detail to question 1, listed below as reported follow-ups and not counted as new questions. A third-party prep guide [30] describes a loop of recruiter screen, technical screen, ML deep dive, system design and research discussion, with an end-to-end ML system design round (data pipeline, feature store, training, serving, monitoring). It is an aggregator summary rather than a candidate report, so it supports format expectations only and no question was tagged [Reported] from it. No existing [Likely] question was retagged.
+
+**Reported detail for question 1 (eval platform for AI agents) [6]:** the snippet frames the users as teams that build agents that analyze contact-center conversations. They change an agent's system prompt or model and need to measure the impact, comparing tool usage and response speed across models.
+- How do you compare the same agent across several models on tool-usage correctness and response latency in a single report? [Reported] [6]
+- How does a team that only edited the system prompt see the impact of that one change on agent performance? [Reported] [6]
+- If the agents analyze conversations (post-call), not talk to customers, what changes in the test-set design and the metrics? [Reported] [6]
+
+**New [Likely] questions that fill gaps for the senior level:**
+
+102. Design the end-to-end ML lifecycle for one classic contact-center model (for example a call-outcome or conversion predictor): data pipeline, feature store, training, serving, monitoring and retraining. [Likely] [30]
+    - How do you avoid training/serving skew between batch features and real-time features?
+    - What triggers retraining: a schedule, a drift signal or a performance drop?
+103. Models are often trained on final, cleaned transcripts but served on streaming partials. How would you design training and evaluation so real-time models stay robust to that gap? [Likely] [16]
+    - Would you train on simulated partials, replayed ASR streams, or both?
+    - How do you measure the quality loss from partials to finals per model?
+104. Design a semantic and prompt cache for LLM calls in Agent Assist and AI agents to cut latency and cost. [Likely]
+    - What is safe to cache across conversations and tenants, and what is never safe?
+    - How do you invalidate entries when the knowledge base, prompt or model version changes?
+105. Design behavioral routing: match each incoming call to the human agent most likely to resolve it, using conversation-intelligence data. [Likely]
+    - How do you balance predicted outcome against queue wait time and fairness of workload across agents?
+    - How do you evaluate a routing policy offline when you only observe outcomes for the agent who actually took the call?
+106. Design a pipeline that improves an AI agent from production outcomes: mining failed conversations, proposing prompt or policy changes, and validating them before release. [Likely] [25]
+    - When would you use automatic prompt optimization, preference tuning (for example DPO) or a human-reviewed change?
+    - How do you stop the loop from overfitting to the evaluation set or to one customer?
+107. Design fine-tuning of a smaller open model for reliable tool calling in customer-specific agents. [Likely]
+    - Where do the training trajectories come from (frontier-model traces, simulator runs, human-corrected calls)?
+    - How do you measure argument accuracy, wrong-tool rate and unnecessary calls before and after fine-tuning?
+108. Agent acceptance of suggested responses dropped 30% overnight for one large customer. Walk through how you would diagnose it. [Likely]
+    - Which dashboards and traces would you check first (model version, prompt config, ASR quality, UI change, traffic mix)?
+    - How would your system design have made this faster to find?
+109. Design evaluation of conversational quality for a voice agent beyond task success: naturalness, turn-taking, interruptions and TTS quality. [Likely] [14]
+    - Which parts can an automated metric or LLM judge score from audio or transcripts, and which need human raters?
+    - How do you weight these against containment and resolution when choosing a release?
+110. Design fairness and bias checks for models that score human agents (QA, coaching, performance), across accents, dialects and demographics. [Likely]
+    - How do you detect that ASR errors on certain accents are lowering QA scores for some agents?
+    - What would you report to a customer, and what would block a launch?
+111. Design the build-or-buy decision and abstraction layer for ASR, TTS and LLM vendors, so the platform can switch providers per customer without rewriting features. [Likely] [15]
+    - What interface hides vendor differences in streaming, timestamps and confidence scores?
+    - How do you run a fair bake-off between vendors on each customer's own audio?
+
 ## References
 
 1. Glassdoor, "Cresta (CA) Interview Questions" (Senior Machine Learning Engineer review with systems design round; "How would you deploy a model in production?"), 2025-2026. https://www.glassdoor.co.in/Interview/Cresta-CA-Interview-Questions-E3180909.htm
@@ -391,5 +433,6 @@
 27. Cresta on Greenhouse, "Senior Machine Learning Engineer (ASR)". https://job-boards.greenhouse.io/cresta/jobs/5101011008
 28. PracHub, "Cresta Interview Questions" (company page; "Design sequence decoding with greedy and beam search"), 2025. https://prachub.com/companies/cresta
 29. 1point3acres, "Cresta Fulltime Software Engineer Tech Phone Screen: Job Dispatcher-Executor System Implementation" (title seen in a listing; full text not read), 2026. https://www.1point3acres.com/interview/thread/1172433
+30. Scoutify, "Cresta Interview Questions" (third-party prep guide, updated February 2026; loop of recruiter screen, technical screen, ML deep dive, system design and research discussion; not a candidate report). https://scoutify.com/companies/cresta/interview/
 
 *Changed in review:* The Blind thread "Cresta senior backend SWE interview" was removed. The only excerpt of it in this guide supports an online assessment, not the one-hour system design round it was cited for here, and ref 26 now points to the Glassdoor FDE report instead. References 1 (now also cited for the reported rate-limiter and worker-pool coding questions), 7, 28 and 29 match excerpts that chapters 01-03 already reviewed. Three generic probes were removed as filler: "what would you build in week one", "what would you hand to a vendor" and "twice or half the budget". Note on [Reported] tags: only questions 1-4 carry the tag. Questions 1 and 2 are reported for this round. Question 3 was reported for an FDE screen, and question 4 for an MLE phone screen. No question was retagged, because every [Reported] attribution matches an excerpt in the sibling chapters. Page contents could not be re-read live.

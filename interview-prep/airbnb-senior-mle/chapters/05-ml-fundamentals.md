@@ -82,7 +82,7 @@
 
 28. When would you choose GBDT over a deep NN for a tabular ranking problem, and vice versa? [Likely] [6]
     - Airbnb moved search from GBDT to a NN and initially saw little gain. Why does that happen, and what made the NN eventually win?
-29. Compare a factorization machine with an embedding + DNN ranker for an Airbnb ranking problem. Which would you ship, and why? [Likely] [29]
+29. Compare a factorization machine with an embedding + DNN ranker for an Airbnb ranking problem. Which would you ship, and why? [Reported] [29]
 30. A NN on the same features as your GBDT performs worse. What do you check first: normalization, distribution shape, learning rate, capacity or label noise? How do you tell which one it is? [Likely] [6]
 31. GBDTs are invariant to monotone feature transforms; NNs are not. What normalization would you apply to price, review count and distance before a NN, and why might a log or Gaussian-rank transform matter for the NN but not the trees? [Likely] [6]
 32. How would you use a GBDT and a NN together (GBDT leaves as NN features, stacking or distillation)? [Likely]
@@ -90,7 +90,7 @@
 34. Deep models are harder to interpret. How do you explain to a PM or a host why a listing ranked lower? [Likely] [6]
     - Compare SHAP, partial dependence plots and ablation-based importance. Which are trustworthy for a NN?
 35. Your NN is more accurate offline but has 3x the inference latency, and the interviewer pushes on the latency budget. How do you decide, and what closes the gap (distillation, caching, fewer candidates, smaller model)? [Reported] [1]
-36. How would you trade off precision, recall, latency and infrastructure cost when choosing a model for production ranking? [Likely] [29]
+36. How would you trade off precision, recall, latency and infrastructure cost when choosing a model for production ranking? [Reported] [29]
 37. How would you enforce a monotonicity requirement (for example, all else equal, a higher price must not raise the score)? [Likely] [7]
 38. You need to classify listings using text, photos and tabular attributes together. How would you design a multimodal model, and when is it worth it over a GBDT on hand-built features? [Likely] [22]
 
@@ -108,6 +108,7 @@
 45. Design user embeddings for semantic search (free-text queries such as "cabin with a hot tub near a lake"). [Reported] [2]
     - How would you align queries and listings in one embedding space?
     - Which training pairs and hard negatives would you use?
+    - A 2026 senior loop framed this as two-stage semantic retrieval plus ranking with user embeddings, optimized for booking conversion. How do you connect the retrieval objective to the conversion goal? [Reported] [29]
 46. How would you build embedding-based retrieval for Airbnb search and combine it with hard filters (dates, price, map bounds, guests)? Pre-filter vs. post-filter with ANN: what are the recall and latency trade-offs? [Likely] [14]
 47. Two-tower vs. cross-encoder: where in the stack would you use each, and why? [Likely] [14]
 48. Prices, photos and availability change daily. How do you keep embeddings and features fresh, and how do you measure what staleness costs you? [Reported] [1]
@@ -145,7 +146,7 @@
 
 71. How do you translate an offline metric (NDCG, AUC) into an expected online metric (bookings, revenue), and which A/B test would confirm it? [Reported] [1]
     - Have you validated the correlation between your offline metric and online lift across past launches?
-72. Offline NDCG improved, but the online A/B test is flat or negative. List the hypotheses you would investigate, in order: training-serving skew, logging bias, metric mismatch, novelty, low power, interference between listings. How do you rule each out? [Likely] [6][29]
+72. Offline NDCG improved, but the online A/B test is flat or negative. List the hypotheses you would investigate, in order: training-serving skew, logging bias, metric mismatch, novelty, low power, interference between listings. How do you rule each out? [Reported] [29] [6]
 73. Why can a model trained on logs from the old ranker look good offline but fail online? How would off-policy evaluation (IPS, doubly robust) help, and what assumptions does it need? [Likely] [7][28]
 74. When would you use interleaving instead of an A/B test to compare two rankers? [Likely] [13]
     - What does interleaving measure well, and what can it not tell you (revenue, long-term effects)?
@@ -173,7 +174,7 @@
 ### I. Regression, forecasting and pricing-flavoured modeling
 
 91. Design a model that helps hosts set a price for each future date, using market demand. What exactly is the target: the booked price, the listed price, or a demand curve? [Reported] [4][5]
-92. Predict the nightly price for a brand-new listing with no booking history. What features and model would you use, and how do you evaluate it? [Reported] [5]
+92. Predict the nightly price for a brand-new listing with no booking history. What features and model would you use, and how do you evaluate it? [Reported] [5][31]
 93. Airbnb proposed a customized regression loss for price suggestions because true "optimal price" labels do not exist. How would you learn a price when you only see booked or not booked at a set price? [Likely] [12]
 94. How would you estimate demand elasticity when price is confounded with listing quality and seasonality? [Likely] [12]
 95. How would you evaluate a price-suggestion model offline when hosts can ignore the suggestion? [Likely] [12]
@@ -184,7 +185,7 @@
 
 98. Design the label and model for detecting fake or fraudulent listings, when positives are rare and arrive late. How do you handle labels that only exist for cases an earlier model or rule flagged (selection bias)? [Likely]
 99. Predict party risk at reservation time. The label (a reported party) is rare and noisy. How would you build it, and which features would you refuse to use for fairness reasons? [Likely] [1]
-100. A property-damage risk score feeds a protection or screening decision. How do asymmetric error costs shape the threshold, and why does calibration matter here? [Likely] [1]
+100. A property-damage risk score feeds a protection or screening decision. How do asymmetric error costs shape the threshold, and why does calibration matter here? [Reported] [32] [1]
 101. Build a classifier that flags "family friendly" listings. Where do labels come from (weak supervision, rules, raters), and how do you measure precision on a long tail of listing types? [Likely] [29]
 102. How do you evaluate a classifier when precision matters far more than recall (for example, removing a host's listing)? [Likely]
 103. How would you use text (descriptions, messages) in a classifier: TF-IDF + GBDT, a fine-tuned transformer, or LLM embeddings? [Likely] [22]
@@ -211,7 +212,7 @@
 
 ### M. Senior-level depth probes (deep dive and design rounds)
 
-117. In the ML project you are walking us through, why did you choose this model, feature set or serving path over the alternatives? [Reported] [1]
+117. In the ML project you are walking us through, why did you choose this model, feature set or serving path over the alternatives? [Reported] [1][36]
 118. In your most impactful model, which single modeling decision mattered most, and how do you know? [Likely] [1]
 119. Tell me about a time a simpler model (heuristic, logistic regression, GBDT) beat a more complex one in production. Why did it win? [Likely]
 120. What did you choose *not* to model, and why? [Likely]
@@ -219,6 +220,40 @@
 122. Given twice the data, twice the features or twice the model capacity, which would you take for Airbnb search, and why? [Likely]
 123. The interviewer redirects you mid-design (for example, from regression to classification). How do you restate the narrower scope and adapt your modeling plan? [Reported] [1]
 124. How do you explain a ranking model's trade-offs to a PM who only cares about bookings? [Likely]
+
+## Deepening pass (October 2026): newly reported questions
+
+Sources: five WebSearch queries run on 2026-10-16. The tags below rely only on search-result titles and snippets, because most of the underlying pages need a login. In this pass, a search snippet from [29] (PracHub, April 2026) was enough to retag Q29, Q36 and Q72 to [Reported]. A 1point3acres snippet describing an ML onsite with "system design for property damage claims and pricing" [32] supports retagging Q100. Snippets [31] and [36] add citations to Q92 and Q117.
+
+### Newly reported
+
+125. Debug a model that shows unexpected behaviour (for example, a sudden metric drop or predictions that do not make sense). How do you work through data, features, model and evaluation in that order? [Reported] [33][34]
+     - How do you tell a data-pipeline or logging problem apart from a real modeling problem? [Reported] [33]
+     - Which production-debugging signals (feature distributions, null rates, score distributions, segment metrics) would you check first? [Likely]
+126. Explain how gradient boosting works. How does it differ from bagging or random forests in its effect on bias and variance? [Reported] [34]
+     - Which hyperparameters (learning rate, number of trees, depth, subsampling) control overfitting, and how would you tune them? [Likely]
+     - How would you evaluate a boosted model, and what feature-engineering steps does it still need? [Reported] [34]
+127. Explain the bias-variance trade-off. Give an example from your own work where it affected a model's results. [Reported] [35]
+     - What did you change to move along the trade-off, and how did you confirm it helped? [Likely]
+128. Design an ML system that detects and redacts sensitive information (PII, contact details, payment data) in documents or messages. [Reported] [33]
+     - Is this token classification, span extraction or an LLM-based pipeline? How do you defend the framing? [Likely]
+     - Recall matters more than precision for leaks, but over-redaction breaks the product. How do you set the operating point and measure both? [Likely]
+     - Where do labels come from, and how do you cover new formats and languages? [Likely]
+129. Design a model for property damage claims (for example, triaging claims, estimating claim validity or payout). What is the label, and how do you handle late, noisy and adversarial outcomes? [Reported] [32]
+     - How do you combine the claim model with pricing or protection decisions without creating a feedback loop? [Likely]
+130. The ML practitioner round uses a real problem that Airbnb's product or business is working on now. Given such a problem, how would you decide whether ML is the right tool, and what is the simplest model you would ship first? [Reported] [37]
+     - Which Airbnb-specific constraints (two-sided marketplace, sparse bookings, host acceptance, seasonality) change your approach? [Likely]
+
+### Gap-closing questions for the Senior level
+
+131. Your validation AUC is suspiciously high (for example, 0.99) on a booking or fraud model. How do you hunt for target leakage, and which feature types usually cause it? [Likely]
+132. Compare L1 and L2 regularization for a model with millions of sparse ID and cross features. When would you use each, and how do they interact with embeddings in a NN? [Likely]
+133. Distinguish covariate shift, label shift and concept drift with Airbnb examples (a new market, a pandemic, a policy change). Which detection method and which mitigation fits each? [Likely]
+134. How would you cross-validate when rows are grouped (many searches per user, many nights per listing) and ordered in time? What goes wrong with plain k-fold? [Likely]
+135. Permutation importance and GBDT gain disagree on which features matter, and several features are strongly correlated. Which do you trust, and how do you decide whether to drop a feature? [Likely]
+136. How would you attach uncertainty to a model's prediction (quantile loss, ensembles, MC dropout, conformal prediction)? When does a host- or trust-facing decision need it? [Likely]
+137. Explain why a NN ranker's training can diverge or stall (exploding gradients, dead ReLUs, bad initialization, learning rate). Which diagnostics would you look at? [Likely]
+138. When would you prefer online or incremental learning over periodic batch retraining for a ranking or pricing model? What are the stability and feedback-loop risks? [Likely]
 
 ## References
 
@@ -252,5 +287,12 @@
 26. Haldar et al., "Learning to Rank for Maps at Airbnb," arXiv 2407.00091 (KDD 2024). (not verified; taken from Chapter 09) https://arxiv.org/abs/2407.00091
 27. Tang, Gao, He and Katariya, "Multi-objective Learning to Rank by Model Distillation," arXiv 2407.07181 (KDD 2024). (not verified; taken from Chapter 09) https://arxiv.org/abs/2407.07181
 28. Zhang et al., "Harnessing the Power of Interleaving and Counterfactual Evaluation for Airbnb Search Ranking," arXiv 2508.00751, 2025. (not verified; taken from Chapter 09) https://arxiv.org/abs/2508.00751
-29. "Airbnb Senior Machine Learning Engineer Interview Experience — Four ML System Design Rounds, Rejected on Calibration," PracHub, 2026. Not reachable in this session. The topics cited here (FM vs. embedding + DNN; precision/recall/latency/cost trade-offs; offline NDCG up but A/B flat; a "family friendly" classifier) come from Chapter 09's summary. "Calibration" in the title may refer to level calibration, not probability calibration. https://prachub.com/interview-experiences/airbnb-senior-machine-learning-engineer-interview-experience-four-ml-system-design-rounds-rejected-on-calibration
+29. "Airbnb Senior Machine Learning Engineer Interview Experience — Four ML System Design Rounds, Rejected on Calibration," PracHub, 2026. Not reachable in this session. A 2026-10-16 search snippet confirmed an April 2026 date, four design rounds, follow-ups on precision/recall/latency trade-offs, offline vs. online metric disagreement and FM vs. embedding + DNN, and a two-stage semantic retrieval + ranking round with user embeddings for booking conversion. The other topics cited here (FM vs. embedding + DNN; precision/recall/latency/cost trade-offs; offline NDCG up but A/B flat; a "family friendly" classifier) come from Chapter 09's summary. "Calibration" in the title may refer to level calibration, not probability calibration. https://prachub.com/interview-experiences/airbnb-senior-machine-learning-engineer-interview-experience-four-ml-system-design-rounds-rejected-on-calibration
 30. Yan, "applied-ml: Papers & tech blogs by companies sharing their work on data science & machine learning in production" (used to confirm Airbnb paper and blog titles and URLs). eugeneyan/applied-ml, GitHub. Fetched 2026-10-14. https://github.com/eugeneyan/applied-ml
+31. "Airbnb Fulltime Machine Learning Engineering Onsite Interview Overview" (search snippet: ML design, pricing prediction, coding challenges and project discussions; full text needs a login). 1point3acres. Seen in search 2026-10-16. https://www.1point3acres.com/interview/thread/1114733
+32. "Airbnb Machine Learning Fulltime Onsite Interview Experience and Insights" (search snippet: coding tests, project discussions, and system design for property damage claims and pricing; full text needs a login). 1point3acres. Seen in search 2026-10-16. https://www.1point3acres.com/interview/thread/1162455
+33. "Airbnb Senior+ Machine Learning Engineer Interview Experience — Search Ranking and Team Matching" (search snippet, Sep 2026: virtual onsite on document redaction, project decisions, search ranking without text queries, and retrieval-assisted guidance for customer-support staff; advice to cover data, models, features, evaluation and production debugging). PracHub. Seen in search 2026-10-16. https://prachub.com/interview-experiences/airbnb-seniorplus-machine-learning-engineer-interview-experience-search-ranking-and-team-matching
+34. "Airbnb Machine Learning Engineer Interview Guide" (prep-site process guide, not a single candidate report. Search snippet: the screen covers Pandas data manipulation, gradient boosting, feature engineering and model evaluation; the onsite ML loop includes a "debug a model with unexpected behavior" round). Interview Query. Seen in search 2026-10-16. https://interviewquery.com/interview-guides/airbnb-machine-learning-engineer
+35. Prepfully, Airbnb Machine Learning Engineer question bank (search snippet: candidate-submitted bias-variance trade-off question asking for an example; entry about four years old). Seen in search 2026-10-16. https://prepfully.com/interview-questions/airbnb/machine-learning-engineer?page=9
+36. "ML experience round at Airbnb" (search snippet: loop of LeetCode, standard ML design and an ML experience round, which was mostly a casual conversation about a past project). Blind. Seen in search 2026-10-16. https://www.teamblind.com/post/ml-experience-round-at-airbnb-sorv1g3x
+37. "Airbnb senior MLE interview prep" (search snippet: the ML practitioner round is tailored to Airbnb's engineering challenges; questions likely involve a real product or business problem the company is working on now). Blind. Seen in search 2026-10-16. https://www.teamblind.com/post/airbnb-senior-mle-interview-prep-n1mdsd3b

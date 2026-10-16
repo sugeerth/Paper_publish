@@ -193,6 +193,31 @@
 103. What is the on-call expectation for MLEs, and who owns model incidents? [Likely]
 104. What does success look like for this role at 6 and 12 months? [Likely]
 
+## Deepening pass (October 2026): newly reported questions
+
+*Search note.* Five web searches (English and Chinese, across Blind, Reddit, 1point3acres, Glassdoor, Prepfully and interviewing.io) found no candidate report of a Cresta Senior MLE project deep dive or hiring-manager round. One snippet supports a new reported topic, but for a SWE phone screen, not this role or round. Search results also showed a Blind thread about a 1.5-hour FDE practical where AI tools are allowed [34]. That is a report of format, not of a question, so it adds no question here. No existing [Likely] question was retagged, because no snippet reported its wording for Cresta.
+
+### Newly reported
+
+105. Which AI trends are you following right now, and which of them changed how you built or would rebuild your project? [Reported for a Cresta SWE phone screen: "discussing AI trends"; asked with this round's project framing here] [33]
+     - Which trend do you think is overhyped for contact-center AI, and why?
+     - Which recent model or tooling release would you adopt first at Cresta, and how would you evaluate it before adopting it?
+
+### Gap-closing questions for the senior level
+
+106. Cresta moved its production NLP models, including response Suggestions and Smart Compose, to PyTorch on AWS. Have you led a framework or infrastructure migration for a live model? How did you prove parity before you cut over? [Likely] [35]
+     - What did you run in parallel, and for how long?
+107. Smart Compose autocompletes while the agent types. If your project had a per-keystroke latency budget, how did you meet it, and what did you trade away? [Likely] [35]
+108. Which assumption from your design doc turned out to be wrong in production, and how did the architecture absorb it? [Likely]
+109. How did you decide when the project was "good enough" to ship, and who agreed on that threshold? [Likely]
+110. If your system took speech and text as input, how did errors in one modality affect the other, and how did you evaluate them jointly? [Likely] [9][10]
+111. Final team placement at Cresta depends on experience and business needs. Which parts of your project would carry over to a team you did not choose, and what would you need to learn first? [Likely] [8]
+112. How did you document the system so that another engineer could run it on-call without you? [Likely]
+113. What security or tenant-isolation risks did your system have (prompt injection, cross-customer data leakage in retrieval or caches), and how did you test for them? [Likely] [11]
+     - How would those risks change when one model serves many enterprise customers?
+114. If you had half the compute budget, which part of your architecture would you cut or redesign first? [Likely]
+115. What would a staff engineer have done differently on your project, and what stopped you from doing it? [Likely] [8]
+
 ## References
 
 1. Glassdoor, "Cresta (CA) Interview Questions" (includes Senior Machine Learning Engineer loop with vibe-coding and system design rounds; "How would you deploy a model in production?"), 2025-2026. https://www.glassdoor.co.in/Interview/Cresta-CA-Interview-Questions-E3180909.htm
@@ -227,5 +252,8 @@
 30. Cresta on Lever, "Senior Machine Learning Engineer (Chat Agent)". https://jobs.lever.co/cresta/172fe276-9415-4bae-9b0b-af72cf7cf014
 31. Glassdoor, "Cresta (CA) Interview Experience and Questions" (FDE technical screen: RAG and hallucination), 2026. https://www.glassdoor.com/Interview/Cresta-CA-Interview-Questions-E3180909.htm
 32. Cresta Blog, "Cresta Conductor: The Agent for AI Agent Development". https://cresta.com/blog/cresta-conductor-the-agent-for-ai-agent-development
+33. 1point3acres, "Cresta Software Engineer Tech Phone Screen Overview" (search-result snippet: Wikipedia API implementation and discussion of AI trends; candidate passed to VO). https://www.1point3acres.com/interview/thread/1173094
+34. Blind, Cresta search results (search-result snippet: a thread asking about Cresta's FDE 1.5-hour practical, with AI tools allowed). https://www.teamblind.com/search/cresta
+35. AWS Machine Learning Blog, "Evolution of Cresta's Machine Learning Architecture: Migration to AWS and PyTorch". https://aws.amazon.com/blogs/machine-learning/evolution-of-crestas-machine-learning-architecture-migration-to-aws-and-pytorch/
 
 *Removed or changed in review:* the Blind "Cresta AI SWE AMA" thread (chapter 03's review found it no longer supported any question; the customer-facing claim now rests on the FDE thread). The Scoutify guide (a generic template, not candidate reports). Two duplicates were merged: the "offline vs online correlation" question went into "worked offline but failed online" (Q31), and "which part could be reused at Cresta" went into the contact-center transfer question (Q65). Q1 was retagged from "[Reported for SWE]" to "[Reported format for SWE]", because the source reports a project presentation round, not this exact wording. Eight sources already cited elsewhere in this bank (chapters 01-04 and 07) were added as refs 25-32. Their pages were not re-opened in this review.
